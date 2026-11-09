@@ -90,3 +90,12 @@ experimental de build não inclui runtime.py/backup.py; `--check` confirma sua
 reprodutibilidade sem reconstruir imagens.
 
 Não mesclar automaticamente. Nenhum teste no servidor de Paulo foi executado.
+
+## Prioridade posterior ao #360: acesso DSpace — 1.5.190
+
+Branch `feat/dspace-install-reliability`. A investigação com os dados do
+servidor confirmou IP canônico diferente do IP atual e rejeição SSR de
+localhost. Correção transacional de configuração, validação de IP e checagens
+web completas estão descritas em `docs/dspace/PR-acesso-instalacao.pt-BR.md`.
+Conferir CI/mesclagem e aplicação no servidor antes de declarar o caso resolvido
+em uso. Idiomas e as demais etapas seguem pendentes.

@@ -19,6 +19,7 @@ on:
       - 'tools/dspace_upgrade_test.py'
       - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
+      - 'tests/test_dspace_web.py'
       - 'tests/java/NexusSchemaGuardTest.java'
       - 'installer'
       - 'tests/test_dspace_images.py'
@@ -42,6 +43,7 @@ on:
       - 'tools/dspace_upgrade_test.py'
       - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
+      - 'tests/test_dspace_web.py'
       - 'tests/java/NexusSchemaGuardTest.java'
       - 'installer'
       - 'tests/test_dspace_images.py'
@@ -88,6 +90,7 @@ jobs:
       - run: python -m unittest discover -s tests -p test_dspace_runtime.py -v
       - run: python -m unittest discover -s tests -p test_dspace_backup.py -v
       - run: python -m unittest discover -s tests -p test_dspace_operations.py -v
+      - run: sudo $(which python) -m unittest discover -s tests -p test_dspace_web.py -v
       - run: python -m unittest discover -s tests -p test_dspace_browser_support.py -v
       - run: bash -n installer
       - name: Validate runtime shell scripts
@@ -276,6 +279,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq apache2 iptables iproute2 curl python3 gnupg restic rclone
           sudo systemctl start apache2
+      - name: Resolve the canonical disposable repository address
+        run: echo "127.0.0.1 repository.kei.test" | sudo tee -a /etc/hosts
       - name: Actual historical upgrade and rollback
         run: >-
           sudo env RUNNER_TEMP="$RUNNER_TEMP"
@@ -313,6 +318,8 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/dspace-browser"
           "$RUNNER_TEMP/dspace-browser/bin/pip" install 'playwright>=1.56,<2'
           "$RUNNER_TEMP/dspace-browser/bin/python" -m playwright install --with-deps chromium
+      - name: Resolve the canonical disposable repository address
+        run: echo "127.0.0.1 repository.kei.test" | sudo tee -a /etc/hosts
       - name: Real integrated lifecycle (no VM reboot claim)
         run: >-
           sudo env RUNNER_TEMP="$RUNNER_TEMP" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/dspace-browsers"

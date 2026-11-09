@@ -341,6 +341,7 @@ class Operations:
         self.pending()
         Recovery(self.rt).checked()
         url = canonical_url(request['url']); u=urlsplit(url)
+        self.rt.core('address-check',url)
         mode=request.get('mode','apache')
         if mode not in ('apache','external','tunnel','tls'): raise Refused('Unknown publication mode.')
         port=request.get('origin_port',8100)
@@ -381,7 +382,7 @@ class Operations:
         if not self.phrase:raise Refused('The recovery phrase is required to verify the safety backup.')
         recovery=Recovery(self.rt,self.phrase);recovery.recover_capture()
         if self.rt.state().get('url')==plan['url'] and self.rt.state().get('publication',{}).get('mode')==plan['mode']:
-            if plan['mode']!='external':self.rt.core('proxy');self.rt.health()
+            if plan['mode']!='external':self.rt.core('proxy');self.rt.health();self.rt.public_health()
             return dict(plan,changed=False,managed_proxy_checked=plan['mode']!='external')
         package=recovery.capture()['package']
         # Recoverability is proven before any canonical URL or configuration changes.
@@ -402,10 +403,77 @@ class Operations:
             self.commit_config(); self.restart()
             if plan['mode']!='external': self.rt.core('proxy')
             self.rt.mark(proxy_status='external-proxy-required' if plan['mode']=='external' else 'apache-configured')
+            self.rt.public_health()
             saved['phase']='complete'; atomic(self.journal,json.dumps(saved)+'\n')
             return dict(plan,changed=True,safety_backup=package,verified='local API and SSR; external DNS/TLS still requires end-to-end verification')
         except BaseException:
             self.rollback(); raise
+
+    def repair_web(self, request, confirm=False):
+        """Repair the managed web configuration, optionally for this PC only.
+
+        No database/assetstore operation and no image build/migration. Keep a
+        private configuration journal and roll it back if the web checks fail.
+        Public address/publication changes still use the normal address flow.
+        """
+        self.pending()
+        state, compose = Recovery(self.rt).checked(web_repair=True)
+        if state.get('migration') != 'done' or state.get('publication', {}).get('mode', 'apache') != 'apache':
+            raise Refused('Local web repair requires a completed installation with the managed HTTP proxy.')
+        if self.rt.core('publication-plan').strip() == 'external':
+            raise Refused('The web server is external; its configuration was preserved.')
+        local = request.get('local_only', False)
+        if type(local) is not bool:
+            raise Refused('Choose whether access is local to this computer.')
+        old = urlsplit(canonical_url(state['url']))
+        if old.scheme != 'http' or (local and (old.port or 80) in (80,443)):
+            raise Refused('Local repair needs a separate HTTP port; use the address assistant for another publication mode.')
+        url = canonical_url(request.get('url') or ('http://localhost:' + str(old.port) if local else old.geturl()))
+        target = urlsplit(url)
+        if target.scheme != 'http' or target.port != old.port or not (url == old.geturl() or target.hostname == 'localhost' or re.fullmatch(r'[0-9.]+',target.hostname)):
+            raise Refused('Web repair accepts the actual local IPv4 address or localhost on the existing HTTP port. Use the address assistant for domains, TLS or port changes.')
+        self.rt.core('address-check',url)
+        local = target.hostname == 'localhost' or target.hostname.startswith('127.')
+        plan = dict(url=url, previous_url=state['url'], local_only=local,
+                    changes='DSpace UI/API address and owned Apache site; private configuration rollback copy',
+                    data_volumes_preserved=True, database_migration=False,
+                    note='localhost works only on this computer. Other computers require the network/address assistant.' if local else 'The configured public address is preserved.')
+        if not confirm:
+            return plan
+        saved = self.snapshot('repair-web')
+        try:
+            cfg = saved['files']['local.cfg']
+            for key, value in {'dspace.ui.url':url, 'dspace.server.url':url+'/server', 'rest.cors.allowed-origins':url}.items():
+                cfg, count = re.subn(r'(?m)^\s*'+re.escape(key)+r'\s*=.*$', key+' = '+value, cfg)
+                if count != 1:
+                    raise Refused('The web configuration needs manual review: '+key)
+            env = compose['services']['ui']['environment']
+            env.update(DSPACE_UI_BASEURL=url, DSPACE_REST_HOST=urlsplit(url).hostname,
+                       DSPACE_REST_PORT=str(old.port or 80), DSPACE_REST_SSL='false')
+            atomic(self.rt.root/'local.cfg',cfg,0o440,gid=10001)
+            atomic(self.rt.root/'compose.json',json.dumps(compose,indent=2)+'\n')
+            self.rt.mark(url=url)
+            self.commit_config()
+            self.restart()
+            self.rt.core('proxy')
+            self.rt.mark(proxy_status='apache-configured')
+            self.rt.public_health()
+            self.rt.mark(status='installed', phase='ready', intended='running')
+            saved['phase']='complete'; atomic(self.journal,json.dumps(saved)+'\n')
+            return dict(plan, repaired=True)
+        except BaseException:
+            # The original configuration may already be broken. Restore its
+            # bytes/listener even when its health check cannot succeed.
+            for name in ('local.cfg','compose.json'):
+                atomic(self.rt.root/name,saved['files'][name],mode=0o440 if name=='local.cfg' else 0o600,gid=10001 if name=='local.cfg' else None)
+            atomic(self.rt.root/'state.json',json.dumps(saved['state'])+'\n')
+            try:
+                self.rt.compose('up','-d','--pull','never','--force-recreate','backend','ui',timeout=420)
+                self.rt.core('proxy')
+                saved['phase']='rolled-back'; atomic(self.journal,json.dumps(saved)+'\n')
+            except BaseException:
+                raise Refused('Web repair failed and automatic configuration recovery is incomplete. Data volumes were preserved; inspect the private operation journal and resume rollback.') from None
+            raise
 
     def upgrade(self, request, confirm=False):
         self.pending()
@@ -505,10 +573,10 @@ class Operations:
         if action=='plan-run':
             if not confirm:raise Refused('Explicit --confirm is required to run a backup.')
             return self.run_plan(request['id'])
-        if action in ('address','upgrade','remove','rollback'):
+        if action in ('address','upgrade','remove','rollback','repair-web'):
             with self.rt.lock(allow_pending=action in ('rollback','remove')):
                 if action=='rollback':
                     if not confirm:raise Refused('Explicit confirmation is required for rollback.')
                     return self.rollback()
-                return getattr(self,action)(request,confirm)
+                return getattr(self,action.replace('-','_'))(request,confirm)
         raise Refused('Unknown DSpace operation.')

@@ -2703,6 +2703,19 @@
    "overview": [
     "Escolha Tainacan ou DSpace e revise o plano de remoção. Os dados são mantidos por padrão; apagá-los exige confirmação separada. A remoção do Koha nativo ainda não é oferecida aqui."
    ]
+  },
+  "dspace-repair-web": {
+   "summary": "Corrige o acesso web sem reinstalar o DSpace. Escolha localhost neste computador, o IPv4 atual com a mesma porta ou mantenha o endereço. Confira o plano e confirme.",
+   "related": [
+    "dspace-diagnose",
+    "dspace-address",
+    "dspace-logs"
+   ],
+   "_en": "b1615bdc8e",
+   "steps": [
+    "Confere se o IP pertence ao servidor ou à configuração de rede do Windows. Salva a configuração privada para desfazer e verifica API, configuração do navegador e login.",
+    "Preserva banco, arquivos, imagens, credenciais e agendamentos. Domínios, HTTPS e mudanças de porta continuam no assistente de endereços."
+   ]
   }
  }
 }

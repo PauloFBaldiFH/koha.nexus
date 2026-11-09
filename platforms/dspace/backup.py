@@ -121,9 +121,10 @@ class Recovery:
         return command(['bash', self.rt.driver, '--task', 'dspace-backup-crypto', operation, *arguments],
                        timeout=21600, env=env)
 
-    def checked(self):
+    def checked(self, web_repair=False):
         state = self.rt.state()
-        if state.get('phase') != 'ready' or state.get('migration') != 'done':
+        phases = ('ready', 'application', 'proxy') if web_repair else ('ready',)
+        if state.get('phase') not in phases or state.get('migration') != 'done':
             raise Error('DSpace must have completed installation before recovery operations.')
         if state.get('release_sha256') != self.rt.release_hash:
             raise Error('Backup requires the same reviewed release.')

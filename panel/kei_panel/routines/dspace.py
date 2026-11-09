@@ -69,7 +69,16 @@ async def install(app):
     current = await call(app, 'status')
     if current is None:
         return
-    url = current.get('url') or await app.push_screen_wait(InputScreen(
+    url = current.get('url')
+    if not url and deps.get('platform') in ('wsl1', 'wsl2'):
+        access = await app.push_screen_wait(ChoiceScreen(TITLE,
+            t('Where will you open DSpace? On Windows/WSL, localhost avoids depending on LAN forwarding. Network access needs the real Windows IP and its network setup.'),
+            [('local', t('This computer only (localhost)')), ('network', t('Other computers or an institutional domain'))]))
+        if access is None:
+            return
+        if access == 'local':
+            url = 'http://localhost:8100'
+    url = url or await app.push_screen_wait(InputScreen(
         TITLE, t('Use this server’s IP and a separate port (for example http://192.168.1.20:8100), or a DNS name already pointing here. Address and HTTPS assistance remains available after installation.'),
         t('Repository address:'), validate=lambda v: '' if origin(v) else t('Enter one HTTP(S) address without credentials or a path.')))
     if not url:
@@ -91,7 +100,7 @@ async def install(app):
         app.check_platforms()
         if isinstance(result.get('note'), str) and result['note']:
             await app.push_screen_wait(MessageScreen(TITLE, t(result['note'])))
-        await app.push_screen_wait(MessageScreen(TITLE, t("DSpace is installed. Administrative access, addresses and backups are available in the menus.")))
+        await app.push_screen_wait(MessageScreen(TITLE, t("DSpace is installed. Administrative access, addresses and backups are available in the menus.") + '\n\n' + origin(result.get('url', url)) + '/login'))
 
 
 async def control(app, start):
@@ -136,6 +145,33 @@ async def logs(app):
     data = await call(app, 'logs')
     if data is not None:
         await app.push_screen_wait(MessageScreen(t('DSpace logs'), data.get('logs', '')))
+
+
+async def repair_web(app):
+    choice = await app.push_screen_wait(ChoiceScreen(TITLE,
+        t('Repair web access without reinstalling DSpace or changing repository data. Local access uses localhost on this computer; network publication remains in the address assistant.'),
+        [('local', t('Use localhost on this computer')), ('network', t('Use the actual local network IPv4 address')), ('keep', t('Keep the current address and repair its proxy'))]))
+    if choice is None:
+        return
+    request = {'local_only': choice == 'local'}
+    if choice == 'network':
+        url = await app.push_screen_wait(InputScreen(TITLE,
+            t('Enter the current address shown by ip -br -4 addr, with the existing DSpace port. Example addresses are not real server addresses.'),
+            t('Repository address:'), validate=lambda v: '' if origin(v) else t('Enter one HTTP(S) address without credentials or a path.')))
+        if not url:
+            return
+        request['url'] = url
+    env = {'KEI_DSPACE_OPERATIONS_DATA': json.dumps(request)}
+    plan = await call(app, 'operations', 'repair-web', env=env)
+    if plan is None:
+        return
+    if not await app.push_screen_wait(ConfirmScreen(TITLE,
+            t('Review web repair. Configuration is saved for rollback; database, files, images and schedules are preserved.') + '\n\n' + json.dumps(plan, ensure_ascii=False, indent=2))):
+        return
+    result = await call(app, 'operations', 'repair-web', '--confirm', env=env, cancellable=False)
+    if result is not None:
+        app.check_platforms()
+        await app.push_screen_wait(MessageScreen(TITLE, t('Web access repaired. Open the address shown in the dashboard.') + '\n\n' + origin(result.get('url', plan.get('url', ''))) + '/login'))
 
 
 async def admin(app):

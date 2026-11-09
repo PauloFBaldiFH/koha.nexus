@@ -267,6 +267,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("dspace-maintenance", "🩺  DSpace diagnosis & maintenance", "🩺  DSpace diagnosis & maintenance", entries=(
         Entry("🩺  DSpace diagnosis", "dspace-diagnose", kind="native"),
         Entry("📜  DSpace logs", "dspace-logs", kind="native"),
+        Entry("🔧  Repair DSpace web access", "dspace-repair-web", kind="native"),
         Entry("▶  Start DSpace", "dspace-start", kind="native"),
         Entry("⏹  Stop DSpace", "dspace-stop", kind="native"),
         Entry("📖  DSpace first steps", "dspace-help", kind="native"),
@@ -378,7 +379,7 @@ def section(section_id: str) -> Section:
 # installer tasks (--task), none is a classic --run routine. The task a card
 # needs from the installer in use, or its card is not drawn.
 PLATFORM_TASKS: dict[str, str] = {
-    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace", "dspace-backup-create", "dspace-backup-test", "dspace-backup-restore", "dspace-backup-key", "dspace-plan", "dspace-plan-run", "dspace-address", "dspace-upgrade", "dspace-remove")},
+    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace", "dspace-backup-create", "dspace-backup-test", "dspace-backup-restore", "dspace-backup-key", "dspace-plan", "dspace-plan-run", "dspace-address", "dspace-upgrade", "dspace-remove", "dspace-repair-web")},
     "docker-install": "docker-plan", "docker-remove": "docker-remove",
     "tainacan-install": "tainacan-plan", "tainacan-status": "tainacan-status", "tainacan-logs": "tainacan-logs",
     "tainacan-credentials": "tainacan-credentials", "tainacan-uninstall": "tainacan-uninstall",
@@ -460,6 +461,7 @@ DESCRIPTIONS: dict[str, str] = {
     "dspace-start": "Starts the existing DSpace services without reinstalling, restoring or changing the approved migration history.",
     "dspace-stop": "Stops the repository gracefully, retaining configuration and every data volume.",
     "dspace-diagnose": "Explicitly checks PostgreSQL, all seven Solr cores, API, interface and isolation; process state alone does not establish health.",
+    "dspace-repair-web": "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.",
     "dspace-logs": "Shows bounded container logs with sensitive fields redacted. It never exports private configuration or the database password.",
     "dspace-admin": "Creates an administrator with an e-mail, chosen password and language, or resets an existing administrator. Creating refuses an e-mail already used by any account.",
     "setup-dspace": "Offers administrator setup now or later and keeps a reminder for subsequent stages. The permanent menus remain available.",

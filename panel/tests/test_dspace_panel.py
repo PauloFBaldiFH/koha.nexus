@@ -323,3 +323,32 @@ def test_all_three_platforms_remain_reachable_in_the_shared_backup_selector(monk
             await pilot.click('#scope-all')
             await ready(lambda: view.scope=='all' and app.backup_scope=='all')
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize('answer',[None,False])
+def test_web_repair_cancel_never_changes_configuration(monkeypatch,answer):
+    calls=mock_calls(monkeypatch,{'operations':{'url':'http://localhost:8100'}})
+    app=App([None] if answer is None else ['local',False])
+    asyncio.run(dspace.repair_web(app))
+    assert not any('--confirm' in c[1] for c in calls)
+
+
+def test_web_repair_uses_the_chosen_actual_network_ip_and_explicit_confirmation(monkeypatch):
+    actual='http://192.168.100.56:8100'
+    calls=mock_calls(monkeypatch,{'operations':{'url':actual}})
+    app=App(['network',actual,True]);app.check_platforms=lambda:None
+    asyncio.run(dspace.repair_web(app))
+    assert [c[1] for c in calls]==[('operations','repair-web'),('operations','repair-web','--confirm')]
+    assert all(json.loads(c[2]['env']['KEI_DSPACE_OPERATIONS_DATA'])=={'local_only':False,'url':actual} for c in calls)
+    assert actual+'/login' in app.screens[-1]._body
+
+
+def test_wsl_install_can_choose_localhost_without_copying_an_example_ip(monkeypatch):
+    calls=mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'platform':'wsl2'},'status':{'status':'absent'},'plan':{'url':'http://localhost:8100'}})
+    app=App(['local',False])
+    async def status():return {'docker':{'installed':True}}
+    app.bridge=SimpleNamespace(status=status)
+    asyncio.run(dspace.install(app))
+    assert any(c[1]==('plan','--url','http://localhost:8100') for c in calls)
+    assert not any(isinstance(s,InputScreen) for s in app.screens)
+    assert not any(c[1][0]=='install' for c in calls)

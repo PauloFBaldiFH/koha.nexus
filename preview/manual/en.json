@@ -3144,6 +3144,18 @@
    "overview": [
     "Choose Tainacan or DSpace, then review the driver removal plan. Data are kept by default; erasing requires separate confirmation. Native Koha removal is not yet offered here."
    ]
+  },
+  "dspace-repair-web": {
+   "summary": "Repairs web access without reinstalling DSpace. Choose localhost for this computer, the actual local IPv4 on the existing port, or keep the current address. Review the plan and confirm.",
+   "related": [
+    "dspace-diagnose",
+    "dspace-address",
+    "dspace-logs"
+   ],
+   "steps": [
+    "Validates that a literal IP belongs to the server or the Windows network configuration. Saves private configuration for rollback and verifies API, browser configuration and login.",
+    "Database, files, images, credentials and schedules are preserved. Domains, HTTPS and port changes continue through the address assistant."
+   ]
   }
  }
 }

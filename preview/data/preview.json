@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.189",
+ "panel_version": "1.5.190",
  "languages": [
   {
    "code": "en",
@@ -752,6 +752,7 @@
    "entries": [
     "dspace-diagnose",
     "dspace-logs",
+    "dspace-repair-web",
     "dspace-start",
     "dspace-stop",
     "dspace-help"
@@ -1859,6 +1860,16 @@
    "label": "🏛  DSpace (repository)",
    "description": "",
    "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "dspace-repair-web": {
+   "id": "dspace-repair-web",
+   "type": "entry",
+   "section": "dspace-maintenance",
+   "label": "🔧  Repair DSpace web access",
+   "description": "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.",
+   "kind": "native",
    "status": "available",
    "media": []
   },
@@ -8155,6 +8166,56 @@
   "🩺  DSpace diagnosis & maintenance": {
    "en": "🩺  DSpace diagnosis & maintenance",
    "pt-BR": "🩺  Diagnóstico e manutenção do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🔧  Repair DSpace web access": {
+   "en": "🔧  Repair DSpace web access",
+   "pt-BR": "🔧  Corrigir acesso web do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.": {
+   "en": "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.",
+   "pt-BR": "Corrige o endereço da interface/API e o proxy gerenciado, com cópia privada da configuração para desfazer. Não migra o banco, troca imagens nem apaga dados.",
    "es": null,
    "fr": null,
    "it": null,
@@ -19969,6 +20030,27 @@
     "summary": "Instalação experimental do DSpace, acesso administrativo e manutenção. Exige catálogo revisado de imagens imutáveis; backups e domínios chegam nas próximas etapas."
    }
   },
+  "dspace-repair-web": {
+   "en": {
+    "summary": "Repairs web access without reinstalling DSpace. Choose localhost for this computer, the actual local IPv4 on the existing port, or keep the current address. Review the plan and confirm.",
+    "steps": [
+     "Validates that a literal IP belongs to the server or the Windows network configuration. Saves private configuration for rollback and verifies API, browser configuration and login.",
+     "Database, files, images, credentials and schedules are preserved. Domains, HTTPS and port changes continue through the address assistant."
+    ],
+    "related": [
+     "dspace-diagnose",
+     "dspace-address",
+     "dspace-logs"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Corrige o acesso web sem reinstalar o DSpace. Escolha localhost neste computador, o IPv4 atual com a mesma porta ou mantenha o endereço. Confira o plano e confirme.",
+    "steps": [
+     "Confere se o IP pertence ao servidor ou à configuração de rede do Windows. Salva a configuração privada para desfazer e verifica API, configuração do navegador e login.",
+     "Preserva banco, arquivos, imagens, credenciais e agendamentos. Domínios, HTTPS e mudanças de porta continuam no assistente de endereços."
+    ]
+   }
+  },
   "dspace-stop": {
    "en": {
     "summary": "Stops the repository gracefully, retaining configuration and every data volume.",
@@ -23493,165 +23575,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 175,
-   "manual_total": 175,
+   "manual": 176,
+   "manual_total": 176,
    "manual_outdated": [],
-   "strings": 525,
-   "strings_total": 525
+   "strings": 527,
+   "strings_total": 527
   },
   "pt-BR": {
-   "manual": 175,
-   "manual_total": 175,
+   "manual": 176,
+   "manual_total": 176,
    "manual_outdated": [],
-   "strings": 519,
-   "strings_total": 525
+   "strings": 521,
+   "strings_total": 527
   },
   "es": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 525
+   "strings_total": 527
   },
   "fr": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 525
+   "strings_total": 527
   },
   "it": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 525
+   "strings_total": 527
   },
   "de": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 525
+   "strings_total": 527
   },
   "nl": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "sv": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "pl": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "cs": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "ru": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "uk": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "tr": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "tl": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "id": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "ar": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "fa": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "hi": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "bn": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "vi": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "zh": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "ja": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   },
   "ko": {
    "manual": 0,
-   "manual_total": 175,
+   "manual_total": 176,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 525
+   "strings_total": 527
   }
  }
 }

@@ -84,6 +84,11 @@ class LabRuntime(ds.Runtime):
         if self.failure == 'health':
             raise ds.Refused('API not ready')
 
+    def public_health(self):
+        if self.failure == 'public-health':
+            raise ds.Refused('Public login is unavailable')
+        return {'status': 'verified-local-proxy'}
+
 
 class RuntimeTests(unittest.TestCase):
     def setUp(self):
@@ -345,15 +350,19 @@ class RuntimeTests(unittest.TestCase):
         requests = []
         def response(request, **kwargs):
             requests.append(request)
-            body = b'<ds-app>DSpace</ds-app>' if request.full_url.endswith('/') else json.dumps(
-                {'dspaceVersion': 'DSpace 10.1', '_links': {'communities': {'href': 'http://backend:8080/server/api/core/communities'}}}).encode()
+            path = ds.urlsplit(request.full_url).path
+            if path == '/': body = b'<ds-app>DSpace</ds-app>'
+            elif path == '/login': body = b'<input type="password">'
+            elif path == '/assets/config.json': body = json.dumps({'ui': {'baseUrl': 'https://repository.example.org'}, 'rest': {'baseUrl': 'https://repository.example.org/server'}}).encode()
+            elif path == '/server/api/authn/status': body = b'{"okay":true,"authenticated":false}'
+            else: body = json.dumps({'dspaceVersion': 'DSpace 10.1', 'dspaceUI': 'https://repository.example.org', 'dspaceServer': 'https://repository.example.org/server', '_links': {'communities': {'href': 'https://repository.example.org/server/api/core/communities'}}}).encode()
             return io.BytesIO(body)
         # RootRestResourceControllerIT in the pinned upstream checks _links.communities.
         # A stale/invented contract must fail immediately, not poll for ten minutes.
         with patch.object(ds.HTTP, 'open', side_effect=response), \
                 patch.object(ds.time, 'sleep', side_effect=AssertionError('Known upstream Root contract was rejected')):
             rt.health()
-        self.assertEqual(len(requests), 2)
+        self.assertEqual(len(requests), 6)
         self.assertEqual(requests[0].get_header('Accept'), 'application/hal+json')
         self.assertTrue(all(r.get_header('Host') == 'repository.example.org' for r in requests))
         self.assertTrue(all(r.get_header('X-forwarded-proto') == 'https' for r in requests))

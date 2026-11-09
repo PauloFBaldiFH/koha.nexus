@@ -140,7 +140,7 @@ class AddressTransaction(unittest.TestCase):
         for name,text in [('local.cfg',self.cfg),('db-password','not-exported'),('compose.json',json.dumps(compose))]:runtime.atomic(self.root/name,text)
         runtime.atomic(self.root/'state.json',json.dumps(dict(phase='ready',migration='done',prepared=True,url='http://repo.test:8100',ports={'backend':18101,'ui':18100},release_sha256=self.rt.release_hash,files={n:runtime.digest(self.root/n) for n in ('local.cfg','db-password','compose.json')})))
         self.rt.existing_resources=Mock();self.rt.core=Mock(return_value='apache-nexus')
-        self.rt.compose=Mock();self.rt.dependencies=Mock();self.rt.health=Mock()
+        self.rt.compose=Mock();self.rt.dependencies=Mock();self.rt.health=Mock();self.rt.public_health=Mock()
         self.op=ops.Operations(self.rt,'test-only phrase')
         # UID/GID mechanics are exercised on the root CI runner; this test runs unprivileged.
         self.atomic_patch=patch.object(ops,'atomic',side_effect=lambda p,text,mode=0o600,gid=None:runtime.atomic(p,text,mode))
@@ -153,6 +153,15 @@ class AddressTransaction(unittest.TestCase):
         self.assertEqual(json.loads((self.root/'compose.json').read_text())['volumes']['assetstore']['name'],'original-owned-assets')
         self.assertEqual(json.loads(self.op.journal.read_text())['phase'],'complete')
         self.assertEqual(self.rt.state()['files']['local.cfg'],runtime.digest(self.root/'local.cfg'))
+        self.rt.public_health.assert_called_once()
+    def test_failed_public_access_rolls_back_address_and_private_configuration(self):
+        self.rt.public_health.side_effect=runtime.Refused('Canonical address unreachable')
+        before={name:(self.root/name).read_bytes() for name in ('local.cfg','compose.json','db-password')}
+        with self.assertRaisesRegex(runtime.Refused,'Canonical address unreachable'):
+            self.op.address({'url':'http://repo.test:8101'},True)
+        self.assertEqual(before,{name:(self.root/name).read_bytes() for name in before})
+        self.assertEqual(self.rt.state()['url'],'http://repo.test:8100')
+        self.assertEqual(json.loads(self.op.journal.read_text())['phase'],'rolled-back')
     def test_failed_health_check_rolls_back_actual_files_before_reporting_failure(self):
         self.rt.health.side_effect=[runtime.Refused('Injected failed health'),None]
         with self.assertRaises(runtime.Refused):self.op.address({'url':'http://repo.test:8101'},True)

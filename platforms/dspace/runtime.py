@@ -92,6 +92,8 @@ def atomic(path, data, mode=0o600, gid=None):
 def canonical_url(value):
     """One origin only: no credentials, paths, controls or Apache interpolation."""
     try:
+        if not isinstance(value, str):
+            raise ValueError()
         u = urlsplit(value)
         host = u.hostname or ''
         port = u.port if u.port is not None else (443 if u.scheme == 'https' else 80)
@@ -445,6 +447,8 @@ class Runtime:
         # Polls fail while a service is still starting; only the last failure
         # of a wait that runs out is kept, so a stale "no response" from the
         # first poll never shows as the installer error of a ready install.
+        if self.progress:
+            self.progress('Checking ' + label)
         deadline = time.monotonic() + seconds
         last = None
         while time.monotonic() < deadline:
@@ -456,7 +460,8 @@ class Runtime:
             time.sleep(3)
         if isinstance(last, OperationFailed):
             self.save_error(last)
-        raise Refused(label + ' did not become ready. Data were kept; inspect the diagnostic before resuming.')
+        detail = ' ' + str(last) if type(last) is Refused else ''
+        raise Refused(label + ' did not become ready. Data were kept; inspect the diagnostic before resuming.' + detail)
 
     def dependencies(self):
         self.wait('PostgreSQL', lambda: self.compose('exec', '-T', 'postgres', 'pg_isready', '-U', 'dspace', '-d', 'dspace',
@@ -473,11 +478,62 @@ class Runtime:
         origin = urlsplit(canonical_url(self.state()['url']))
         return Request('http://127.0.0.1:%s%s' % (port, path),
                        headers={'Accept': 'application/hal+json' if path.startswith('/server/api') else 'text/html',
-                                'Host': origin.netloc, 'X-Forwarded-Proto': origin.scheme})
+                                'Host': origin.netloc, 'Origin': origin.geturl(),
+                                'X-Forwarded-Proto': origin.scheme})
 
     def http_json(self, path, port):
-        with HTTP.open(self.probe(path, port), timeout=15) as stream:
-            return json.load(stream)
+        try:
+            with HTTP.open(self.probe(path, port), timeout=15) as stream:
+                return json.load(stream)
+        except (OSError, ValueError) as error:
+            raise Refused('DSpace HTTP/JSON check failed at ' + path +
+                          (' (HTTP %s)' % error.code if hasattr(error, 'code') else '')) from None
+
+    def web_checks(self, api_port, ui_port):
+        """Check the browser's configuration and login, not just a 200 HTML shell."""
+        origin = canonical_url(self.state()['url'])
+        doc = self.http_json('/server/api', api_port)
+        if (doc.get('dspaceUI') != origin or doc.get('dspaceServer') != origin + '/server' or
+                not doc.get('_links', {}).get('communities', {}).get('href', '').startswith(origin + '/server/')):
+            raise Refused('The REST API advertises a different public address. Review the DSpace address configuration.')
+        auth = self.http_json('/server/api/authn/status', api_port)
+        if auth.get('okay') is not True or auth.get('authenticated') is not False:
+            raise Refused('Anonymous authentication status is invalid; the login service is unavailable.')
+        config = self.http_json('/assets/config.json', ui_port)
+        if config.get('ui', {}).get('baseUrl') != origin or config.get('rest', {}).get('baseUrl') != origin + '/server':
+            raise Refused('The browser configuration points to a different UI/API address. Review DSpace configuration before restarting.')
+        with HTTP.open(self.probe('/login', ui_port), timeout=30) as response:
+            page = response.read(4 * 1024 * 1024).decode('utf8', errors='replace')
+        if not re.search(r'<input\b[^>]*\btype=["\']password["\']', page, re.I):
+            raise Refused('The login page did not render its password form. Inspect the UI/API logs; an HTTP 200 page alone is not a successful installation.')
+        return {'api': 'ok', 'authentication': 'ok', 'browser_configuration': 'ok', 'login_form': 'ok'}
+
+    def public_health(self):
+        state = self.state()
+        if state.get('proxy_status') in ('external-configuration-required', 'external-proxy-required'):
+            return {'status': 'external-configuration-required'}
+        origin = urlsplit(canonical_url(state['url']))
+        publication = state.get('publication') or {}
+        # Connect only to the owned local listener; never follow arbitrary public
+        # DNS/redirects while running privileged diagnostics.
+        port = int(publication.get('origin_port')) if publication.get('mode') == 'tunnel' else origin.port or (443 if origin.scheme == 'https' else 80)
+        if origin.scheme == 'https' and publication.get('mode') != 'tunnel':
+            return {'status': 'external-tls-check-required'}
+        try:
+            checks = self.web_checks(port, port)
+        except (OSError, ValueError):
+            raise Refused('The managed proxy did not serve the expected DSpace API/configuration/login. Inspect its routes and the UI/API logs.') from None
+        if publication.get('mode') != 'tunnel':
+            try:
+                request = Request(origin.geturl() + '/server/api/authn/status',
+                                  headers={'Accept': 'application/hal+json', 'Origin': origin.geturl()})
+                with HTTP.open(request, timeout=8) as response:
+                    auth = json.load(response)
+                if auth.get('okay') is not True or auth.get('authenticated') is not False:
+                    raise ValueError()
+            except (OSError, ValueError) as error:
+                raise Refused('The configured browser address ' + origin.geturl() + ' does not reach the authentication API from this server. Internal container checks passed, but public access did not. On Windows/WSL check forwarding/firewall and the actual host IP, or use the local web repair for localhost access.') from None
+        return dict(checks, status='verified-local-proxy', url=origin.geturl())
 
     def health(self):
         state = self.state()
@@ -494,6 +550,7 @@ class Runtime:
                 page = response.read(4 * 1024 * 1024).decode('utf8', errors='replace')
             return '<ds-app' in page and 'DSpace' in page
         self.wait('DSpace production interface', ui, 300)
+        self.wait('DSpace browser configuration and login', lambda: self.web_checks(ports['backend'], ports['ui']), 120)
 
     def install(self, url=None, retry_migration=False):
         # Preflight first: a missing catalog never creates even the platform directory.
@@ -564,6 +621,8 @@ class Runtime:
                 if proxy not in ('external', 'apache-configured'):
                     raise Refused('The proxy driver returned an unknown result; public access was not assumed.')
                 publication = 'external-configuration-required' if proxy == 'external' else 'apache-configured'
+                self.mark(proxy_status=publication)
+                self.public_health()
                 self.mark(status='installed', phase='ready', intended='running', proxy_status=publication)
                 result = {'status': 'installed', 'url': plan['url'], 'experimental': True, 'proxy_status': publication}
                 if proxy == 'external':
@@ -595,6 +654,7 @@ class Runtime:
                 try:
                     self.health()
                     self.core('audit')
+                    self.public_health()
                 except BaseException:
                     self.mark(status='degraded', intended='running')
                     raise
@@ -646,7 +706,12 @@ class Runtime:
                 self.health()
                 self.core('audit')
                 result['health'] = 'api-ui-dependencies'
+                result['public_access'] = 'checking'
+                result['web'] = self.public_health()
+                result['public_access'] = result['web']['status']
             except Refused as error:
+                if result['public_access'] == 'checking':
+                    result['public_access'] = 'failed'
                 result['health'] = 'failed'
                 result['reason'] = str(error)
         # Never output docker inspect/config, command output, local.cfg, password or environment.
@@ -788,6 +853,8 @@ class Runtime:
             tls = '  SSLEngine on\n  SSLCertificateFile %s\n  SSLCertificateKeyFile %s\n' % (publication['certificate'],publication['key'])
         return (listen + '<VirtualHost %s:%s>\n' % (bind,port) + tls +
                 '  ServerName %s\n  ProxyRequests Off\n  ProxyPreserveHost On\n' % u.hostname +
+                '  RewriteEngine On\n  RewriteCond %%{HTTP_HOST} !^%s$ [NC]\n' % re.escape(u.netloc) +
+                '  RewriteRule ^ %s%%{REQUEST_URI} [R=307,L,NE]\n' % u.geturl() +
                 '  RequestHeader unset Forwarded\n  RequestHeader unset X-Forwarded-For\n' +
                 '  RequestHeader unset X-Forwarded-Host\n  RequestHeader unset X-Forwarded-Port\n' +
                 '  RequestHeader set X-Forwarded-Proto "%s"\n' % u.scheme +
@@ -837,7 +904,7 @@ def main():
         child.add_argument('--confirm', action='store_true')
     sub.add_parser('backup-list')
     ops = sub.add_parser('operations')
-    ops.add_argument('action', choices=('plans','plan-save','plan-disable','plan-run','address','upgrade','remove','rollback'))
+    ops.add_argument('action', choices=('plans','plan-save','plan-disable','plan-run','address','upgrade','remove','rollback','repair-web'))
     ops.add_argument('--confirm', action='store_true')
     args = parser.parse_args()
     # The bridge's one-task environment carries the password only into Python.
