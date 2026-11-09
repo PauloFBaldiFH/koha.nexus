@@ -1,34 +1,24 @@
-"""SchedulesView: every scheduled job of this server in one list (Paulo,
-2026-11-06), in the main menu (key s).
+"""Unified schedules with explicit per-row save and existing backend writers.
 
-  ⏰ Schedules                                         [Refresh]
-  Platform: [All ▾]   Type: [All ▾]
-  Times in America/Sao_Paulo (the server's time zone).
-  [✏ Koha's scheduled jobs]  [⏰ Schedule backups (Tainacan)]   the editors
-  ● Koha · Database backup (compressed SQL)
-    Daily at 23:00 · next 2026-11-06 23:00
-    Last run: 2026-11-05 23:00 · OK
-    Changed in: Schedules & cron tasks
-  ...
-  ℹ Tainacan · WP-Cron (WordPress's own scheduler)
-    Runs when the site gets visits: it is not a server schedule
-
-It only reads (schedules.py). Each row says where it is changed: the
-editor of koha_tasks (views/crons.py), "Schedule backups" for the
-platforms, or the screen of the job the installer keeps in its own file.
-The Koha group opens it already filtered on Koha (menus.Entry.scope).
+Known Koha jobs support recurrence editing. Tainacan's backup group and
+explicit DSpace/set plans expose their supported daily schedule. Manual,
+package and linked maintenance rows remain read-only. Filtering preserves
+unsaved drafts; opening the screen never writes a schedule.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import asyncio
 
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Label, Select, Static
+from textual.widgets import Button, Input, Label, Select, Static, Switch
 
-from .. import cloud, platforms, schedules
+from .. import cloud, cron, platforms, schedules
+from ..schedule_controls import controls, EditError
+from ..screens.dialogs import ConfirmScreen
 from ..i18n import t
 from .base import SectionView
 
@@ -49,7 +39,7 @@ def row_text(row: schedules.Row) -> Text:
         text.append(" · " + (t("next ${when}", when=row.next) if row.state == "on" else t("Switched off")), style="dim")
         text.append(f"\n  {t('Last run')}: ", style="dim")
         text.append(row.last, style=LAST.get(row.last_state, "dim"))
-    text.append(f"\n  {t('Changed in')}: ", style="dim")
+    text.append(f"\n  {t('Original editor')}: ", style="dim")
     text.append(row.editor)
     for other in row.also:
         text.append("\n  ⚠ " + t("Also scheduled in ${where}: it runs twice", where=other), style="yellow")
@@ -63,12 +53,20 @@ class SchedulesView(SectionView):
         self.kind = ""
         self.rows: list[schedules.Row] = []
         self.loaded = False
+        self.controls = {}
+        self.drafts = {}
+        self.tainacan_settings = None
+        self.joint_settings = None
+        self.operation_plans = []
+        self.saving = False
+        self.loading = False
+        self._render_lock = None
         self.ready = False          # the rows were read at least once
 
     def compose(self) -> ComposeResult:
         yield from self.heading()
-        yield Static(t("Everything this server runs by itself, from every file that holds a schedule. Nothing "
-                       "is changed here: each row says where it is changed."), classes="view-prompt", markup=False)
+        yield Static(t("Turn managed jobs on or off, choose their frequency and time, then Save. "
+                       "Changes are reviewed before applying. Manual and package jobs are read-only."), classes="view-prompt", markup=False)
         with Horizontal(id="sc-filters"):
             yield Label(t("Platform:"), classes="form-label")
             yield Select([(t("All"), "")], value="", allow_blank=False, id="sc-platform")
@@ -77,9 +75,10 @@ class SchedulesView(SectionView):
                          allow_blank=False, id="sc-kind")
             yield Button(t("Refresh"), id="sc-refresh", classes="small")
         yield Static("", id="sc-tz", classes="view-prompt", markup=False)
-        yield from self.cards()
         yield Label(t("Scheduled jobs"), classes="view-prompt zone-title")
         yield Vertical(id="sc-rows")
+        yield Label(t("Other editors"), classes="view-prompt zone-title")
+        yield from self.cards()
 
     def on_mount(self) -> None:
         self._platform_choices()
@@ -90,8 +89,9 @@ class SchedulesView(SectionView):
             self.refresh_data()
 
     def refresh_data(self) -> None:
+        self._remember()
         self._platform_choices()
-        self.run_worker(self._load, exclusive=True, group="schedules", exit_on_error=False)
+        self.run_worker(self._load, exclusive=False, group="schedules", exit_on_error=False)
 
     # --- filters ----------------------------------------------------------
     def _platform_choices(self) -> None:
@@ -111,7 +111,10 @@ class SchedulesView(SectionView):
 
     def on_select_changed(self, event: Select.Changed) -> None:
         value = event.value if isinstance(event.value, str) else ""
-        if event.select.id == "sc-platform":
+        if event.select.id and event.select.id.startswith("sc-freq-"):
+            event.stop()
+            self._fields(int(event.select.id.removeprefix("sc-freq-")))
+        elif event.select.id == "sc-platform":
             event.stop()
             if value != self.platform:
                 self.platform = value
@@ -123,12 +126,25 @@ class SchedulesView(SectionView):
                 self._draw()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "sc-refresh":
+        bid = event.button.id or ""
+        if bid.startswith("sc-save-"):
+            event.stop()
+            self.app.run_worker(self._save(int(bid.removeprefix("sc-save-")), getattr(event.button, "schedule_control", None)), group="routine", exclusive=True, exit_on_error=False)
+        elif bid == "sc-refresh":
             event.stop()
             self.refresh_data()
 
     # --- loading ----------------------------------------------------------
     async def _load(self) -> None:
+        if self.loading: return
+        self.loading = True
+        self.ready = False
+        try:
+            await self._load_data()
+        finally:
+            self.loading = False
+
+    async def _load_data(self) -> None:
         koha, tainacan = self.app.platform_ready("koha"), self.app.platform_ready("tainacan")
         if self.app.env.demo:
             from ..demo import demo_cron_files
@@ -139,10 +155,12 @@ class SchedulesView(SectionView):
             zone = schedules.server_timezone()
         rows = schedules.collect(files, self.app.env.instance, tainacan)
         last = await self._last_runs(koha, tainacan)
+        self.controls = controls(rows, files, self.app.env.instance, tainacan=self.tainacan_settings,
+                                 joint=self.joint_settings, plans=self.operation_plans)
         schedules.fill_times(rows, dt.datetime.now(), last)
         self.rows = rows
         self.query_one("#sc-tz", Static).update(t("Times in ${zone} (the server's time zone).", zone=zone))
-        self._draw()
+        await self._render_rows()
         self.ready = True
 
     async def _last_runs(self, koha: bool, tainacan: bool) -> dict[str, tuple[str, str]]:
@@ -153,9 +171,14 @@ class SchedulesView(SectionView):
         history: list = []
         tn = None
         joint = ""
+        self.tainacan_settings = None
+        self.joint_settings = None
+        self.operation_plans = []
         if koha and tainacan and bridge.has_task("set-schedule-status"):
             try:
-                joint = (await bridge.task("set-schedule-status")).results.get("last", "")
+                out = await bridge.task("set-schedule-status")
+                self.joint_settings = dict(out.results) if out.ok else None
+                joint = out.results.get("last", "")
             except Exception:  # noqa: BLE001
                 pass
         if koha:
@@ -175,23 +198,148 @@ class SchedulesView(SectionView):
                 if bridge.has_task("platform-backup-status"):
                     out = await bridge.task("platform-backup-status", "tainacan")
                     tn = platforms.backup_from_results(out.results)
+                    if out.ok:
+                        self.tainacan_settings = dict(schedule=tn.schedule, key=tn.key, known=tn.known)
+                    else:
+                        self.tainacan_settings = {"known": False}
             except Exception:  # noqa: BLE001
                 pass
         last = schedules.last_runs(backup, plans, history, tn, joint)
         if self.app.platform_ready("dspace") and bridge.has_task("dspace-panel"):
             try:
                 from ..dspace import payload
-                last.update(schedules.operation_last_runs(payload(await bridge.task("dspace-panel", "operations", "plans"))))
+                out = await bridge.task("dspace-panel", "operations", "plans")
+                if out.ok:
+                    data = payload(out)
+                    self.operation_plans = data.get('plans', [])
+                    last.update(schedules.operation_last_runs(data))
             except Exception:  # noqa: BLE001 - the rows then say "No run recorded"
                 pass
         return last
 
+    def _values(self, i):
+        return dict(enabled=self.query_one(f"#sc-on-{i}", Switch).value,
+                    freq=self.query_one(f"#sc-freq-{i}", Select).value,
+                    day=int(self.query_one(f"#sc-day-{i}", Select).value),
+                    time=self.query_one(f"#sc-time-{i}", Input).value,
+                    raw=self.query_one(f"#sc-raw-{i}", Input).value)
+
+    def _remember(self):
+        if not self.ready: return
+        for i, row in enumerate(self.rows):
+            if id(row) in self.controls and self.query(f"#sc-on-{i}"):
+                key = (row.source, row.key)
+                values = self._values(i)
+                if values != self.controls[id(row)].values():
+                    self.drafts[key] = values
+                else:
+                    self.drafts.pop(key, None)
+
     def _draw(self) -> None:
+        self._remember()
+        self.run_worker(self._render_rows(), group="schedule-render", exclusive=False, exit_on_error=False)
+
+    async def _render_rows(self):
+        # Never cancel an in-flight remove_children: cancellation can also
+        # cancel widget message pumps and leave a terminal filter hanging.
+        if self._render_lock is None:
+            self._render_lock = asyncio.Lock()
+        async with self._render_lock:
+            await self._render_rows_unlocked()
+
+    async def _render_rows_unlocked(self):
         box = self.query_one("#sc-rows", Vertical)
-        box.remove_children()
-        rows = schedules.shown(self.rows, self.platform, self.kind)
-        if not rows:
-            box.mount(Static(t("Nothing is scheduled here.") if not self.rows else
-                             t("Nothing scheduled matches this filter."), classes="sc-row", markup=False))
+        await box.remove_children()
+        shown = schedules.shown(self.rows, self.platform, self.kind)
+        if not shown:
+            await box.mount(Static(t("Nothing is scheduled here.") if not self.rows else
+                                   t("Nothing scheduled matches this filter."), classes="sc-row sc-description", markup=False))
             return
-        box.mount_all(Static(row_text(r), classes=f"sc-row -{r.state}") for r in rows)
+        for i, row in enumerate(self.rows):
+            if row not in shown: continue
+            control = self.controls.get(id(row))
+            block = Vertical(classes=f"sc-row -{row.state}")
+            await box.mount(block)
+            await block.mount(Static(row_text(row), classes="sc-description"))
+            if control is None:
+                reason = ("Linked schedule: change the platform backup schedule above." if row.key in ('tainacan:maintain', 'tainacan:verify')
+                          else "Read-only: managed by its original tool or package.")
+                await block.mount(Label(t(reason), classes="sc-note"))
+                continue
+            values = self.drafts.get((row.source, row.key), control.values())
+            toolbar = Horizontal(classes="sc-controls")
+            await block.mount(toolbar)
+            await toolbar.mount(Switch(values['enabled'], id=f"sc-on-{i}", disabled=not control.available),
+                Select([(t(cron.FREQS[f]), f) for f in control.frequencies], value=values['freq'], allow_blank=False, id=f"sc-freq-{i}"),
+                Select([(str(n), n) for n in range(0,32)], value=values['day'], allow_blank=False, id=f"sc-day-{i}"),
+                Input(values['time'], id=f"sc-time-{i}", placeholder="HH:MM", max_length=5),
+                Input(values['raw'], id=f"sc-raw-{i}", placeholder=t("Cron expression")),
+                Button(t("Save"), id=f"sc-save-{i}", disabled=not control.available))
+            button = toolbar.query_one(f"#sc-save-{i}", Button)
+            button.schedule_control = control
+            button.tooltip = t("Review and save this schedule")
+            self.query_one(f"#sc-on-{i}").tooltip = t("Enabled after saving")
+            self.query_one(f"#sc-freq-{i}").tooltip = t("Frequency")
+            self.query_one(f"#sc-time-{i}").tooltip = t("Server time (HH:MM)")
+            if control.note:
+                await block.mount(Label(t(control.note), classes="sc-note"))
+            if not control.available:
+                await block.mount(Label(t("Read-only: the schedule contains manual changes or its settings could not be read. Use its original editor."), classes="sc-note"))
+            self._fields(i)
+
+    def on_switch_changed(self, event: Switch.Changed):
+        if event.switch.id and event.switch.id.startswith('sc-on-'):
+            event.stop()
+            self._fields(int(event.switch.id.removeprefix('sc-on-')))
+
+    def _fields(self, i):
+        # Initial Select events may arrive before its siblings finish mounting.
+        if not all(self.query(f"#{key}-{i}") for key in ('sc-freq','sc-day','sc-time','sc-raw','sc-on')): return
+        freq = self.query_one(f"#sc-freq-{i}", Select).value
+        enabled = self.query_one(f"#sc-on-{i}", Switch).value and self.controls[id(self.rows[i])].available
+        for key in ('sc-freq','sc-day','sc-time','sc-raw'):
+            self.query_one(f"#{key}-{i}").disabled = not enabled
+        day = self.query_one(f"#sc-day-{i}", Select)
+        current = day.value
+        if freq == 'weekly':
+            day.set_options([(t(name), n) for n,name in enumerate(cron.WEEKDAYS)])
+            day.value = current if isinstance(current,int) and 0 <= current <= 6 else 0
+        elif freq == 'monthly':
+            day.set_options([(t("Day ${n}", n=n), n) for n in range(1,32)])
+            day.value = current if isinstance(current,int) and 1 <= current <= 31 else 1
+        day.display = freq in ('weekly','monthly')
+        self.query_one(f"#sc-time-{i}").display = freq != 'custom'
+        self.query_one(f"#sc-raw-{i}").display = freq == 'custom'
+
+    async def _save(self, i, expected=None):
+        if self.loading or self.saving or not 0 <= i < len(self.rows): return
+        row = self.rows[i]
+        control = self.controls.get(id(row))
+        if control is None or not control.available or (expected is not None and expected is not control): return
+        try:
+            values = control.edited(self._values(i))
+            if control.driver == 'koha': control.koha_text(values)
+        except EditError as error:
+            self.app.notify(t(str(error)), severity='warning')
+            return
+        if values == control.values() and not control.out_of_sync:
+            self.app.notify(t("Nothing changed."))
+            return
+        if values['enabled'] and control.driver == 'tainacan' and not self.tainacan_settings.get('key'):
+            self.app.notify(t("Configure the backup key in the Backup center first."), severity='warning')
+            return
+        self._remember()
+        self.saving = True
+        try:
+            summary = cron.Job('', '', '', freq=values['freq'], day=values['day'], raw=values['raw'])
+            if values['freq'] != 'custom': summary.hour, summary.minute = cron.parse_time(values['time'])
+            description = t("Switched off") if not values['enabled'] else schedules.describe(summary.schedule())
+            if not await self.app.push_screen_wait(ConfirmScreen(t("Schedules"),
+                    t(schedules.PLATFORM_LABELS.get(row.platform, row.platform)) + ' · ' + row.name + '\n' + description + '\n\n' + t(control.note or "Only this task is changed. Other schedules are kept."))):
+                return
+            from ..routines.schedules import apply
+            if await apply(self.app, control, values):
+                self.drafts.pop((row.source,row.key), None)
+                await self._load()
+        finally:
+            self.saving = False

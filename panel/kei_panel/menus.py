@@ -306,8 +306,8 @@ SECTIONS: tuple[Section, ...] = (
         Entry("♻  Assisted restore", "restore-assisted", kind="native"),
         Entry("🔌  Cloud connections", "cloud-connections", kind="native"),
     ), view="backups", key="b"),
-    # Every scheduled job of the server, from every source, read only
-    # (views/schedules.py); the cards are the editors (Paulo, 2026-11-06).
+    # Unified inventory and confirmed edits through the original schedule writers.
+    # Manual/package jobs remain read-only; the original editors stay available.
     Section("schedules", "⏰  Schedules", "⏰ Schedules", entries=(
         Entry("⏰  DSpace and platform-set plans", "dspace-plan", kind="native", requires="dspace"),
         Entry("✏  Koha's scheduled jobs", "crons", kind="view", requires="koha"),

@@ -213,7 +213,8 @@ class CronView(SectionView):
             return
         path = cron.write_temp(text)
         try:
-            result = await run_task(self.app, title, "cron-apply", str(path))
+            from ..schedule_controls import checksum
+            result = await run_task(self.app, title, "cron-apply", str(path), checksum(self.seen))
         finally:
             path.unlink(missing_ok=True)
         await show_done(self.app, title, result)

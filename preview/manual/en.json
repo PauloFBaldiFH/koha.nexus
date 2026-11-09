@@ -2979,12 +2979,13 @@
    ]
   },
   "sec-schedules": {
-   "summary": "Every job this server runs by itself, from every file that holds a schedule, in one list of the main menu (key s): when it runs, its last and next run and where it is changed.",
+   "summary": "Manage scheduled jobs in one center: activation, supported frequency and time, last/next run and original editor.",
    "overview": [
-    "It only reads. The rows come from Koha's jobs (koha_tasks, with the cloud backups and the lines written by hand), the backups of the platforms (Tainacan), the jobs the installer keeps in files of their own (search watchdogs, messaging, the OPAC sitemap, the free address heartbeat, the local AI) and Koha's own package. Each line of these files is one row: nothing is listed twice, and a command scheduled in two lines says it runs twice.",
-    "**Platform** and **Type** filter the list; the **Koha schedules** card of the Koha group opens it already on Koha. The next run is computed from the line in the server's time zone; the last run comes only from a reliable record (the backup logs, the newest Tainacan package, the restore test), otherwise the row says **No run recorded**.",
-    "WP-Cron is WordPress's own scheduler inside Tainacan: it runs when the site gets visits, so it is shown as such and never as a server schedule.",
-    "The cards are the editors: **Koha's scheduled jobs** opens Schedules & cron tasks, and **Schedule backups** sets the Tainacan backups. Rows that the installer keeps say which screen changes them."
+    "Known Koha jobs have a switch, daily/weekly/monthly or supported custom frequency, day and time. Changes remain drafts until Save and confirmation. Other cron lines and manual blocks are preserved.",
+    "Tainacan has one daily backup control linked to weekly maintenance one hour later and a monthly restore test two hours later. Disabling turns off all three; repository and retention remain configured.",
+    "Explicit DSpace and multi-platform backup plans have daily activation/time controls. Editing preserves participants, destination, retention and cloud copy; disabling does not require an available cloud account or backup key. Disabled configured plans remain listed.",
+    "Platform and Type filter the list without losing drafts. Manual, package, WP-Cron and related maintenance rows are read-only; their original tool is identified. Opening or filtering never writes a schedule.",
+    "Save shows the target and change before applying. Concurrent edits or unexpected manual group entries are refused: Refresh and review again. Times follow the server timezone. Last-run data come only from recorded results."
    ],
    "related": [
     "crons",

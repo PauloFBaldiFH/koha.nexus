@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.188"
+PANEL_VERSION=" 1.5.189"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -273,6 +273,29 @@ export KOHA_PANEL_LANG_FULL KOHA_PANEL_LANG SYS_LANG
 declare -A _TRANS_CACHE=()
 
 declare -A _MENU_PT=(
+    ["Other editors"]="Outros editores"
+    ["Configure the backup key in the Backup center first."]="Configure primeiro a chave de backup na Central de backups."
+    ["Cron expression"]="Expressão cron"
+    ["Enabled after saving"]="Ativada após salvar"
+    ["Frequency"]="Frequência"
+    ["Original editor"]="Editor original"
+    ["Read-only: the schedule contains manual changes or its settings could not be read. Use its original editor."]="Somente leitura: há alterações manuais ou não foi possível consultar a configuração. Use o editor original."
+    ["Review and save this schedule"]="Revisar e salvar este agendamento"
+    ["Schedules"]="Agendamentos"
+    ["Server time (HH:MM)"]="Horário do servidor (HH:MM)"
+    ["Turn managed jobs on or off, choose their frequency and time, then Save. Changes are reviewed before applying. Manual and package jobs are read-only."]="Ative ou desative tarefas gerenciadas, escolha frequência e horário e clique em Salvar. As mudanças são revisadas antes de aplicar. Tarefas manuais e de pacotes são somente leitura."
+    ["Linked schedule: change the platform backup schedule above."]="Horário vinculado: altere o agendamento do backup da plataforma acima."
+    ["Read-only: managed by its original tool or package."]="Somente leitura: gerenciada pela ferramenta ou pelo pacote de origem."
+    ["This also schedules weekly maintenance one hour later and a monthly restore test two hours later. All three are disabled together."]="Inclui manutenção semanal uma hora depois e teste mensal de restauração duas horas depois. As três tarefas são desativadas juntas."
+    ["Only the schedule changes. Destination, retention and cloud copy are kept."]="Muda apenas o agendamento. Destino, retenção e cópia na nuvem são mantidos."
+    ["Only the schedule changes. Participants, destination, retention and cloud copy are kept."]="Muda apenas o agendamento. Participantes, destino, retenção e cópia na nuvem são mantidos."
+    ["The configured cron entry is missing. Enable and save to recreate it."]="A entrada cron configurada não foi encontrada. Ative e salve para recriá-la."
+    ["Only this task is changed. Other schedules are kept."]="Muda apenas esta tarefa. Os demais agendamentos são mantidos."
+    ["Choose a supported frequency."]="Escolha uma frequência compatível."
+    ["Use HH:MM (00:00 to 23:59)."]="Use HH:MM (00:00 a 23:59)."
+    ["Choose a valid day."]="Escolha um dia válido."
+    ["This task is read-only."]="Esta tarefa é somente leitura."
+    ["This task is ambiguous. Open its original editor."]="A identificação desta tarefa é ambígua. Abra o editor original."
     ["➕  Add or remove instance"]="➕  Adicionar ou remover instância"
     ["Instances"]="Instâncias"
     ["➕  Add instance"]="➕  Adicionar instância"
@@ -12456,7 +12479,7 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_OPERATIONS_SHA="b9a4b980d6f2a5f2e9ef2c35d883ae170bc92cf0f3983ae77d2cfbdecc13cac2"
+KEI_DSPACE_OPERATIONS_SHA="d7067537d2055569ff8d909259eb984a8fa9b04a90358f0aec74e5ddfe7d23a3"
 KEI_DSPACE_RUNTIME_SHA="38820452bf97918507b57866d994f5bd826e7230d5c4fb0de32e9626b881301b"
 KEI_DSPACE_BACKUP_SHA="975ded6ea59a40ff274c28bfdd6ea0fc5741ef6bc35de1280e1443f1f155540e"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
@@ -15915,7 +15938,67 @@ kei_backup_verify() {
 
 # kei_backup_schedule PLATFORM HH:MM|off: the daily package, the weekly
 # maintenance and the monthly verification, in $KEI_BK_CRON.
+# Shared writer lock for the existing schedule editors and the unified center.
+# EXPECTED is an optional SHA-256 of the file displayed to the operator.
+kei_schedule_locked() (
+    local path="$1" expected="$2" lock fd current mode
+    shift 2
+    lock="${path}.lock"
+    if [ -e "$path" ]; then
+        [ -f "$path" ] && [ "$(stat -c %u "$path")" = "$(id -u)" ] && [ "$(stat -c %h "$path")" = 1 ] || return 4
+        mode=$(stat -c %a "$path")
+        [ "$((8#$mode & 022))" = 0 ] || return 4
+    fi
+    [ -d "${path%/*}" ] || mkdir -p "${path%/*}" || return 1
+    [ ! -L "$path" ] && [ ! -L "$lock" ] || { echo 'Untrusted schedule path.' >&2; return 4; }
+    (umask 077; touch "$lock") || return 1
+    [ -f "$lock" ] && [ "$(stat -c %u "$lock")" = "$(id -u)" ] && [ "$(stat -c %h "$lock")" = 1 ] || return 4
+    mode=$(stat -c %a "$lock")
+    [ "$((8#$mode & 022))" = 0 ] || return 4
+    exec {fd}>"$lock" || return 1
+    flock -w 10 "$fd" || { echo 'Another schedule edit is running. Retry.' >&2; return 4; }
+    if [ -n "$expected" ]; then
+        [[ "$expected" =~ ^[a-f0-9]{64}$ ]] || return 2
+        if [ -e "$path" ]; then
+            [ -f "$path" ] && [ ! -L "$path" ] || return 4
+            current=$(sha256sum < "$path" | cut -d' ' -f1)
+        else current=$(printf '' | sha256sum | cut -d' ' -f1); fi
+        [ "$current" = "$expected" ] || { echo 'The schedule changed since it was displayed. Refresh before saving.' >&2; return 4; }
+    fi
+    "$@"
+)
+
+# A grouped writer may replace only its known generated cron commands.
+kei_schedule_group_ok() {
+    [ ! -L "$1" ] || return 4
+    [ -e "$1" ] || return 0
+    python3 -I - "$1" "$2" <<'PYGROUP'
+import pathlib,re,sys
+patterns={
+ 'tainacan':r'\S+ --task platform-backup-(?:run tainacan scheduled|maintain tainacan|verify tainacan 30) >/dev/null 2>&1',
+ 'set':r'\S+ --task set-run scheduled >/dev/null 2>&1',
+}
+try:
+    for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+        text=line.strip()
+        if not text:continue
+        if text.startswith('#') and not text.startswith('#off#'):continue
+        if text in ('SHELL=/bin/bash','PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'):continue
+        parts=text.split(None,6)
+        if len(parts)!=7 or parts[5]!='root' or not re.fullmatch(patterns[sys.argv[2]],' '.join(parts[6].split())):
+            raise ValueError()
+except (OSError,UnicodeError,ValueError,KeyError):
+    print('This schedule contains manual changes. Use its original editor; nothing was changed.',file=sys.stderr)
+    sys.exit(4)
+PYGROUP
+}
+
 kei_backup_schedule() {
+    [ -z "${3:-}" ] || kei_schedule_group_ok "$KEI_BK_CRON" tainacan || return 4
+    kei_schedule_locked "$KEI_BK_CRON" "${3:-}" _kei_backup_schedule "${1:-}" "${2:-}"
+}
+
+_kei_backup_schedule() {
     local p="${1:-}" v="${2:-}" h m tmp q hh
     _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
     case "$v" in
@@ -16712,6 +16795,15 @@ _kei_set_history() { printf '%s/sets-history.jsonl' "$KEI_BK_ROOT"; }
 
 # kei_set_schedule time=HH:MM|off [dest=DIR] [keep=N] [copy=REMOTE:PATH|none] [secrets=yes|no]
 kei_set_schedule() {
+    local item expected="" args=()
+    for item in "$@"; do
+        case "$item" in expected=*) expected=${item#*=} ;; *) args+=("$item") ;; esac
+    done
+    [ -z "$expected" ] || kei_schedule_group_ok "$KEI_SET_CRON" set || return 4
+    kei_schedule_locked "$KEI_SET_CRON" "$expected" _kei_set_schedule "${args[@]}"
+}
+
+_kei_set_schedule() {
     local a k v time="" dest="" keep="" copy="" secrets="" h m tmp p why
     for a in "$@"; do
         k=${a%%=*}; v=${a#*=}
@@ -44237,6 +44329,10 @@ SH
 }
 
 cron_apply() {
+    kei_schedule_locked "$CRON_TASKS" "${2:-}" _kei_cron_apply "$1"
+}
+
+_kei_cron_apply() {
     local f="$1"
     require_koha || return 1
     if [ ! -s "$f" ] || ! cron_file_ok "$f"; then
@@ -46298,7 +46394,7 @@ kei_task() {
         platform-backup-discard)  _kei_docker_task kei_backup_discard "${1:-}" ;;
         platform-backup-repo)     _kei_docker_task kei_backup_repo "${1:-}" "${2:-}" ;;
         platform-backup-copy)     _kei_docker_task kei_backup_copy "${1:-}" "${2:-}" ;;
-        platform-backup-schedule) _kei_docker_task kei_backup_schedule "${1:-}" "${2:-}" ;;
+        platform-backup-schedule) _kei_docker_task kei_backup_schedule "${1:-}" "${2:-}" "${3:-}" ;;
         platform-backup-verify)   _kei_docker_task kei_backup_verify "${1:-}" "${2:-30}" ;;
         platform-backup-maintain) _kei_docker_task kei_backup_maintain "${1:-}" ;;
         platform-backup-kit)      _kei_docker_task kei_backup_kit ;;
@@ -46429,7 +46525,7 @@ kei_task() {
         opac-theme-apply) [ -n "${1:-}" ] || return 2; opac_theme_apply "$1" ;;
         opac-theme-remove) opac_theme_remove ;;
         opac-carousel-refresh) opac_carousel_refresh ;;
-        cron-apply)      [ -n "${1:-}" ] || return 2; cron_apply "$1" ;;
+        cron-apply)      [ -n "${1:-}" ] || return 2; cron_apply "$1" "${2:-}" ;;
         hub-status)      hub_status ;;
         sip-apply)       [ -n "${3:-}" ] || return 2; sip_apply "$1" "$2" "$3" ;;
         cloud-provider)  [ -n "${1:-}" ] || return 2; cloud_provider_add "$1" ;;

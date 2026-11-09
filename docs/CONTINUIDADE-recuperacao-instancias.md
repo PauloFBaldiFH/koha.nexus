@@ -36,9 +36,10 @@ editáveis das agendas, idiomas DSpace e criação/remoção pela lateral.
    associação com idioma do painel; entrada no menu Idiomas. O helper Java
    ainda limita a três códigos. Mudá-lo exige nova receita e atualização
    compatível da receita 4 (preservar também a recuperação da receita 3).
-2. Tela de agendas com switch/horário gravando pela configuração original.
-   A central atual permanece inventário; `CronView` já é o editor com switch
-   e horário do Koha e deve ser reaproveitado.
+2. Tela de agendas: implementada na branch `feat/schedule-controls`, versão
+   1.5.189, após #359. Switch, frequência/horário compatíveis, confirmação,
+   revisão concorrente e gravadores existentes. Detalhes e limites em
+   `docs/schedules/PR-agendamentos.md`; verificar mesclagem e CI da etapa.
 3. Tainacan: compactação configurável e painel individual completo. Adaptar
    formato e leitores, pois hoje esperam db.sql.gz/files.tar.gz fixos.
 4. Recuperação completa Nexus: manifesto de todas as instâncias, configurações

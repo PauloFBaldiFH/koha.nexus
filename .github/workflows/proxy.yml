@@ -62,6 +62,7 @@ on:
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
       - "tests/backup_set.bats"
+      - "tests/schedule_controls.bats"
       - "tests/admin_access.bats"
       - "tests/tainacan_free.bats"
       - "tests/dspace_free.bats"
@@ -90,6 +91,7 @@ on:
       - "tests/tainacan_reboot.bats"
       - "tests/backup_engine.bats"
       - "tests/backup_set.bats"
+      - "tests/schedule_controls.bats"
       - "tests/admin_access.bats"
       - "tests/tainacan_free.bats"
       - "tests/dspace_free.bats"
@@ -126,7 +128,7 @@ jobs:
               restic version
               cd /src
               bats tests/platforms.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
-              bats tests/backup_engine.bats tests/backup_set.bats tests/admin_access.bats tests/tainacan_free.bats tests/dspace_free.bats
+              bats tests/backup_engine.bats tests/backup_set.bats tests/schedule_controls.bats tests/admin_access.bats tests/tainacan_free.bats tests/dspace_free.bats
               KEI_REQUIRE_REAL_EVENTS=1 bats tests/tainacan_events.bats
               bats tests/uninstall_registry.bats'
 
