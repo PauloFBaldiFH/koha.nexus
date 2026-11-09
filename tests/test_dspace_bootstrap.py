@@ -130,7 +130,7 @@ with patch.object(dspace_smoke, 'docker', side_effect=docker):
             fetch.assert_not_called()
             validate.assert_called_once()
             self.assertEqual(build.call_count, 1)
-            self.assertIn('nexus-dspace-ui:10.1-r4', build.call_args.args)
+            self.assertIn('nexus-dspace-ui:10.1-r5', build.call_args.args)
 
 
 if __name__ == '__main__': unittest.main()

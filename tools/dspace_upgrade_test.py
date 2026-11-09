@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Review recipe 3 -> 4 against actual historical images, in an EMPTY disposable runner.
+"""Review historical recipes -> current recipe against actual historical images, in an EMPTY disposable runner.
 
 No historical image is relabelled as a different release. Builds come from the
 pinned original repository export. This tests a same-DSpace-version image update,
@@ -21,15 +21,16 @@ from operations import Operations
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--disposable',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--disposable',action='store_true');parser.add_argument('--from-recipe',type=int,choices=(3,4),default=4)
+    args=parser.parse_args()
     root=Path('/var/lib/koha-nexus/platforms/dspace')
     if not args.disposable or os.geteuid()!=0 or root.exists():parser.error('Requires root, --disposable and an empty dedicated runner.')
     output=Path(os.environ['RUNNER_TEMP'])
     old_catalog=output/'legacy-catalog.json';new_catalog=output/'current-catalog.json'
-    previous=digest(REPO/'platforms/dspace/release-r3.json')
+    previous=digest(REPO/('platforms/dspace/release-r'+str(args.from_recipe)+'.json'))
     images={}
     for name in ('backend','ui','solr'):
-        image=json.loads(subprocess.check_output(['docker','--host=unix:///var/run/docker.sock','image','inspect','nexus-dspace-'+name+':10.1-r3'],text=True))[0]
+        image=json.loads(subprocess.check_output(['docker','--host=unix:///var/run/docker.sock','image','inspect','nexus-dspace-'+name+':10.1-r'+str(args.from_recipe)],text=True))[0]
         assert image['Config']['Labels']['org.koha-nexus.dspace.release-lock']==previous
         images[name]=image['Id']
     old_catalog.write_text(json.dumps({'schema':1,'release_sha256':previous,'images':images}))
@@ -60,6 +61,13 @@ def main():
         rt.compose('run','--rm','--no-deps','-T','backend','cli','index-discovery','-b',timeout=300)
         schema=rt.compose('exec','-T','postgres','psql','-U','dspace','-d','dspace','-Atc','SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
         owned={k:v['name'] for k,v in read_json(root/'compose.json')['volumes'].items()}
+        from languages import edit, configuration
+        old_compose=read_json(root/'compose.json')
+        old_language=edit(old_compose,{'active':['en','kk','pt-PT','sr-lat'],'fallback':'pt-PT'},args.from_recipe)
+        (root/'compose.json').write_text(json.dumps(old_compose)+'\n')
+        Operations(rt).commit_config()
+        rt.compose('up','-d','--pull','never','--no-deps','--force-recreate','ui',timeout=240)
+        rt.health()
         from dspace_recovery_test import prepare, assert_history
         recovery,_=prepare(rt)
         op=Operations(rt,recovery.phrase)
@@ -83,6 +91,8 @@ def main():
         assert result['updated'] and rt.state()['release_sha256']==digest(REPO/'platforms/dspace/release.json')
         assert_matrix()
         assert owned=={k:v['name'] for k,v in read_json(root/'compose.json')['volumes'].items()}
+        updated_language=configuration(read_json(root/'compose.json'),5)
+        assert updated_language['active']==old_language['active'] and updated_language['fallback']==old_language['fallback']
         assert schema==rt.compose('exec','-T','postgres','psql','-U','dspace','-d','dspace','-Atc','SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
         assert_history(rt)
         current=API(rt.state()['url']);current.login(email,password)
@@ -91,10 +101,10 @@ def main():
         rt.compose('exec','-T','backend','sh','-ec','find /dspace/assetstore -type f -print0 | xargs -0 sha256sum > /dspace/reports/upgrade-files.sha256')
         expected=hashlib.sha256(files['document.txt'].encode()).hexdigest()
         assert expected in rt.compose('exec','-T','backend','cat','/dspace/reports/upgrade-files.sha256')
-        (output/'dspace-upgrade-acceptance.json').write_text(json.dumps(dict(actual_recipe3_images=True,same_version_update=True,
+        (output/'dspace-upgrade-acceptance.json').write_text(json.dumps(dict(actual_historical_recipe=args.from_recipe,same_version_update=True,
             failed_validation_rollback=True,administrator_and_collection_preserved=True,document_checksum_preserved=True,
             schema_history_unchanged=True,old_volumes_preserved=True,major_version_migration=False)))
-        print('PASS: actual recipe 3 -> 4, injected failure rollback and historical document',flush=True)
+        print('PASS: actual historical recipes -> current recipe, injected failure rollback and historical document',flush=True)
     except BaseException:
         # Disposable lab only: service logs with this lab's generated database
         # password redacted, so a refused start (e.g. the schema guard) is visible.

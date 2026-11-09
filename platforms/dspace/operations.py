@@ -7,6 +7,7 @@ import contextlib
 import copy
 import fcntl
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -326,14 +327,21 @@ class Operations:
         data = trusted_json(self.journal)
         if data.get('operation')=='remove':raise Refused('Removal is resumed with the same explicit removal request; erased volumes are recovered from its safety backup, not by configuration rollback.')
         if data.get('phase') == 'complete': raise Refused('Completed operations are not automatically reversed.')
-        for name in ('local.cfg', 'compose.json'): atomic(self.rt.root/name, data['files'][name], gid=10001 if name=='local.cfg' else None, mode=0o440 if name=='local.cfg' else 0o600)
+        language_change = data.get('operation') == 'languages'
+        for name in (('compose.json',) if language_change else ('local.cfg', 'compose.json')):
+            atomic(self.rt.root/name, data['files'][name], gid=10001 if name=='local.cfg' else None, mode=0o440 if name=='local.cfg' else 0o600)
         atomic(self.rt.root/'state.json', json.dumps(data['state'])+'\n')
         if data.get('catalog'):
             if data['catalog']['path']!=str(self.rt.catalog_path):raise Refused('Catalog rollback destination changed; inspect the journal.')
             atomic(self.rt.catalog_path,data['catalog']['text'])
         upgrade=data.get('operation')=='upgrade'
-        self.restart(dependencies=upgrade,schema=data.get('schema_receipt') if upgrade else None)
-        self.rt.core('proxy')
+        if language_change:
+            if data['state'].get('intended') != 'stopped':
+                self.rt.compose('up','-d','--pull','never','--no-deps','--force-recreate','ui',timeout=240)
+                self.rt.health(); self.rt.public_health()
+        else:
+            self.restart(dependencies=upgrade,schema=data.get('schema_receipt') if upgrade else None)
+            self.rt.core('proxy')
         data['phase']='rolled-back'; atomic(self.journal,json.dumps(data)+'\n')
         return {'rolled_back':True, 'data_volumes_preserved':True}
 
@@ -475,13 +483,53 @@ class Operations:
                 raise Refused('Web repair failed and automatic configuration recovery is incomplete. Data volumes were preserved; inspect the private operation journal and resume rollback.') from None
             raise
 
+    def languages(self, request):
+        from languages import configuration, suggest
+        state,compose=Recovery(self.rt).checked()
+        result=configuration(compose,self.rt.release['recipe'])
+        result.update(suggested=suggest(request.get('panel_language'),self.rt.release['recipe']),
+                      bundled=True, downloads_required=False,
+                      account_upgrade_required=self.rt.release['recipe']<5)
+        return result
+
+    def language_save(self, request, confirm=False):
+        from languages import edit
+        self.pending()
+        state,compose=Recovery(self.rt).checked()
+        stopped=state.get('intended')=='stopped'
+        revision=hashlib.sha256((digest(self.rt.root/'compose.json')+'\0'+str(stopped)).encode()).hexdigest()
+        if 'expected_revision' in request and request['expected_revision']!=revision:
+            raise Refused('The DSpace configuration changed since this plan was displayed. Refresh before applying languages.')
+        try:result=edit(compose,request,self.rt.release['recipe'])
+        except ValueError as error:raise Refused(str(error)) from None
+        if not confirm:
+            changes = 'UI languages and fallback; applied on next start.' if stopped else 'UI languages and fallback; UI container restart only.'
+            return dict(result,revision=revision,pending_start=stopped,changes=changes+' Existing account preferences are kept.')
+        saved=self.snapshot('languages')
+        try:
+            atomic(self.rt.root/'compose.json',json.dumps(compose,indent=2)+'\n')
+            self.commit_config()
+            if not stopped:
+                self.rt.compose('up','-d','--pull','never','--no-deps','--force-recreate','ui',timeout=240)
+                self.rt.health();self.rt.public_health()
+            saved['phase']='complete';atomic(self.journal,json.dumps(saved)+'\n')
+            return dict(result,saved=True,pending_start=stopped)
+        except BaseException:
+            atomic(self.rt.root/'compose.json',saved['files']['compose.json'])
+            atomic(self.rt.root/'state.json',json.dumps(saved['state'])+'\n')
+            if not stopped:
+                self.rt.compose('up','-d','--pull','never','--no-deps','--force-recreate','ui',timeout=240)
+            saved['phase']='rolled-back';atomic(self.journal,json.dumps(saved)+'\n')
+            raise
+
     def upgrade(self, request, confirm=False):
         self.pending()
         state,compose=Recovery(self.rt).checked()
         target=read_json(BASE/'release.json'); target_hash=digest(BASE/'release.json')
-        previous=target.get('previous_release',{})
-        if self.rt.release_hash!=previous.get('sha256') or target.get('recipe')!=4 or self.rt.release.get('recipe')!=3:
-            raise Refused('Only the reviewed recipe 3 to 4 update of DSpace 10.1 is supported.')
+        from runtime import reviewed_releases
+        reviewed=reviewed_releases()
+        if self.rt.release_hash not in reviewed or self.rt.release_hash==target_hash or self.rt.release.get('recipe') not in (3,4) or target.get('recipe')!=5:
+            raise Refused('Only reviewed recipe 3 or 4 to 5 updates of DSpace 10.1 are supported.')
         if target['sources']!=self.rt.release['sources'] or target['bases']!=self.rt.release['bases']:
             raise Refused('Schema, runtime or database migrations require a separately reviewed procedure.')
         catalog=Path(request['catalog']).absolute()
@@ -489,7 +537,10 @@ class Operations:
         from runtime import Runtime
         candidate=Runtime(self.rt.root.parent/'upgrade-candidate'/'dspace',catalog,self.rt.lab,self.rt.driver,release_lock=target_hash)
         images=candidate.images()
-        plan=dict(from_recipe=3,to_recipe=4,release_sha256=target_hash,images=images,database_migration=False,safety_backup_required=True,
+        from languages import migrate_environment
+        try:migrate_environment(compose,self.rt.release['recipe'])
+        except ValueError as error:raise Refused(str(error)) from None
+        plan=dict(from_recipe=self.rt.release['recipe'],to_recipe=target['recipe'],release_sha256=target_hash,images=images,database_migration=False,safety_backup_required=True,language_configuration_preserved=True,
                   # Recovery requires the exact installed image matrix (PR4); recipe 3 packages,
                   # including this safety backup, are refused once recipe 4 is confirmed.
                   earlier_backups_restorable_after_update=False)
@@ -506,7 +557,7 @@ class Operations:
             for name,image in images.items(): compose['services'][name]['image']=image
             atomic(self.rt.root/'compose.json',json.dumps(compose,indent=2)+'\n')
             atomic(self.rt.catalog_path,catalog.read_text())
-            self.rt.mark(release_sha256=target_hash,recipe=4)
+            self.rt.mark(release_sha256=target_hash,recipe=target['recipe'])
             self.commit_config(); self.restart(dependencies=True,schema='record')
             saved['phase']='complete'; atomic(self.journal,json.dumps(saved)+'\n')
             return dict(plan,updated=True,safety_backup=package)
@@ -568,12 +619,13 @@ class Operations:
 
     def dispatch(self, action, request, confirm=False):
         if action=='plans':return self.plans()
+        if action=='languages':return self.languages(request)
         if action=='plan-save':return self.save_plan(request,confirm)
         if action=='plan-disable':return self.disable_plan(request['id'],confirm,request.get('expected_plan'))
         if action=='plan-run':
             if not confirm:raise Refused('Explicit --confirm is required to run a backup.')
             return self.run_plan(request['id'])
-        if action in ('address','upgrade','remove','rollback','repair-web'):
+        if action in ('address','upgrade','remove','rollback','repair-web','language-save'):
             with self.rt.lock(allow_pending=action in ('rollback','remove')):
                 if action=='rollback':
                     if not confirm:raise Refused('Explicit confirmation is required for rollback.')

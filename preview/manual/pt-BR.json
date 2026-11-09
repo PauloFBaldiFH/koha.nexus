@@ -2716,6 +2716,23 @@
     "Confere se o IP pertence ao servidor ou à configuração de rede do Windows. Salva a configuração privada para desfazer e verifica API, configuração do navegador e login.",
     "Preserva banco, arquivos, imagens, credenciais e agendamentos. Domínios, HTTPS e mudanças de porta continuam no assistente de endereços."
    ]
+  },
+  "dspace-languages": {
+   "summary": "Selecione os idiomas da interface do DSpace já incluídos na imagem instalada e o idioma alternativo para visitantes sem preferência compatível.",
+   "steps": [
+    "Escolha os idiomas dos visitantes e, depois, um idioma alternativo ativo. O idioma do painel fornece a primeira sugestão.",
+    "Confira e confirme antes de reiniciar apenas a interface. Contas existentes, dados, domínios e agendamentos são preservados."
+   ],
+   "tips": [
+    "Os visitantes mantêm as preferências compatíveis da conta, dos cookies ou do navegador. A cobertura das traduções varia.",
+    "As receitas 3 e 4 oferecem 35 idiomas da interface e três de conta. A receita 5 oferece 37 idiomas de interface/conta; atualizar as imagens é uma etapa separada de atualizar o painel."
+   ],
+   "related": [
+    "dspace-admin",
+    "dspace-upgrade",
+    "languages"
+   ],
+   "_en": "1644ab19ee"
   }
  }
 }

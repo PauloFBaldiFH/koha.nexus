@@ -20,6 +20,7 @@ on:
       - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
       - 'tests/test_dspace_web.py'
+      - 'tests/test_dspace_languages.py'
       - 'tests/java/NexusSchemaGuardTest.java'
       - 'installer'
       - 'tests/test_dspace_images.py'
@@ -44,6 +45,7 @@ on:
       - 'tests/test_dspace_browser_support.py'
       - 'tests/test_dspace_runtime.py'
       - 'tests/test_dspace_web.py'
+      - 'tests/test_dspace_languages.py'
       - 'tests/java/NexusSchemaGuardTest.java'
       - 'installer'
       - 'tests/test_dspace_images.py'
@@ -91,6 +93,7 @@ jobs:
       - run: python -m unittest discover -s tests -p test_dspace_backup.py -v
       - run: python -m unittest discover -s tests -p test_dspace_operations.py -v
       - run: sudo $(which python) -m unittest discover -s tests -p test_dspace_web.py -v
+      - run: sudo $(which python) -m unittest discover -s tests -p test_dspace_languages.py -v
       - run: python -m unittest discover -s tests -p test_dspace_browser_support.py -v
       - run: bash -n installer
       - name: Validate runtime shell scripts
@@ -228,6 +231,7 @@ jobs:
       fail-fast: false
       matrix:
         image: [backend, ui, solr]
+        recipe: [3, 4]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -242,20 +246,24 @@ jobs:
         id: legacy-cache
         with:
           path: ${{ runner.temp }}/legacy-${{ matrix.image }}.tar.gz
-          key: dspace-historical-r3-858153cc-${{ runner.os }}-${{ runner.arch }}-${{ matrix.image }}
-      - name: Build actual recipe 3 from its pinned historical source export
+          key: dspace-historical-r${{ matrix.recipe }}-${{ matrix.recipe == 3 && '858153cc' || 'c58a6db3' }}-${{ runner.os }}-${{ runner.arch }}-${{ matrix.image }}
+      - name: Build the actual historical recipe from its pinned source export
         if: steps.legacy-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/legacy-recipe"
-          git archive 858153cc730c17d410943836d222944149c24250 platforms/dspace tools/dspace_images.py LICENSE | tar -x -C "$RUNNER_TEMP/legacy-recipe"
+          case "${{ matrix.recipe }}" in
+            3) source_commit=858153cc730c17d410943836d222944149c24250 ;;
+            4) source_commit=c58a6db3dcc57558abb780d7a3b7ebdd281ddd5a ;;
+          esac
+          git archive "$source_commit" platforms/dspace tools/dspace_images.py LICENSE | tar -x -C "$RUNNER_TEMP/legacy-recipe"
           python "$RUNNER_TEMP/legacy-recipe/tools/dspace_images.py" prepare "$RUNNER_TEMP/legacy-sources"
-          python "$RUNNER_TEMP/legacy-recipe/tools/dspace_images.py" build "$RUNNER_TEMP/legacy-sources" --image '${{ matrix.image }}' --metadata "$RUNNER_TEMP/legacy-${{ matrix.image }}.json"
-          docker save "nexus-dspace-${{ matrix.image }}:10.1-r3" | gzip -1 > "$RUNNER_TEMP/legacy-${{ matrix.image }}.tar.gz"
+          python "$RUNNER_TEMP/legacy-recipe/tools/dspace_images.py" build "$RUNNER_TEMP/legacy-sources" --image '${{ matrix.image }}' --metadata "$RUNNER_TEMP/legacy-${{ matrix.recipe }}-${{ matrix.image }}.json"
+          docker save "nexus-dspace-${{ matrix.image }}:10.1-r${{ matrix.recipe }}" | gzip -1 > "$RUNNER_TEMP/legacy-${{ matrix.image }}.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
-          name: legacy-dspace-${{ matrix.image }}-runtime
+          name: legacy-dspace-r${{ matrix.recipe }}-${{ matrix.image }}-runtime
           path: ${{ runner.temp }}/legacy-${{ matrix.image }}.tar.gz
           compression-level: 0
           retention-days: 1
@@ -264,11 +272,20 @@ jobs:
     needs: [images, legacy-images, dependencies]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        recipe: [3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          pattern: '*dspace-*-runtime'
+          pattern: 'dspace-*-runtime'
+          path: ${{ runner.temp }}/dspace-runtime
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: 'legacy-dspace-r${{ matrix.recipe }}-*-runtime'
           path: ${{ runner.temp }}/dspace-runtime
           merge-multiple: true
       - name: Load both independently built reviewed image matrices
@@ -285,11 +302,11 @@ jobs:
         run: >-
           sudo env RUNNER_TEMP="$RUNNER_TEMP"
           KEI_DOCKER_ISOLATION_CMD="/bin/bash $GITHUB_WORKSPACE/installer --task docker-isolation"
-          python3 tools/dspace_upgrade_test.py --disposable
+          python3 tools/dspace_upgrade_test.py --disposable --from-recipe ${{ matrix.recipe }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dspace-reviewed-upgrade
+          name: dspace-reviewed-upgrade-r${{ matrix.recipe }}
           path: ${{ runner.temp }}/dspace-upgrade-acceptance.json
           if-no-files-found: ignore
 

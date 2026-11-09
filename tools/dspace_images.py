@@ -31,7 +31,7 @@ def load_release(path: Path = BASE / "release.json") -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("schema") != 1 or data.get("status") != "experimental":
         raise ValueError("Unsupported release schema or maturity")
-    if data.get("recipe") != 4 or data.get("architectures") != ["linux/amd64"]:
+    if data.get("recipe") != 5 or data.get("architectures") != ["linux/amd64"]:
         raise ValueError("Only the experimental amd64 recipe is currently supported")
     if set(data.get("sources", {})) != set(REPOSITORIES):
         raise ValueError("Expected backend and UI sources")
@@ -68,10 +68,19 @@ def load_release(path: Path = BASE / "release.json") -> dict:
     if source_patch.get('file') != 'ui-cookie-metadata.patch' or hashlib.sha256((BASE / 'ui-cookie-metadata.patch').read_bytes()).hexdigest() != source_patch.get('sha256'):
         raise ValueError('UI cookie metadata patch checksum mismatch')
     previous = data.get('previous_release', {})
-    if previous != {'file':'release-r3.json', 'sha256':'72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608'}:
+    if previous != {'file':'release-r4.json', 'sha256':'6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012'}:
         raise ValueError('Unreviewed previous release')
     if hashlib.sha256((BASE / previous['file']).read_bytes()).hexdigest() != previous['sha256']:
         raise ValueError('Previous release checksum mismatch')
+    expected_inputs={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in sorted((BASE/'images').iterdir()) if f.is_file()}
+    if data.get('image_inputs')!=expected_inputs:
+        raise ValueError('Image build inputs differ from the reviewed release')
+    catalog = data.get('language_catalog', {})
+    if catalog.get('file') != 'languages.json' or hashlib.sha256((BASE/'languages.json').read_bytes()).hexdigest() != catalog.get('sha256'):
+        raise ValueError('Language catalog checksum mismatch')
+    translations=json.loads((BASE/'languages.json').read_text())
+    if translations.get('ui_source_commit') != data['sources']['ui']['commit'] or len(translations.get('languages',[])) != 37:
+        raise ValueError('Language catalog differs from the pinned UI release')
     return data
 
 
@@ -115,6 +124,13 @@ def apply_ui_patch(directory: Path, patch: dict) -> None:
         path.write_bytes(result)
 
 
+def validate_language_inputs(directory: Path) -> None:
+    for row in json.loads((BASE/'languages.json').read_text())['languages']:
+        path=directory/'src/assets/i18n'/(row['code']+'.json5')
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest()!=row['sha256']:
+            raise ValueError('Pinned translation missing or changed: '+row['code'])
+
+
 def validate_ui_toolchain(directory: Path) -> None:
     package = json.loads((directory / 'package.json').read_text())
     lock = json.loads((directory / 'package-lock.json').read_text())
@@ -147,6 +163,7 @@ def validate_sources(data: dict, directory: Path) -> None:
     expected = json.loads((directory / "checksums.json").read_text())
     if not expected or expected != source_checksums(directory):
         raise ValueError("Prepared source files changed; prepare a fresh source directory")
+    validate_language_inputs(directory / "ui-source")
 
 
 def source_checksums(directory: Path) -> dict:
@@ -199,6 +216,7 @@ def prepare(data: dict, output: Path) -> None:
             shutil.rmtree(checkout)
         apply_ui_patch(stage / "ui-source", json.loads((BASE / data["ui_patch"]["file"]).read_text()))
         validate_ui_toolchain(stage / "ui-source")
+        validate_language_inputs(stage / "ui-source")
         (stage / "sources.json").write_text(json.dumps(source_stamp(data), indent=2) + "\n")
         (stage / "checksums.json").write_text(json.dumps(source_checksums(stage), sort_keys=True) + "\n")
         validate_sources(data, stage)

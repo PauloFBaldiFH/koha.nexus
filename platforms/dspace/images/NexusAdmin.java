@@ -2,6 +2,9 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +25,15 @@ public final class NexusAdmin {
         if (value == null || value.length() > 1024) throw new IllegalArgumentException("Invalid input.");
         return value;
     }
+    private static String supportedLanguage(String input) throws Exception {
+        String normalized = input.replace('_', '-');
+        JsonNode catalog = new ObjectMapper().readTree(Files.readString(
+            Path.of("/usr/local/share/nexus-dspace/languages.json"), StandardCharsets.UTF_8));
+        for (JsonNode row : catalog.get("languages")) {
+            if (row.get("code").asText().equalsIgnoreCase(normalized)) return row.get("code").asText();
+        }
+        throw new IllegalArgumentException("Unsupported account language.");
+    }
     public static void main(String[] args) {
         Context context = null;
         DSpaceKernelImpl kernel = null;
@@ -37,9 +49,10 @@ public final class NexusAdmin {
                 language = line(input); password = line(input);
                 if (!email.matches("[^@\\s|=]+@[^@\\s|=]+\\.[^@\\s|=]+") || password.length() < 10)
                     throw new IllegalArgumentException("Invalid e-mail or password length.");
-                if (operation.equals("create") && (first.isBlank() || last.isBlank() ||
-                        !List.of("pt_BR", "en", "es").contains(language)))
-                    throw new IllegalArgumentException("Name and supported language are required.");
+                if (operation.equals("create")) {
+                    if (first.isBlank() || last.isBlank()) throw new IllegalArgumentException("Name is required.");
+                    language = supportedLanguage(language);
+                }
             }
             // Match the official ScriptLauncher bootstrap before creating a Context.
             kernel = DSpaceKernelInit.getKernel(null);

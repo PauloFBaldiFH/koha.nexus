@@ -349,6 +349,34 @@ def test_wsl_install_can_choose_localhost_without_copying_an_example_ip(monkeypa
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
-    assert any(c[1]==('plan','--url','http://localhost:8100') for c in calls)
+    assert any(c[1]==('plan','--url','http://localhost:8100','--language','en') for c in calls)
     assert not any(isinstance(s,InputScreen) for s in app.screens)
     assert not any(c[1][0]=='install' for c in calls)
+
+
+LANGUAGE_STATE={'available':[{'code':'en','label':'English'},{'code':'pt-BR','label':'Português do Brasil'},{'code':'fr','label':'Français'}], 'active':['en','pt-BR','fr'],'fallback':'en','suggested':'pt-BR','revision':'a'*64}
+
+@pytest.mark.parametrize('answers',[[None],[['en'],None],[['en','fr'],'fr',False]])
+def test_interface_language_cancel_never_applies(monkeypatch,answers):
+    calls=mock_calls(monkeypatch,{'operations':LANGUAGE_STATE})
+    asyncio.run(dspace.languages(App(answers)))
+    assert not any('--confirm' in c[1] for c in calls)
+
+
+def test_interface_language_save_has_an_explicit_review_and_keeps_separate_panel_preference(monkeypatch):
+    calls=mock_calls(monkeypatch,{'operations':LANGUAGE_STATE})
+    app=App([['en','fr'],'fr',True]);app.env=SimpleNamespace(lang='pt')
+    asyncio.run(dspace.languages(app))
+    writes=[c for c in calls if '--confirm' in c[1]]
+    assert len(writes)==1 and writes[0][1]==('operations','language-save','--confirm')
+    assert json.loads(writes[0][2]['env']['KEI_DSPACE_OPERATIONS_DATA'])=={'active':['en','fr'],'fallback':'fr','expected_revision':'a'*64}
+    assert app.env.lang=='pt'
+
+
+def test_administrator_choices_come_from_installed_capabilities(monkeypatch):
+    supported=[{'code':'en','ui_code':'en','label':'English'},{'code':'fr','ui_code':'fr','label':'Français'}]
+    calls=mock_calls(monkeypatch,{'admin-status':{'state':'missing','admins':[],'languages':supported}})
+    app=App(['create','admin@example.org','Name','Last',None])
+    asyncio.run(dspace.admin(app))
+    assert app.screens[-1]._options==[('en','English'),('fr','Français')]
+    assert not any('--confirm' in c[1] for c in calls)

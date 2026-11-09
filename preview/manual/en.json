@@ -3156,6 +3156,22 @@
     "Validates that a literal IP belongs to the server or the Windows network configuration. Saves private configuration for rollback and verifies API, browser configuration and login.",
     "Database, files, images, credentials and schedules are preserved. Domains, HTTPS and port changes continue through the address assistant."
    ]
+  },
+  "dspace-languages": {
+   "summary": "Select the DSpace interface languages already bundled in the installed image and the fallback for visitors without a matching preference.",
+   "steps": [
+    "Select the languages available to visitors, then choose an active fallback. The panel language supplies the first suggestion.",
+    "Review and confirm before restarting only the interface. Existing accounts, data, domains and schedules are preserved."
+   ],
+   "tips": [
+    "Visitors keep saved account, cookie or browser preferences when supported. Translation completeness varies.",
+    "Image recipes 3 and 4 offer 35 interface languages and three account languages. Recipe 5 offers 37 interface/account languages; an image update is separate from a panel update."
+   ],
+   "related": [
+    "dspace-admin",
+    "dspace-upgrade",
+    "languages"
+   ]
   }
  }
 }

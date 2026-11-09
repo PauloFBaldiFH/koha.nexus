@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "recipe": 4,
+  "recipe": 5,
   "status": "experimental",
   "architectures": [
     "linux/amd64"
@@ -55,7 +55,23 @@
     "sha256": "b0087fece8554bc7edc5bb1383615cce69095af0837b59265e01a86758e9c2c0"
   },
   "previous_release": {
-    "file": "release-r3.json",
-    "sha256": "72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
+    "file": "release-r4.json",
+    "sha256": "6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
+  },
+  "language_catalog": {
+    "file": "languages.json",
+    "sha256": "d74040a2b3c88620b166258afdefa610d45064f620b50f646e4e0266bd294ddc"
+  },
+  "image_inputs": {
+    ".dockerignore": "139821344b83c4b5f5b514fdf54da25cb4c1d7d71628d456fad9c74948ad3573",
+    "NexusAdmin.java": "e9287d32235acb40205972111e9a021d440ae4d5b453d9a849644160e682036d",
+    "NexusSchemaGuard.java": "e224c96c08680f4a291de8a2da20da857dd1e0c61e4066debfb604e19c8da4e4",
+    "backend-entrypoint.sh": "3206ee7167a7ca6e2a59c19769b955206ecc0687e56c1b9b397cfa312a80f502",
+    "backend.Dockerfile": "e1e63f5b04936cb5aa1caf45493c8e93dc76a72dcb3fef9c0cd72abdca26bb85",
+    "cookie-metadata.test.mjs": "4e348443353b289caddba62147c7cfd3d988ac4fe606574362baa5c96febf3e5",
+    "solr-entrypoint.sh": "80695b069951612d908699f4babff28b7d950cde1920163dd395fa1ac705aa24",
+    "solr.Dockerfile": "5cf3faad8f67e47a6169e5cf12862d545674d629b09d98c28251a94ab52b8ab7",
+    "ui-entrypoint.sh": "3aca4d3ac009333531ba92fcb979779244fb4c211f21e9d1ec438417b358942e",
+    "ui.Dockerfile": "5fb7f1864be2b0eb67eccd367f70c6721049774cc72c13fe39febbac2a03be5d"
   }
 }

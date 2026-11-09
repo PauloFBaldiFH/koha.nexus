@@ -646,7 +646,7 @@ class PreviousReleaseBinding(unittest.TestCase):
     def test_new_installation_defaults_to_corrected_recipe_without_writing(self):
         with patch.object(ds, 'command') as command:
             rt = ds.Runtime(self.root, lab=True)
-        self.assertEqual(rt.release['recipe'],4)
+        self.assertEqual(rt.release['recipe'],5)
         self.assertFalse(self.root.exists())
         command.assert_not_called()
 
@@ -665,6 +665,15 @@ class PreviousReleaseBinding(unittest.TestCase):
         self.assertEqual(rt.release_hash,self.previous)
         self.assertFalse(self.root.exists())
 
+    def test_recipe_four_can_still_be_selected_for_existing_data_and_recovery(self):
+        four=ds.digest(ds.BASE/'release-r4.json')
+        self.root.mkdir(mode=0o700)
+        (self.root/'state.json').write_text(json.dumps({'release_sha256':four}))
+        rt=ds.Runtime(self.root,lab=True)
+        self.assertEqual(rt.release_hash,four)
+        self.assertEqual(rt.release['recipe'],4)
+        self.assertEqual(ds.Runtime(Path(self.tmp.name)/'restore'/'dspace',lab=True,release_lock=four).release['recipe'],4)
+
     def test_unknown_explicit_release_is_refused_without_writes(self):
         with self.assertRaises(ds.Refused): ds.Runtime(self.root,lab=True,release_lock='0'*64)
         self.assertFalse(self.root.exists())
@@ -672,6 +681,7 @@ class PreviousReleaseBinding(unittest.TestCase):
     def test_changed_previous_lock_cannot_be_adopted(self):
         base=Path(self.tmp.name)/'adapter';base.mkdir()
         (base/'release.json').write_bytes((ds.BASE/'release.json').read_bytes())
+        (base/'release-r4.json').write_bytes((ds.BASE/'release-r4.json').read_bytes())
         (base/'release-r3.json').write_text('{}')
         with patch.object(ds,'BASE',base), self.assertRaisesRegex(ds.Refused,'checksum'):
             ds.Runtime(self.root,lab=True,release_lock=self.previous)

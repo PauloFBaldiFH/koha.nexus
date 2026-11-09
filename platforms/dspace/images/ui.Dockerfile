@@ -36,6 +36,10 @@ COPY --from=ui-source /NOTICE /usr/share/licenses/dspace-ui/NOTICE
 COPY --from=ui-source /LICENSES_THIRD_PARTY /usr/share/licenses/dspace-ui/LICENSES_THIRD_PARTY
 COPY --chmod=0555 ui-entrypoint.sh /usr/local/bin/nexus-dspace-ui
 COPY --from=nexus-license /LICENSE /usr/share/licenses/nexus-dspace/LICENSE
+COPY --chmod=0444 --from=nexus-license /platforms/dspace/languages.json /usr/local/share/nexus-dspace/languages.json
+RUN chmod 0755 /usr/local/share/nexus-dspace
+RUN node -e 'const fs=require("fs");const c=JSON.parse(fs.readFileSync("/usr/local/share/nexus-dspace/languages.json"));fs.writeFileSync("/app/config/nexus-languages.json",JSON.stringify({languages:c.languages.map(({code,label})=>({code,label,active:true}))}));'
+ENV DSPACE_APP_CONFIG_PATH=/app/config/nexus-languages.json
 # Upstream generates hashed browser configuration and index.html at startup.
 # The server bundle and source configuration remain root-owned.
 RUN mkdir -p /app/log && chown -R node:node /app/log /app/dist/browser

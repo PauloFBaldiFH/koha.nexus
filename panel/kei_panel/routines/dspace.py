@@ -83,7 +83,8 @@ async def install(app):
         t('Repository address:'), validate=lambda v: '' if origin(v) else t('Enter one HTTP(S) address without credentials or a path.')))
     if not url:
         return
-    plan = await call(app, 'plan', '--url', url)
+    language = getattr(getattr(app,'env',None),'lang','en')
+    plan = await call(app, 'plan', '--url', url, '--language', language)
     if plan is None:
         return
     text = t('Review the DSpace installation plan. Only its own resources are created; existing repository data are preserved.') + '\n\n' + json.dumps(plan, ensure_ascii=False, indent=2)
@@ -95,7 +96,7 @@ async def install(app):
         if not await app.push_screen_wait(ConfirmScreen(TITLE, t('An earlier database migration was interrupted or failed. Review the diagnosis and preserved data before another attempt. Explicitly retry the migration?'), danger=True)):
             return
         retry = ['--retry-migration']
-    result = await call(app, 'install', '--url', url, '--confirm', *retry)
+    result = await call(app, 'install', '--url', url, '--language', language, '--confirm', *retry)
     if result is not None:
         app.check_platforms()
         if isinstance(result.get('note'), str) and result['note']:
@@ -192,7 +193,13 @@ async def admin(app):
             if not value:
                 return
             request[key] = value
-        language = await app.push_screen_wait(ChoiceScreen(TITLE, t('Account language'), [('pt_BR', 'Português'), ('en', 'English'), ('es', 'Español')]))
+        choices = [(row['code'], row['label']) for row in data.get('languages', [])
+                   if isinstance(row,dict) and isinstance(row.get('code'),str) and isinstance(row.get('label'),str)]
+        if not choices:
+            choices = [('pt_BR', 'Português'), ('en', 'English'), ('es', 'Español')]
+        preferred = getattr(getattr(app,'env',None),'lang','en').split('-')[0].split('_')[0]
+        choices.sort(key=lambda row: not row[0].startswith(preferred))
+        language = await app.push_screen_wait(ChoiceScreen(TITLE, t('Account language'), choices))
         if not language:
             return
         request['language'] = language
@@ -419,9 +426,48 @@ async def address(app):
     await operation(app,'address',request,True)
 
 
+async def languages(app):
+    from ..screens.dialogs import ChecklistScreen
+    request={'panel_language':getattr(getattr(app,'env',None),'lang','en')}
+    env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps(request)}
+    data=await call(app,'operations','languages',env=env)
+    if data is None:return
+    options=[(row['code'],row['label'],row['code'] in data['active']) for row in data['available']]
+    active=await app.push_screen_wait(ChecklistScreen(TITLE,t('These translations are already included in the installed image. Choose the languages available to visitors.'),options))
+    if active is None:return
+    if not active:
+        app.notify(t('Keep at least one language active.'),severity='warning');return
+    labels={row['code']:row['label'] for row in data['available']}
+    suggestion=data['suggested'] if data['suggested'] in active else data['fallback'] if data['fallback'] in active else active[0]
+    ordered=[suggestion]+[code for code in active if code!=suggestion]
+    fallback=await app.push_screen_wait(ChoiceScreen(TITLE,t('Fallback language. Visitors keep their own saved or browser preference when available. The first suggestion follows the panel language.'),[(code,labels[code]) for code in ordered]))
+    if fallback is None:return
+    env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps(dict(active=active,fallback=fallback))}
+    plan=await call(app,'operations','language-save',env=env)
+    if plan is None:return
+    question = t('DSpace is stopped. Save these languages for its next start without starting any service?') if plan.get('pending_start') else t('Apply these languages and restart only the DSpace interface? Existing accounts, repository data, domains and schedules are kept.')
+    if not await app.push_screen_wait(ConfirmScreen(TITLE,question+'\n\n'+', '.join(labels[c] for c in active)+'\n'+labels[fallback])):return
+    if isinstance(plan.get('revision'),str):
+        env={'KEI_DSPACE_OPERATIONS_DATA':json.dumps(dict(active=active,fallback=fallback,expected_revision=plan['revision']))}
+    result=await call(app,'operations','language-save','--confirm',env=env,cancellable=False)
+    if result is not None:
+        message=t('Languages saved for the next DSpace start. Services remain stopped.') if result.get('pending_start') else t('Languages saved and the DSpace interface restarted.')
+        await app.push_screen_wait(MessageScreen(TITLE,message))
+
+
 async def upgrade(app):
     from ..screens.files import PathPickerScreen
-    path=await app.push_screen_wait(PathPickerScreen(TITLE,'/etc/koha-nexus',mode='file',suffixes=('.json',),help_text=t('Choose the reviewed immutable image catalog for the recipe 3 to 4 update. Other migrations are refused.')))
+    mode=await app.push_screen_wait(ChoiceScreen(TITLE,t('Use the current reviewed image recipe, preserving the repository and verifying a safety backup before replacing images.'),[('prepare',t('Prepare the reviewed images on this server')),('catalog',t('Choose an existing reviewed image catalog'))]))
+    if mode is None:return
+    if mode=='prepare':
+        if not await app.push_screen_wait(ConfirmScreen(TITLE,t('Build the reviewed update images? This can take 30–90 minutes or longer. Current repository images and data remain until the separate update plan is confirmed.'))):return
+        prepared=await call(app,'prepare-upgrade-images','--confirm',cancellable=False)
+        if prepared is None:return
+        if prepared.get('already_current'):
+            await app.push_screen_wait(MessageScreen(TITLE,t('The repository already uses the current reviewed image recipe.')));return
+        path=prepared['catalog']
+    else:
+        path=await app.push_screen_wait(PathPickerScreen(TITLE,'/etc/koha-nexus',mode='file',suffixes=('.json',),help_text=t('Choose the reviewed image catalog for this update. Database migrations are not performed.')))
     if path:await operation(app,'upgrade',{'catalog':str(path)},True)
 
 

@@ -344,7 +344,8 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📦  Export diagnostics", "export-diagnostics", kind="native"),
         Entry("🗂  Open diagnostics", "open-diagnostics", kind="native"),
     )),
-    Section("languages", "🌍  Koha languages", "🌍 Koha & Panel Languages", "Choose an action:", (
+    Section("languages", "🌍  Languages", "🌍 Panel & application languages", "Choose an action:", (
+        Entry("🏛  DSpace interface languages", "dspace-languages", kind="native", requires="dspace"),
         Entry("🌍  Download & activate a language", "languages", kind="native"),
         Entry("📥  Download a language pack only", "lang-download", kind="native", requires="koha"),
         Entry("✅  Set an installed language as active", "lang-activate", kind="native", requires="koha"),
@@ -379,7 +380,7 @@ def section(section_id: str) -> Section:
 # installer tasks (--task), none is a classic --run routine. The task a card
 # needs from the installer in use, or its card is not drawn.
 PLATFORM_TASKS: dict[str, str] = {
-    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace", "dspace-backup-create", "dspace-backup-test", "dspace-backup-restore", "dspace-backup-key", "dspace-plan", "dspace-plan-run", "dspace-address", "dspace-upgrade", "dspace-remove", "dspace-repair-web")},
+    **{name: "dspace-panel" for name in ("dspace-install", "dspace-start", "dspace-stop", "dspace-diagnose", "dspace-logs", "dspace-admin", "dspace-help", "setup-dspace", "dspace-backup-create", "dspace-backup-test", "dspace-backup-restore", "dspace-backup-key", "dspace-plan", "dspace-plan-run", "dspace-address", "dspace-upgrade", "dspace-remove", "dspace-repair-web", "dspace-languages")},
     "docker-install": "docker-plan", "docker-remove": "docker-remove",
     "tainacan-install": "tainacan-plan", "tainacan-status": "tainacan-status", "tainacan-logs": "tainacan-logs",
     "tainacan-credentials": "tainacan-credentials", "tainacan-uninstall": "tainacan-uninstall",
@@ -461,6 +462,7 @@ DESCRIPTIONS: dict[str, str] = {
     "dspace-start": "Starts the existing DSpace services without reinstalling, restoring or changing the approved migration history.",
     "dspace-stop": "Stops the repository gracefully, retaining configuration and every data volume.",
     "dspace-diagnose": "Explicitly checks PostgreSQL, all seven Solr cores, API, interface and isolation; process state alone does not establish health.",
+    "dspace-languages": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
     "dspace-repair-web": "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.",
     "dspace-logs": "Shows bounded container logs with sensitive fields redacted. It never exports private configuration or the database password.",
     "dspace-admin": "Creates an administrator with an e-mail, chosen password and language, or resets an existing administrator. Creating refuses an e-mail already used by any account.",

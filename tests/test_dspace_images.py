@@ -81,6 +81,18 @@ class DSpaceInputs(unittest.TestCase):
                         self.assertIn(source,included,'COPY source is excluded by .dockerignore')
                         self.assertTrue((directory/source).is_file())
 
+    def test_translation_inputs_reject_missing_or_changed_files(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);source=base/'source';directory=source/'src/assets/i18n';directory.mkdir(parents=True)
+            text=b'{"test":"hello"}'
+            (base/'languages.json').write_text(json.dumps({'languages':[{'code':'en','sha256':hashlib.sha256(text).hexdigest()}]}))
+            with patch.object(images,'BASE',base):
+                with self.assertRaisesRegex(ValueError,'translation missing'):images.validate_language_inputs(source)
+                (directory/'en.json5').write_bytes(text);images.validate_language_inputs(source)
+                (directory/'en.json5').write_text('{}')
+                with self.assertRaisesRegex(ValueError,'translation missing'):images.validate_language_inputs(source)
+
     def test_rejects_tag_or_shell_in_prefix(self):
         for prefix in ("image:latest", "image;touch /tmp/unwanted", "$(id)"):
             with self.subTest(prefix=prefix), self.assertRaises(ValueError):
@@ -104,6 +116,10 @@ class DSpaceInputs(unittest.TestCase):
             self.assertFalse(out.exists())
 
     def prepared_fixture(self, path):
+        # This minimal fixture exercises exported-file integrity. Translation
+        # content is checked separately and by the real image preparation.
+        translations=patch.object(images,'validate_language_inputs')
+        translations.start();self.addCleanup(translations.stop)
         (path / "backend-source").mkdir()
         (path / "ui-source").mkdir()
         (path / "backend-source/pom.xml").write_text(

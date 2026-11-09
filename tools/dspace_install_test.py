@@ -185,6 +185,33 @@ def main():
             finally:
                 browser.close()
         check(True, 'real browser signs in after local web repair')
+        backend_id = rt.compose('ps','-q','backend').strip()
+        selected_languages = ['en','pt-BR','fr','ja']
+        Operations(rt).dispatch('language-save', {'active':selected_languages,'fallback':'pt-BR'}, True)
+        check(backend_id == rt.compose('ps','-q','backend').strip(), 'changing interface languages restarts only the interface')
+        config = rt.http_json('/assets/config.json', rt.state()['ports']['ui'])
+        check(config['fallbackLanguage']=='pt-BR' and
+              {row['code'] for row in config['languages'] if row['active']} == set(selected_languages),
+              'real browser configuration contains the selected languages and fallback')
+        language_email='language-acceptance@example.org'; language_password=__import__('secrets').token_urlsafe(24)
+        rt.admin('create',dict(email=language_email,first='Language',last='Acceptance',language='fr',password=language_password))
+        from dspace_browser_test import API
+        french=API(rt.state()['url']);french.login(language_email,language_password)
+        person=french.request(french.request('/authn/status')['_links']['eperson']['href'])
+        check(person['metadata']['eperson.language'][0]['value']=='fr', 'the real administrator helper saves the selected account language')
+        with sync_playwright() as playwright:
+            browser=playwright.chromium.launch(headless=True)
+            try:
+                context=browser.new_context(locale='zz-ZZ');page=context.new_page()
+                page.goto('http://localhost:8100/login',wait_until='domcontentloaded');wait_for_client(page)
+                page.wait_for_function("document.documentElement.lang === 'pt-BR'")
+                page.screenshot(path=str(output/'dspace-portuguese-login.png'))
+                context.add_cookies([{'name':'dsLanguage','value':'fr','url':'http://localhost:8100'}])
+                page.reload(wait_until='domcontentloaded');wait_for_client(page)
+                page.wait_for_function("document.documentElement.lang === 'fr'")
+            finally:
+                browser.close()
+        check(True, 'real browser uses the Portuguese fallback and a saved French preference')
         (output / 'dspace-acceptance.json').write_text(json.dumps(rt.diagnostic(), indent=2))
     except BaseException as error:
         # Only this disposable lab's generated credentials; never export raw inspect/config.
