@@ -127,7 +127,7 @@ def test_the_sidebar_and_the_tabs_follow_what_is_installed(server):
 
     ids, shown, active, ran, planned = asyncio.run(main())
     koha, tainacan = server in ("koha", "both"), server in ("tainacan", "both")
-    expected = ["dashboard", "koha"] + (KOHA_SCREENS if koha else []) + ["tainacan"] + \
+    expected = ["dashboard", "instances", "koha"] + (KOHA_SCREENS if koha else []) + ["tainacan"] + \
         (TAINACAN_SCREENS if tainacan else []) + ["dspace", "sidebar-server"] + SERVER_SCREENS
     assert ids == expected
     assert "platforms" not in ids and "install" not in ids
