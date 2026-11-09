@@ -1,6 +1,8 @@
 # Recuperação e instâncias — continuidade
 
-Atualizado em 09/11/2026. Branch `feat/instance-recovery`, base `05aed5c`.
+Atualizado em 09/11/2026. Primeiro conjunto mesclado no #359
+(`feat/instance-recovery`, base `05aed5c`). Continuação de agendamentos na
+branch `feat/schedule-controls`, base `9bac7c0`, versão 1.5.189.
 Trabalho autorizado: plano de recuperação e instâncias inteiro, mais logs,
 backups individuais com compactação, recuperação do Nexus completo, controles
 editáveis das agendas, idiomas DSpace e criação/remoção pela lateral.

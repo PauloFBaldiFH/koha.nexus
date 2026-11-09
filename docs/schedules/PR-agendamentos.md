@@ -64,7 +64,12 @@ edição de cron. A única ação de escrita é Salvar após confirmação.
   remoção dos jobs vinculados e recusa de links simbólicos.
 - 45 testes dos motores/conjuntos e 35 testes das operações DSpace aprovados
   no contêiner, incluindo os casos novos. Nenhum serviço real foi alterado.
-- Suíte completa do painel em execução antes da publicação; registrar o
-  resultado final junto ao commit. Testes da CI incluem o novo módulo de
-  controles e os testes Bash em Ubuntu/Debian.
+- Mesma seleção completa do workflow Platforms panel: 267 testes aprovados,
+  sem falhas nem testes pulados, em Python 3.12 local (10 min 38 s). A CI
+  verifica Python 3.9 e 3.13; seus resultados devem ser conferidos no GitHub.
+- 19 verificações de menus, documentação, checksums e formatos aprovadas.
+- Após o último ajuste, os sete casos Bats novos e os 35 testes de operações
+  DSpace passaram novamente. Sintaxe Bash, checksum e build bundle conferidos.
+- Testes da CI incluem o novo módulo de controles e os testes Bash em
+  Ubuntu/Debian; nenhum teste obrigatório foi removido ou ignorado.
 - Sem validação no servidor de Paulo nesta etapa.
