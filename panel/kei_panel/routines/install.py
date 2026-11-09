@@ -144,9 +144,6 @@ async def install_koha(app) -> None:
             if rep.previews:
                 await app.push_screen_wait(TextScreen(t("Diagnostic Report"), rep.previews[-1][1]))
 
-    # A new library: the steps after the installation (each can wait).
-    from .setup import maybe_start
-    await maybe_start(app, "koha")
 
     if done.get("can_reboot") != "yes":
         await app.push_screen_wait(MessageScreen(t("Koha is ready"), tx(

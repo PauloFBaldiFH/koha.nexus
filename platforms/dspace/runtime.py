@@ -824,7 +824,13 @@ def main():
     for name in ('availability', 'admin-status', 'logs', 'setup-close', 'status', 'diagnose', 'proxy-config'):
         sub.add_parser(name)
     for name in ('backup-create', 'backup-rollback'):
-        sub.add_parser(name).add_argument('--confirm', action='store_true')
+        child = sub.add_parser(name)
+        child.add_argument('--confirm', action='store_true')
+        if name == 'backup-create':
+            child.add_argument('--compression', choices=('none', 'gz', 'bz2', 'xz'))
+    settings = sub.add_parser('backup-settings')
+    settings.add_argument('--compression', choices=('none', 'gz', 'bz2', 'xz'))
+    settings.add_argument('--confirm', action='store_true')
     for name in ('backup-test', 'backup-restore', 'backup-plan'):
         child = sub.add_parser(name)
         child.add_argument('package')
@@ -869,14 +875,19 @@ def main():
             recovery = Recovery(runtime, recovery_phrase)
             try:
                 if args.command == 'backup-list':
-                    result = {'packages': [str(p) for p in sorted(recovery.home.glob('knx-dspace-*.tar.gpg'), reverse=True)]}
+                    result = recovery.packages()
+                elif args.command == 'backup-settings':
+                    if args.compression is None:
+                        result = recovery.settings()
+                    else:
+                        with runtime.lock(): result = recovery.settings(args.compression, args.confirm)
                 elif args.command == 'backup-plan':
                     with runtime.lock(): result = recovery.plan(args.package)
                 else:
                     if not args.confirm: raise Refused('Review the recovery scope and use explicit --confirm.')
                     with runtime.lock():
                         if args.command != 'backup-rollback': recovery.recover_capture()
-                        if args.command == 'backup-create': result = recovery.capture()
+                        if args.command == 'backup-create': result = recovery.capture(args.compression)
                         elif args.command == 'backup-test': result = recovery.test(args.package)
                         elif args.command == 'backup-restore': result = recovery.restore(args.package)
                         else: result = recovery.rollback()

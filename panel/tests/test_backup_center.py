@@ -436,7 +436,10 @@ def test_the_assisted_restore_recognises_the_backup_and_uses_the_existing_restor
             elif kind == "unsafe":
                 await until(pilot, lambda: isinstance(app.screen, MessageScreen))
                 shown = app.screen._body
-            await pilot.pause(1.0)
+            if restored:
+                await until(pilot, lambda: len(calls) == len(restored.split()))
+            if kind == "koha-nexus-set":
+                await until(pilot, lambda: any(n == "set-cleanup" for n, _a in ran))
             return shown, [n for n, _a in ran]
 
     shown, names = asyncio.run(main())
@@ -628,3 +631,47 @@ def test_scheduling_the_joint_backup_asks_everything_then_writes_one_schedule(se
     assert "every day at 01:15 in /root/backups" in current
     assert "never two at the same time" in question and "Cloud copy: gdrive:sets" in question
     assert ran == [("set-schedule", ("time=02:40", f"dest={tmp_path}", "keep=5", "copy=gdrive:sets", "secrets=yes"))]
+
+
+@pytest.mark.parametrize('size', [(80, 24), (160, 48)])
+def test_dspace_inventory_and_persisted_compression_are_available_without_capturing(monkeypatch, size):
+    import json
+    from textual.widgets import Select
+    from kei_panel.bridge import TaskOutcome
+    from kei_panel.widgets.cards import StatusCard
+    monkeypatch.setenv('KEI_PANEL_DEMO_KOHA', '0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_TAINACAN', '0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_DSPACE', '1')
+    async def exercise():
+        app = KohaPanelApp(PanelEnv(installer=None, lang='en', plain=True, demo=True))
+        original = app.bridge.task
+        calls = []; preference = {'compression': 'gz'}
+        async def task(name, *args, **kwargs):
+            calls.append((name,args))
+            if name == 'dspace-panel' and args[0] == 'backup-list':
+                data = dict(preference, packages=['/backups/new.tar.gz.gpg'], directory='/backups',
+                            details=[dict(path='/backups/new.tar.gz.gpg',bytes=2048,modified_at=1730000000)])
+                return TaskOutcome(results={'json':json.dumps(data)})
+            if name == 'dspace-panel' and args[0] == 'backup-settings':
+                assert args == ('backup-settings', '--compression', 'xz', '--confirm')
+                preference['compression'] = 'xz'
+                return TaskOutcome(results={'json':json.dumps(preference)})
+            return await original(name,*args,**kwargs)
+        app.bridge.task = task
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause(1.5)
+            app.backup_scope='dspace'; app.screen.action_show('backups')
+            await until(pilot, loaded(app))
+            view = current_view(app)
+            select = view.query_one('#bk-ds-codec', Select)
+            assert not select.disabled and select.value == 'gz'
+            assert '2 KB' in str(view.query_one('#bk-ds-size', StatusCard).query_one('.card-value').render())
+            assert not any(args and args[0]=='backup-settings' for name,args in calls)
+            select.value='xz'
+            await until(pilot, lambda: preference['compression']=='xz')
+            await until(pilot, lambda: not select.disabled)
+            view.refresh_data()
+            await until(pilot, loaded(app))
+            assert select.value == 'xz'
+            assert not any(args and args[0] in ('backup-create','backup-restore','backup-test') for name,args in calls)
+    asyncio.run(exercise())

@@ -73,11 +73,18 @@ class Section:
 # The platform groups of the sidebar, in order: the id of the platform's
 # home section, which is also the group's name.
 GROUPS = ("koha", "tainacan", "dspace")
+# UI orchestration uses existing drivers and has no standalone Bash mutation.
+PANEL_ONLY_ACTIONS = frozenset({"instance-add", "instance-remove"})
 
 SECTIONS: tuple[Section, ...] = (
     # State, addresses and indicators of the server and of each platform
     # live here only, in tabs (views/dashboard.py).
     Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="📊"),
+
+    Section("instances", "➕  Add or remove instance", "Instances", entries=(
+        Entry("➕  Add instance", "instance-add", kind="native"),
+        Entry("🗑  Remove instance", "instance-remove", kind="native", zone="removal"),
+    )),
 
     # ---------------- Koha (library) ----------------
     # Its home: installing while Koha is absent; its tools once installed;
@@ -437,6 +444,8 @@ def all_actions() -> set[str]:
 # few words. English keys like the labels; pt.cache holds the PT-BR texts.
 # tests/test_menus.py checks every entry has one.
 DESCRIPTIONS: dict[str, str] = {
+    "instance-add": "Choose an available application driver and review its installation plan.",
+    "instance-remove": "Choose an installation and review whether to preserve or erase its data.",
     "dspace-address": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.",
     "dspace-upgrade": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.",
     "dspace-remove": "Keeps repository data by default. Erasing active owned volumes needs an additional typed confirmation and a verified safety backup. Other platforms and shared infrastructure remain.",

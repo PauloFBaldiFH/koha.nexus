@@ -3125,6 +3125,24 @@
   },
   "dspace-plan-run": {
    "summary": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups."
+  },
+  "sec-instances": {
+   "summary": "Installations",
+   "overview": [
+    "Use Add instance to choose an application that is not installed, or Remove instance to review an existing container installation. Additional copies of the same application are not enabled by these shortcuts."
+   ]
+  },
+  "instance-add": {
+   "summary": "Add instance",
+   "overview": [
+    "Choose Koha, Tainacan or DSpace and follow its existing driver. Installed applications are excluded to preserve existing data."
+   ]
+  },
+  "instance-remove": {
+   "summary": "Remove instance",
+   "overview": [
+    "Choose Tainacan or DSpace, then review the driver removal plan. Data are kept by default; erasing requires separate confirmation. Native Koha removal is not yet offered here."
+   ]
   }
  }
 }

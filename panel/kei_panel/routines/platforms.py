@@ -174,9 +174,6 @@ async def tainacan_install(app) -> None:
             await _setup_done(app, "tainacan", "public")
         elif mode == "free":
             await tainacan_free(app, True)
-        # A new installation: the steps after it (each can wait).
-        from .setup import maybe_start
-        await maybe_start(app, "tainacan")
 
 
 async def tainacan_backup(app) -> None:

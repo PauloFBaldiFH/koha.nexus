@@ -148,7 +148,7 @@ def dspace_problem(facts) -> str:
         "absent": "DSpace is experimental. Installation needs a reviewed image catalog, Docker and a web proxy; each change has its own plan and confirmation.",
         "incomplete": "DSpace installation is incomplete. Read the diagnosis before resuming; data and the migration journal are preserved.",
         "failing": "DSpace is stopped or unavailable. Diagnose first, then start its services; this does not require restoring a backup.",
-        "unknown": "DSpace state is unknown. Refresh or update the panel before changing services.",
+        "unknown": "DSpace state could not be read. Retry Refresh or use Diagnosis and Logs below.",
         "installed": "Experimental DSpace: encrypted individual backups are in the Backup center. Explicit schedules and cloud copies are in the same center; address/HTTPS and reviewed updates remain in the DSpace menu. State and addresses are in the DSpace dashboard tab.",
     }[mode])
 
@@ -720,6 +720,13 @@ def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
     task for it, and the facts that decide some cards (a button that would
     only answer "not possible here" is not drawn)."""
     from .menus import PLATFORM_TASKS
+    if mode == "unknown":
+        # Reading health must never be a prerequisite for reaching diagnosis.
+        # Mutating routines independently identify/validate their own target.
+        recovery = {"dspace-diagnose", "dspace-logs", "dspace-remove",
+                    "tainacan-status", "tainacan-logs", "tainacan-uninstall"}
+        task = PLATFORM_TASKS.get(action)
+        return action in recovery and (not task or facts.has(task))
     if zone not in ZONES.get(mode, ("", "removal")):
         return False
     task = PLATFORM_TASKS.get(action)

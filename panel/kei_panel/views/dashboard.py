@@ -19,12 +19,15 @@ to cover the screen, but it still never blocks it.
 
 from __future__ import annotations
 
+import asyncio
+import shutil
 import time
+from pathlib import Path
 
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal
-from textual.widgets import Button, Label, TabbedContent, TabPane
+from textual.widgets import Button, Label, Static, TabbedContent, TabPane
 
 from .. import health, platforms
 from ..i18n import t
@@ -322,6 +325,7 @@ class DashboardView(SectionView):
             yield Button(t("Refresh"), id="refresh", classes="small")
         yield PacmanLoader(compact=True, plain=self.app.env.plain, colors=not self.app.env.no_color,
                            id="status-loader")
+        yield Static("", id="status-error", classes="view-prompt", markup=False)
         with TabbedContent(id="dash-tabs", initial="dash-tab-general"):
             with TabPane(t("General"), id="dash-tab-general"):
                 yield Label(t("Platforms"), classes="view-prompt")
@@ -367,6 +371,8 @@ class DashboardView(SectionView):
                 yield DSpaceSummary(id="dash-dspace")
 
     def on_mount(self) -> None:
+        self._last_status_at = 0
+        self.query_one("#status-error").display = False
         self.koha_layout()
         self.refresh_data()
 
@@ -408,25 +414,78 @@ class DashboardView(SectionView):
 
     def refresh_data(self) -> None:
         self.query_one("#status-loader").display = True
+        # Local resources remain visible even if Docker, a platform adapter or
+        # the installer protocol fails. They do not need network access.
+        self.run_worker(self._load_local_health(), exclusive=True, group="local-health", exit_on_error=False)
         self.run_worker(self._load(), exclusive=True, group="status", exit_on_error=False)
+
+    async def _load_local_health(self) -> None:
+        def read():
+            memory = {}
+            disk = None
+            try:
+                values = {line.split(":")[0]: int(line.split()[1]) * 1024
+                          for line in Path("/proc/meminfo").read_text().splitlines()}
+                memory = {"total": values.get("MemTotal", 0), "available": values.get("MemAvailable", 0)}
+            except (OSError, ValueError, IndexError):
+                pass
+            try:
+                disk = shutil.disk_usage("/")
+            except OSError:
+                pass
+            try:
+                cpu = health.read_cpu()
+            except (OSError, ValueError):
+                cpu = None
+            return cpu, memory, disk
+        if self.app.env.demo:
+            return
+        cpu, memory, disk = await asyncio.to_thread(read)
+        self.query_one("#health-cpu", StatusCard).set(*cpu_card(cpu))
+        self.query_one("#health-memory", StatusCard).set(*memory_card(memory))
+        if disk:
+            self.query_one("#card-disk", StatusCard).set(
+                human_bytes(disk.free), "/ " + human_bytes(disk.total),
+                "bad" if disk.total and disk.free / disk.total < 0.1 else "ok")
+        else:
+            self.query_one("#card-disk", StatusCard).set(*_unread())
+
+    def _status_failed(self) -> None:
+        error = self.query_one("#status-error", Static)
+        message = t("Could not read server status. Retry Refresh or open Server diagnostics.")
+        if self._last_status_at:
+            message += " " + t("Showing the last reading from ${when}.",
+                                when=time.strftime("%H:%M:%S", time.localtime(self._last_status_at)))
+        else:
+            # Never leave the initial ellipses behind after the loader stops.
+            for card in self.query(StatusCard):
+                if card.id in ("health-cpu", "health-memory", "card-disk"):
+                    continue
+                card.set(t("Unknown"), t("Could not read"), "warn")
+        error.update(message)
+        error.display = True
 
     async def _load(self) -> None:
         try:
             status = await self.app.bridge.status()
-        except Exception as e:  # shown in the card, never a crash
-            self.query_one("#card-state", StatusCard).set(t("Unknown"), str(e)[:60], "bad")
-            status = None
-        finally:
-            self.query_one("#status-loader").display = False
-        if status:
+            if not isinstance(status, dict) or not status:
+                raise ValueError("Empty status response")
             self.app.platforms_seen(status)
             self.koha_layout()
             self.show(status)
             self.query_one("#dash-dspace", DSpaceSummary).show(platforms.dspace_detail(status))
+            self._last_status_at = time.time()
+            self.query_one("#status-error").display = False
             self.run_worker(self._load_health(status), exclusive=True, group="health", exit_on_error=False)
             if self.app.tainacan_installed:
                 self.run_worker(self._load_tainacan(status), exclusive=True, group="dash-tainacan",
                                 exit_on_error=False)
+        except Exception:
+            # Includes rendering/type failures; details returned by an external
+            # command must never become unredacted text in the public dashboard.
+            self._status_failed()
+        finally:
+            self.query_one("#status-loader").display = False
 
     async def _load_tainacan(self, status: dict) -> None:
         """The Tainacan tab: what --status-json and the backup engine say

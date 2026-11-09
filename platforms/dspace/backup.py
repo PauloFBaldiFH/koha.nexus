@@ -18,6 +18,20 @@ class Error(Exception):
     pass
 
 
+COMPRESSIONS = {'none': ('w', '.tar'), 'gz': ('w:gz', '.tar.gz'),
+                'bz2': ('w:bz2', '.tar.bz2'), 'xz': ('w:xz', '.tar.xz')}
+
+
+def archive_compression(path):
+    """Read the envelope, never trust the name of a restored package."""
+    with open(path, 'rb') as stream:
+        magic = stream.read(6)
+    if magic.startswith(b'\x1f\x8b'): return 'gz'
+    if magic.startswith(b'BZh'): return 'bz2'
+    if magic.startswith(b'\xfd7zXZ\x00'): return 'xz'
+    return 'none'
+
+
 def sha(path):
     h = hashlib.sha256()
     with open(path, 'rb') as stream:
@@ -50,12 +64,13 @@ def entries(root):
 def extract(archive, dest, budget):
     """Validate the entire archive before writing anything, including duplicates."""
     seen = set(); total = 0
-    with tarfile.open(archive, 'r:') as source:
+    with tarfile.open(archive, 'r:*') as source:
         members = []
         for member in source:
             members.append(member)
             if len(members) > 1000000: raise Error('Too many archive entries.')
-        for member in members:
+            # Check each header before tarfile advances past its payload. A
+            # compressed archive may expand far beyond its on-disk size.
             p = PurePosixPath(member.name)
             if (member.name in seen or not p.parts or not member.name or p.is_absolute() or
                     '..' in p.parts or '\\' in member.name or str(p) != member.name or
@@ -163,8 +178,52 @@ class Recovery:
             elif data.get('phase') not in ('writes-resumed', 'complete'):
                 raise Error('Interrupted restoration: inspect the recovery journal before continuing.')
 
-    def capture(self):
+    def settings(self, compression=None, confirm=False):
+        """One preference for manual, scheduled and safety copies; reads do not write."""
         from runtime import atomic
+        path = self.rt.root / 'backup-settings.json'
+        current = {'schema': 1, 'compression': 'gz'}
+        if path.exists() or path.is_symlink():
+            info = path.lstat()
+            if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_uid != os.geteuid():
+                raise Error('Backup settings must be a private file owned by the operator.')
+            current = json.loads(path.read_text())
+            if (not isinstance(current, dict) or current.get('schema') != 1 or
+                    current.get('compression') not in COMPRESSIONS):
+                raise Error('Invalid DSpace backup settings; existing configuration was preserved.')
+        if compression is None:
+            return current
+        if compression not in COMPRESSIONS:
+            raise Error('Choose none, gz, bz2 or xz compression.')
+        if not confirm:
+            raise Error('Confirm the backup compression change explicitly.')
+        if not self.rt.state():  # verifies the installation directory before writing
+            raise Error('Install DSpace before saving its backup settings.')
+        result = {'schema': 1, 'compression': compression}
+        atomic(path, json.dumps(result) + '\n')
+        return result
+
+    def packages(self):
+        """Read-only inventory; presence is not a claim of a tested restoration."""
+        details = []
+        if self.home.is_symlink():
+            raise Error('Backup directory cannot be a symbolic link.')
+        for path in self.home.glob('knx-dspace-*.tar*.gpg'):
+            info = path.lstat()
+            if (not stat.S_ISREG(info.st_mode) or
+                    not any(path.name.endswith(suffix + '.gpg') for _, suffix in COMPRESSIONS.values())):
+                continue
+            details.append({'path': str(path), 'bytes': info.st_size, 'modified_at': int(info.st_mtime)})
+        details.sort(key=lambda item: (item['modified_at'], item['path']), reverse=True)
+        return {'packages': [item['path'] for item in details], 'details': details,
+                'compression': self.settings()['compression'], 'directory': str(self.home)}
+
+    def capture(self, compression=None):
+        from runtime import atomic
+        compression = self.settings()['compression'] if compression is None else compression
+        if compression not in COMPRESSIONS:
+            raise Error('Choose none, gz, bz2 or xz compression.')
+        archive_mode, extension = COMPRESSIONS[compression]
         self.crypto('check')  # no data copied or stopped without an encryption key
         state, compose = self.checked()
         paths = self.volumes(compose)
@@ -177,7 +236,7 @@ class Recovery:
         running = self.running()
         if 'postgres' not in running: raise Error('PostgreSQL must be running for a logical backup.')
         name = 'knx-dspace-' + time.strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(4)
-        destination = self.home / (name + '.tar.gpg')
+        destination = self.home / (name + extension + '.gpg')
         with tempfile.TemporaryDirectory(prefix='.capture-', dir=self.home) as temporary:
             work = Path(temporary); tree = work / 'data'; tree.mkdir(mode=0o700)
             self.record(phase='capture', services=running, package=str(destination))
@@ -200,6 +259,7 @@ class Recovery:
                 for name in ('local.cfg', 'db-password', 'state.json'):
                     shutil.copyfile(self.rt.root / name, private / name)
                 manifest = dict(format=1, platform='dspace', complete=True, created=time.time(),
+                    compression=compression,
                     release_sha256=self.rt.release_hash, images={k:v['image'] for k,v in compose['services'].items()},
                     url=state['url'], files=entries(tree), volumes=sorted(k for k in paths if k != 'postgres'),
                     cores=['authority','oai','search','statistics','qaevent','suggestion','audit'])
@@ -207,8 +267,9 @@ class Recovery:
                 self.resume(running)  # failure propagates; never claim successful resumption
             manifest['window_seconds'] = round(time.time() - start, 3)
             atomic(tree / 'manifest.json', json.dumps(manifest, sort_keys=True))
-            archive = work / 'capture.tar'
-            with tarfile.open(archive, 'w', format=tarfile.PAX_FORMAT, dereference=True) as out:
+            archive = work / ('capture' + extension)
+            self.notify('backup-compressing' if compression != 'none' else 'backup-packaging')
+            with tarfile.open(archive, archive_mode, format=tarfile.PAX_FORMAT, dereference=True) as out:
                 for number,path in enumerate(sorted(tree.rglob('*')),1):
                     if number > 1000000: raise Error('Too many archive entries for this recovery format.')
                     out.add(path, arcname=path.relative_to(tree).as_posix(), recursive=False)
@@ -223,7 +284,8 @@ class Recovery:
             finally:
                 partial.unlink(missing_ok=True)
         self.record(phase='complete', package=str(destination))
-        return {'package':str(destination), 'encrypted':True, 'window_seconds':manifest['window_seconds']}
+        return {'package':str(destination), 'encrypted':True, 'compression':compression,
+                'bytes':destination.stat().st_size, 'window_seconds':manifest['window_seconds']}
 
     @contextlib.contextmanager
     def opened(self, package):
@@ -238,11 +300,17 @@ class Recovery:
             self.notify('recovery-decrypting')
             self.crypto('decrypt', package, archive)
             tree.mkdir(mode=0o700)
-            extract(archive, tree, shutil.disk_usage(stage).free // 2)
+            compression = archive_compression(archive)
+            try:
+                extract(archive, tree, shutil.disk_usage(stage).free // 2)
+            except (tarfile.TarError, EOFError) as error:
+                raise Error('The decrypted recovery archive is invalid or truncated.') from error
             manifest = json.loads((tree / 'manifest.json').read_text())
             if (manifest.get('format') != 1 or manifest.get('platform') != 'dspace' or
                     manifest.get('complete') is not True or manifest.get('release_sha256') != self.rt.release_hash):
                 raise Error('Unknown format or incompatible DSpace release.')
+            if manifest.get('compression', 'none') != compression:
+                raise Error('Recovery compression does not match its manifest.')
             actual = entries(tree); actual.pop('manifest.json', None)
             if actual != manifest.get('files'): raise Error('Recovery file inventory does not match.')
             from runtime import VOLUMES
@@ -350,6 +418,7 @@ class Recovery:
             if manifest['url'] != state['url']:
                 raise Error('Cross-address recovery requires a separate migration.')
             return {'platform':'dspace', 'release_sha256':manifest['release_sha256'],
+                'compression':manifest.get('compression','none'),
                 'source_url':manifest['url'], 'destination_url':state['url'],
                 'files':len(manifest['files']), 'uncompressed_bytes':sum(v['bytes'] for v in manifest['files'].values()),
                 'safety_backup_required':True, 'destination_database_must_be_readable':True,

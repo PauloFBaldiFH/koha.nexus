@@ -105,3 +105,33 @@ def test_escape_cancels():
         await asyncio.sleep(10)
     result, _, _ = run(job, cancel_after=0.3)
     assert result.cancelled and not result.ok
+
+
+def test_silent_task_explains_wait_and_replaces_placeholder_with_output():
+    from textual.widgets import Label, RichLog, Static
+
+    async def main():
+        app = Host()
+        gate = asyncio.Event()
+        async def job(reporter):
+            await gate.wait()
+        async with app.run_test(size=(100, 30)) as pilot:
+            run_with_loader(app, 'DSpace', job, on_done=app.results.append)
+            await pilot.pause(0.1)
+            screen = app.screen
+            assert isinstance(screen, LoadingScreen)
+            assert screen.query_one('#loader-status', Label).content
+            screen.action_toggle_log()
+            await pilot.pause()
+            assert screen.query_one('#loader-log', RichLog).lines
+            assert not screen.reporter.lines  # explanatory UI is not a fake process log
+            screen.last_output -= 20
+            screen._update_clock()
+            assert screen.query_one('#loader-waiting', Static).display
+            screen.add_log('Checking PostgreSQL')
+            screen._update_clock()
+            assert screen.has_output
+            assert not screen.query_one('#loader-waiting', Static).display
+            gate.set()
+            await pilot.pause(0.7)
+    asyncio.run(main())

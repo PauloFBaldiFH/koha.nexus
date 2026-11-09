@@ -557,3 +557,34 @@ kei_set_backup '$OUT' koha,tainacan,dspace"
     absent_count=$(tar -tf "$SET" | grep -c '^dspace/.\+' || true)
     [ "$absent_count" -eq 0 ]
 }
+
+@test "DS01 compressed DSpace members roundtrip through shared sets" {
+    for suffix in gz bz2 xz; do
+    run lib "
+_kei_bk_has_key() { return 0; }
+kei_dspace_runtime() {
+    printf cipher > '$T/knx-dspace-20261108-000000-abcd1234.tar.$suffix.gpg'
+    printf '{\"package\":\"$T/knx-dspace-20261108-000000-abcd1234.tar.$suffix.gpg\"}'
+}
+kei_set_backup '$OUT' dspace"
+    [ "$status" -eq 0 ]
+    SET=$(field file "$output")
+    [[ "$output" == *$'platform=dspace\tok\t'* ]]
+    tar -tf "$SET" | grep -q "^dspace/knx-dspace-.*\.tar\.$suffix\.gpg$"
+    m=$(manifest "$SET")
+    python3 -I - "$m" <<'PY'
+import json,sys
+x=json.loads(sys.argv[1]);assert x['format']==2 and x['complete'] is True
+assert x['recoverability']=='full' and [r['id'] for r in x['platforms']]==['dspace']
+PY
+    run lib "kei_set_inspect '$SET'"
+    [ "$status" -eq 0 ]
+    [ "$(field integrity "$output")" = ok ]
+    [ "$(field platforms "$output")" = dspace ]
+    run lib "kei_set_unpack '$SET'"
+    [ "$status" -eq 0 ]
+    [ -f "$(field dspace "$output")" ]
+    run lib "kei_set_platforms"
+    [ "$output" = 'koha tainacan' ]
+    done
+}

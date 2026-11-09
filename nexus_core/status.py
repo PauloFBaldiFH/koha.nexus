@@ -2,8 +2,8 @@
 
 The installer prints one JSON object on stdout (kei_status_json in
 `installer`, section 21.5); a wrapper may print other lines before it, so
-the last line that starts with "{" is the one read, as Get-KohaLinuxStatus
-does. Every field has a default: an older installer that lacks a block, or
+the final complete JSON object is read, as Get-KohaLinuxStatus does.
+Older serializers may place newlines inside that object. Every field has a default: an older installer that lacks a block, or
 a value of the wrong type, reads as "nothing known" instead of failing.
 Keys this module does not know are kept in `raw`.
 """
@@ -165,16 +165,40 @@ class LinuxStatus:
 
 
 def last_json_line(output: str) -> Optional[Dict[str, Any]]:
-    """The last line of `output` that starts with "{", parsed; None if none
-    parses to a JSON object."""
-    lines = [line for line in (output or "").splitlines() if line.lstrip().startswith("{")]
-    if not lines:
+    """Read a complete final object after optional legacy text/older objects.
+
+    Consume objects from their opening line. A malformed/truncated object
+    cannot fall back to a nested object's line and look like a valid status.
+    The public function name is kept for compatibility with older clients.
+    """
+    output = output or ""
+    if len(output) > 4 * 1024 * 1024:
         return None
-    try:
-        data = json.loads(lines[-1])
-    except ValueError:
-        return None
-    return data if isinstance(data, dict) else None
+    decoder = json.JSONDecoder()
+    position = 0
+    while position < len(output):
+        newline = output.find("\n", position)
+        line_end = newline if newline >= 0 else len(output)
+        line = output[position:line_end]
+        if not line.lstrip().startswith("{"):
+            position = line_end + 1
+            continue
+        start = position + len(line) - len(line.lstrip())
+        try:
+            data, end = decoder.raw_decode(output, start)
+        except ValueError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        if not output[end:].strip():
+            return data
+        # Only a new line may separate a completed older object from the
+        # preamble/response that follows it; trailing inline text is invalid.
+        newline = output.find("\n", end)
+        if newline < 0 or output[end:newline].strip():
+            return None
+        position = newline + 1
+    return None
 
 
 def parse_status(output: str) -> Optional[LinuxStatus]:

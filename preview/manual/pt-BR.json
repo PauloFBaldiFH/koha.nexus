@@ -2684,6 +2684,24 @@
   },
   "dspace-plan-run": {
    "summary": "Executa um plano explícito agora. Cifra o pacote inteiro e confere a cópia na nuvem; capturas parciais e falhas de envio não eliminam backups válidos."
+  },
+  "sec-instances": {
+   "summary": "Instalações",
+   "overview": [
+    "Use Adicionar instância para escolher um aplicativo ainda não instalado, ou Remover instância para revisar uma instalação em contêiner. Estes atalhos ainda não habilitam cópias adicionais do mesmo aplicativo."
+   ]
+  },
+  "instance-add": {
+   "summary": "Adicionar instância",
+   "overview": [
+    "Escolha Koha, Tainacan ou DSpace e siga o driver existente. Aplicativos instalados não são oferecidos, preservando seus dados."
+   ]
+  },
+  "instance-remove": {
+   "summary": "Remover instância",
+   "overview": [
+    "Escolha Tainacan ou DSpace e revise o plano de remoção. Os dados são mantidos por padrão; apagá-los exige confirmação separada. A remoção do Koha nativo ainda não é oferecida aqui."
+   ]
   }
  }
 }

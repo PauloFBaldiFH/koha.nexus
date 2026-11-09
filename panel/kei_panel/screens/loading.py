@@ -45,6 +45,9 @@ class LoadingScreen(ModalScreen[TaskResult]):
         self.started = 0.0
         self.worker: Worker | None = None
         self.fraction: float | None = None
+        self.last_output = 0.0
+        self.has_output = False
+        self.explicit_status = False
 
     def compose(self) -> ComposeResult:
         plain = getattr(self.app, "env", None) and self.app.env.plain
@@ -57,6 +60,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
             with Horizontal(id="loader-meta"):
                 yield Label("", id="loader-status", markup=False)
                 yield Label("", id="loader-clock", markup=False)
+            yield Static("", id="loader-waiting", markup=False)
             yield RichLog(id="loader-log", max_lines=500, wrap=False, markup=False)
             with Horizontal(id="loader-buttons"):
                 yield Button("Log", id="toggle-log", variant="default")
@@ -64,6 +68,11 @@ class LoadingScreen(ModalScreen[TaskResult]):
 
     def on_mount(self) -> None:
         self.started = time.monotonic()
+        self.last_output = self.started
+        self.set_status(t("Starting operation…"))
+        self.explicit_status = False
+        self.query_one("#loader-log", RichLog).write(t("Waiting for output. Some operations report only when a step finishes."))
+        self.query_one("#loader-waiting").display = False
         self.query_one("#loader-log").display = False
         self.query_one("#loader-notice").display = False
         self.query_one("#loader-bar").display = False
@@ -85,11 +94,18 @@ class LoadingScreen(ModalScreen[TaskResult]):
     # Called by the Reporter (always on the app's thread)
     # ------------------------------------------------------------------
     def add_log(self, line: str) -> None:
-        self.query_one("#loader-log", RichLog).write(line)
-        if not self.query_one("#loader-status", Label).content:
+        log = self.query_one("#loader-log", RichLog)
+        if not self.has_output:
+            log.clear()
+        self.has_output = True
+        self.last_output = time.monotonic()
+        log.write(line)
+        if not self.explicit_status:
             self.query_one("#loader-status", Label).update(line[:60])
 
     def set_status(self, text: str) -> None:
+        self.explicit_status = True
+        self.last_output = time.monotonic()
         self.query_one("#loader-status", Label).update(text)
 
     def set_notice(self, text: str) -> None:
@@ -120,6 +136,11 @@ class LoadingScreen(ModalScreen[TaskResult]):
     def _update_clock(self) -> None:
         secs = int(time.monotonic() - self.started)
         self.query_one("#loader-clock", Label).update(f"{secs // 60:02d}:{secs % 60:02d}")
+        silent = int(time.monotonic() - self.last_output)
+        waiting = self.query_one("#loader-waiting", Static)
+        waiting.display = silent >= 10
+        if waiting.display:
+            waiting.update(t("Waiting for the current step. No new output for ${seconds} seconds.", seconds=silent))
 
     # ------------------------------------------------------------------
     # End of the worker

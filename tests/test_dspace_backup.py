@@ -54,6 +54,20 @@ class ArchiveTests(unittest.TestCase):
         with self.assertRaises(b.Error): b.extract(path,self.dest,3)
         self.assertEqual(list(self.dest.iterdir()), [])
 
+    def test_all_compressions_detected_by_content_and_budgeted(self):
+        for codec, (mode, _extension) in b.COMPRESSIONS.items():
+            with self.subTest(codec=codec):
+                path = self.root / 'renamed.package'
+                with tarfile.open(path, mode) as archive:
+                    info = tarfile.TarInfo('document'); info.size = 200000
+                    archive.addfile(info, io.BytesIO(b'A' * info.size))
+                self.assertEqual(b.archive_compression(path), codec)
+                with self.assertRaises(b.Error): b.extract(path, self.dest, 1000)
+                self.assertEqual(list(self.dest.iterdir()), [])
+                self.assertEqual(b.extract(path, self.dest, 200000), 200000)
+                self.assertEqual((self.dest/'document').read_bytes(), b'A' * 200000)
+                (self.dest/'document').unlink()
+
     def test_inventory_rejects_symlinks(self):
         (self.dest/'link').symlink_to('/etc/passwd')
         with self.assertRaises(b.Error): b.entries(self.dest)
@@ -105,6 +119,76 @@ class CaptureFailures(unittest.TestCase):
         def binary(args,path,write): path.write_bytes(b'PGDMP' if path.name=='database.dump' else b'INSERT INTO t VALUES(1);\n')
         self.r.binary=Mock(side_effect=binary)
         self.r.crypto=Mock()
+
+    def test_compression_preference_is_read_only_until_confirmed(self):
+        self.assertEqual(self.r.settings()['compression'], 'gz')
+        self.assertFalse((self.root/'backup-settings.json').exists())
+        with self.assertRaises(b.Error): self.r.settings('xz')
+        with self.assertRaises(b.Error): self.r.settings('zip', confirm=True)
+        self.assertFalse((self.root/'backup-settings.json').exists())
+        self.r.settings('xz', confirm=True)
+        self.assertEqual(self.r.settings()['compression'], 'xz')
+        self.assertEqual((self.root/'backup-settings.json').stat().st_mode & 0o777, 0o600)
+
+    def test_settings_reject_symlink_without_changing_its_target(self):
+        target=self.root/'external'; target.write_text('original')
+        (self.root/'backup-settings.json').symlink_to(target)
+        with self.assertRaises(b.Error): self.r.settings('gz', confirm=True)
+        self.assertEqual(target.read_text(),'original')
+
+    def test_inventory_includes_old_and_compressed_packages_without_links_or_partial_files(self):
+        self.r.home.mkdir(mode=0o700)
+        names=[]
+        for i, (_mode, suffix) in enumerate(b.COMPRESSIONS.values()):
+            name='knx-dspace-%s%s.gpg' % (i,suffix)
+            (self.r.home/name).write_bytes(b'encrypted-package')
+            names.append(name)
+        (self.r.home/'knx-dspace-other.tar.zip.gpg').write_text('unknown')
+        (self.r.home/'knx-dspace-incomplete.tar.gz.part').write_text('partial')
+        (self.r.home/'knx-dspace-link.tar.gpg').symlink_to(self.r.home/names[0])
+        inventory=self.r.packages()
+        self.assertEqual({Path(p).name for p in inventory['packages']},set(names))
+        self.assertTrue(all(item['bytes']==17 for item in inventory['details']))
+        self.assertEqual(inventory['compression'],'gz')
+
+    def test_full_capture_and_open_each_compression_and_saved_default(self):
+        import shutil
+        from runtime import VOLUMES
+        paths={}
+        for key in VOLUMES:
+            path=self.root/('volume-'+key); path.mkdir()
+            (path/'document').write_bytes(b'example content ' * 1024)
+            paths[key]=path
+        self.r.volumes.return_value=paths
+        def crypto(operation,source=None,target=None):
+            if operation in ('encrypt','decrypt'): shutil.copyfile(source,target)
+        self.r.crypto.side_effect=crypto  # service/encryption double; actual archives/files
+        for codec in b.COMPRESSIONS:
+            with self.subTest(codec=codec):
+                self.r.settings(codec, confirm=True)
+                result=self.r.capture()
+                self.assertEqual(result['compression'],codec)
+                self.assertTrue(result['package'].endswith(b.COMPRESSIONS[codec][1]+'.gpg'))
+                renamed=self.root/'renamed.gpg'; shutil.copyfile(result['package'],renamed)
+                with self.r.opened(renamed) as (tree,manifest):
+                    self.assertEqual(manifest['compression'],codec)
+                    self.assertEqual((tree/'volumes/assetstore/document').read_bytes(),b'example content '*1024)
+
+    def test_legacy_uncompressed_manifest_remains_readable(self):
+        import shutil
+        from runtime import VOLUMES
+        tree=self.root/'legacy'; (tree/'private').mkdir(parents=True)
+        (tree/'database.dump').write_bytes(b'PGDMPlegacy')
+        manifest=dict(format=1,platform='dspace',complete=True,release_sha256='release',
+                      volumes=sorted(v for v in VOLUMES if v!='postgres'),files=b.entries(tree))
+        (tree/'manifest.json').write_text(json.dumps(manifest))
+        package=self.root/'old.tar.gpg'
+        with tarfile.open(package,'w') as archive:
+            for path in sorted(tree.rglob('*')):
+                archive.add(path,arcname=path.relative_to(tree).as_posix(),recursive=False)
+        self.r.crypto.side_effect=lambda op,src,dst: shutil.copyfile(src,dst)
+        with self.r.opened(package) as (_,read):
+            self.assertNotIn('compression',read)
 
     def test_capture_emits_regular_entries_even_for_hardlinked_data(self):
         import os, shutil

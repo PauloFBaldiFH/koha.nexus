@@ -89,3 +89,14 @@ def test_the_real_installer_output_parses():
     for key in ("services", "http", "backup", "recovery", "access", "disk", "memory"):
         assert key in s.raw, key
     assert set(s.services) >= {"apache2", "mariadb", "koha-common"}
+
+
+def test_multiline_status_and_legacy_preamble():
+    out = 'Legacy preamble\n' + json.dumps(HEALTHY, indent=2)
+    assert parse_status(out).state == 'ok'
+
+
+@pytest.mark.parametrize('out', ['{"schema":1,\n"platforms":[\n{"id":"dspace"}',
+                                  '{"schema":1,\n"services": {"schema": 2}'])
+def test_truncated_outer_document_does_not_become_a_nested_status(out):
+    assert parse_status(out) is None

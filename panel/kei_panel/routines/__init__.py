@@ -13,12 +13,14 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import (dspace, admin_access, backup, backup_set, database, diagnostics, install, platforms, search, security, setup,
+from . import (dspace, instances, admin_access, backup, backup_set, database, diagnostics, install, platforms, search, security, setup,
                settings, tools)
 
 Routine = Callable[[object], Awaitable[None]]
 
 ROUTINES: dict[str, Routine] = {
+    "instance-add": instances.add,
+    "instance-remove": instances.remove,
     **{"dspace-" + name: getattr(dspace, name) for name in ("install", "start", "stop", "diagnose", "logs", "admin", "help")},
     "setup-dspace": dspace.assistant,
     **{"dspace-"+name.replace("_","-"):getattr(dspace,name) for name in ("plan","plan_run","address","upgrade","remove")},
