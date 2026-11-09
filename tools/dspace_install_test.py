@@ -147,6 +147,44 @@ def main():
         check_files('files persist after Docker service restart')
         from dspace_operations_test import exercise as operations_exercise
         operations_exercise(rt,prepared,output)
+        # Reproduce the desktop recovery path using the real configuration,
+        # containers and browser. Changing an unreachable LAN origin to local
+        # access must preserve the installed image matrix, volumes and schema.
+        from operations import Operations
+        from dspace_browser_test import wait_for_client
+        from playwright.sync_api import sync_playwright
+        old_compose = json.loads((root / 'compose.json').read_text())
+        database_password = module.digest(root / 'db-password')
+        history_before = rt.compose('exec','-T','postgres','psql','-U','dspace','-d','dspace','-Atc',
+                                    'SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank')
+        repair = Operations(rt).dispatch('repair-web', {'local_only': True}, True)
+        check(repair['url'] == 'http://localhost:8100', 'web repair selects a coherent localhost UI/API origin')
+        new_compose = json.loads((root / 'compose.json').read_text())
+        check(old_compose['volumes'] == new_compose['volumes'] and
+              {k:v['image'] for k,v in old_compose['services'].items()} == {k:v['image'] for k,v in new_compose['services'].items()} and
+              database_password == module.digest(root / 'db-password'), 'web repair preserves volumes, images and database credentials')
+        check(history_before == rt.compose('exec','-T','postgres','psql','-U','dspace','-d','dspace','-Atc',
+                                           'SELECT installed_rank,version,checksum,success FROM schema_version ORDER BY installed_rank'),
+              'web repair does not migrate or change Flyway history')
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page()
+                page.goto('http://localhost:8100/login', wait_until='domcontentloaded')
+                wait_for_client(page)
+                page.screenshot(path=str(output / 'dspace-local-repair-login.png'))
+                page.locator('input[type=email]').fill(fixture['email'])
+                page.locator('input[type=password]').fill(fixture['password'])
+                with page.expect_response(lambda response: response.request.method == 'POST' and
+                                          module.urlsplit(response.url).path == '/server/api/authn/login', timeout=60000) as login:
+                    page.locator('[data-test=login-button]').click()
+                check(login.value.status == 200, 'authentication API accepts the existing account after web repair')
+                page.wait_for_url(lambda url: '/login' not in url and '/500' not in url, timeout=60000)
+            except Exception:
+                raise AssertionError('The real browser could not sign in after local web repair. Inspect the sanitized UI/API diagnostics.') from None
+            finally:
+                browser.close()
+        check(True, 'real browser signs in after local web repair')
         (output / 'dspace-acceptance.json').write_text(json.dumps(rt.diagnostic(), indent=2))
     except BaseException as error:
         # Only this disposable lab's generated credentials; never export raw inspect/config.

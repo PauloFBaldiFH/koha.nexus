@@ -723,7 +723,7 @@ def entry_shown(action: str, zone: str, mode: str, facts: Facts) -> bool:
     if mode == "unknown":
         # Reading health must never be a prerequisite for reaching diagnosis.
         # Mutating routines independently identify/validate their own target.
-        recovery = {"dspace-diagnose", "dspace-logs", "dspace-remove",
+        recovery = {"dspace-diagnose", "dspace-logs", "dspace-remove", "dspace-repair-web",
                     "tainacan-status", "tainacan-logs", "tainacan-uninstall"}
         task = PLATFORM_TASKS.get(action)
         return action in recovery and (not task or facts.has(task))

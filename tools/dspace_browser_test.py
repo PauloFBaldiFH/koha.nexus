@@ -159,7 +159,7 @@ def exercise(rt, output, recovery_capture=None):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--host-resolver-rules=MAP repository.kei.test 127.0.0.1'])
         context = browser.new_context(locale='en-US')
-        context.route('**/*', lambda route: route.continue_() if urlsplit(route.request.url).hostname in ('repository.kei.test', '127.0.0.1') else route.abort())
+        context.route('**/*', lambda route: route.continue_() if urlsplit(route.request.url).hostname in ('repository.kei.test', '127.0.0.1', 'localhost') else route.abort())
         page = context.new_page(); page.set_default_timeout(60000)
         agreement_observations = []
         def observe_agreement(response):
@@ -174,6 +174,11 @@ def exercise(rt, output, recovery_capture=None):
                 agreement_observations.append(record)
         page.on('response', observe_agreement)
         try:
+            stage = 'localhost alias canonical redirect'
+            page.goto('http://localhost:8100/login?access-check=1', wait_until='domcontentloaded')
+            page.wait_for_url(origin + '/login?access-check=1')
+            wait_for_client(page)
+            check(page.locator('input[type=password]').is_visible(), 'localhost reaches the canonical address and a hydrated login form')
             stage = 'browser login'
             page.goto(origin + '/login', wait_until='domcontentloaded')
             wait_for_client(page)

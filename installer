@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.189"
+PANEL_VERSION=" 1.5.190"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -303,6 +303,18 @@ declare -A _MENU_PT=(
     ["Starting operation…"]="Iniciando operação…"
     ["Waiting for output. Some operations report only when a step finishes."]="Aguardando saída. Algumas operações informam o resultado somente ao concluir uma etapa."
     ["Waiting for the current step. No new output for ${seconds} seconds."]="Aguardando a etapa atual. Sem nova saída há ${seconds} segundos."
+    ["Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion."]="Corrige o endereço da interface/API e o proxy gerenciado, com cópia privada da configuração para desfazer. Não migra o banco, troca imagens nem apaga dados."
+    ["🔧  Repair DSpace web access"]="🔧  Corrigir acesso web do DSpace"
+    ["Repair web access without reinstalling DSpace or changing repository data. Local access uses localhost on this computer; network publication remains in the address assistant."]="Corrija o acesso web sem reinstalar o DSpace nem alterar os dados. O acesso local usa localhost neste computador; a publicação fica no assistente de endereços."
+    ["Use localhost on this computer"]="Usar localhost neste computador"
+    ["Use the actual local network IPv4 address"]="Usar o IPv4 atual da rede local"
+    ["Keep the current address and repair its proxy"]="Manter o endereço atual e corrigir o proxy"
+    ["Enter the current address shown by ip -br -4 addr, with the existing DSpace port. Example addresses are not real server addresses."]="Informe o endereço atual mostrado por ip -br -4 addr, com a porta atual do DSpace. Endereços de exemplo não são endereços reais do servidor."
+    ["Review web repair. Configuration is saved for rollback; database, files, images and schedules are preserved."]="Confira a correção do acesso web. A configuração é salva para desfazer; banco, arquivos, imagens e agendamentos são preservados."
+    ["Web access repaired. Open the address shown in the dashboard."]="Acesso web corrigido. Abra o endereço mostrado no painel de controle."
+    ["Where will you open DSpace? On Windows/WSL, localhost avoids depending on LAN forwarding. Network access needs the real Windows IP and its network setup."]="Onde você abrirá o DSpace? No Windows/WSL, localhost evita depender do encaminhamento da rede. O acesso pela rede precisa do IP real do Windows e da rede configurada."
+    ["This computer only (localhost)"]="Apenas neste computador (localhost)"
+    ["Other computers or an institutional domain"]="Outros computadores ou um domínio institucional"
     ["DSpace is installed. Administrative access, addresses and backups are available in the menus."]="DSpace instalado. Acesso administrativo, endereços e backups estão disponíveis nos menus."
     ["Control Dashboard"]="Painel de Controle"
     ["Exit"]="Sair"
@@ -12479,9 +12491,9 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_OPERATIONS_SHA="d7067537d2055569ff8d909259eb984a8fa9b04a90358f0aec74e5ddfe7d23a3"
-KEI_DSPACE_RUNTIME_SHA="38820452bf97918507b57866d994f5bd826e7230d5c4fb0de32e9626b881301b"
-KEI_DSPACE_BACKUP_SHA="975ded6ea59a40ff274c28bfdd6ea0fc5741ef6bc35de1280e1443f1f155540e"
+KEI_DSPACE_OPERATIONS_SHA="de776b7f25a8cce90af4e180a109653a2c83429c5534d39ca8144e7da2c08148"
+KEI_DSPACE_RUNTIME_SHA="f98b4331562df5ce23af2d9b208cfc05dd8fd5f45112956649eca7c64cd1e6eb"
+KEI_DSPACE_BACKUP_SHA="efd5fae6805cabbe048e53337c9ecd382f17ccc35027be368c0c29b636cf94ad"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
 KEI_DSPACE_BUILD_SHA="2e73bddbc34997ba983a8eac45c5f21eed5971fcd0a236449c5a2fd0edf886c4"
@@ -12644,7 +12656,7 @@ kei_dspace_prerequisites() (
     [ "$mode" != none ] || apache_missing=true
     command -v docker >/dev/null 2>&1 && ! _kei_docker_running && docker_stopped=true
     if [ "$action" = plan ]; then
-        printf '@@result json={"apache_missing":%s,"docker_stopped":%s,"proxy_mode":"%s"}\n' "$apache_missing" "$docker_stopped" "$mode"
+        printf '@@result json={"apache_missing":%s,"docker_stopped":%s,"proxy_mode":"%s","platform":"%s"}\n' "$apache_missing" "$docker_stopped" "$mode" "$KEI_PLATFORM"
         return
     fi
     [ "${2:-}" = confirm ] || return 2
@@ -12663,16 +12675,29 @@ kei_dspace_prerequisites() (
 # These internal tasks are called only by the local Python adapter.
 # They use the exact same isolation, registry and safe Apache operations
 # as Tainacan; no second firewall/proxy implementation is introduced.
+kei_dspace_address_check() {
+    local scheme host port
+    read -r scheme host port < <(kei_tainacan_parse_url "$1") || return 2
+    if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ "$host" != 127.* ]]; then
+        if [ -z "$(kei_ip_interface "$host")" ] && { ! is_wsl || [ "$host" != "${WIN_LAN_IP:-}" ]; }; then
+            echo 'This IPv4 address was not found on this server or in the Windows network configuration. Use the actual network address; on WSL choose localhost for access on this computer only. No repository data were changed.' >&2
+            return 4
+        fi
+    fi
+}
+
 kei_dspace_resource() {
     local action="${1:-}" mode scheme host port tmp rc
     [ "$(id -u)" = 0 ] || return 3
     shift || return 2
     case "$action" in
         prepare-images) kei_dspace_prepare_images "${1:-}" ;;
+        address-check) kei_dspace_address_check "${1:-}" ;;
         plan)
             kei_tainacan_parse_url "${1:-}" >/dev/null || return 2
             read -r mode _ < <(kei_proxy_detect)
             read -r scheme host port < <(kei_tainacan_parse_url "$1")
+            [ -f "$KEI_DSPACE_DIR/state.json" ] || kei_dspace_address_check "$1" || return 4
             if [ "$mode" = none ]; then
                 echo 'Apache must be installed and reviewed first (shared infrastructure); no package is installed by this experimental task.' >&2
                 return 3
@@ -12748,7 +12773,7 @@ kei_dspace_resource() {
             command -v apache2ctl >/dev/null 2>&1 || return 3
             tmp=$(mktemp) || return 1
             kei_dspace_runtime proxy-config > "$tmp" || { rm -f "$tmp"; return 1; }
-            local modules="proxy proxy_http headers" loopback=no
+            local modules="proxy proxy_http headers rewrite" loopback=no
             grep -q 'SSLEngine on' "$tmp" && modules="$modules ssl"
             grep -q '^Listen 127.0.0.1:' "$tmp" && loopback=yes
             for action in $modules; do

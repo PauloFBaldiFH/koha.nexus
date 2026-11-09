@@ -197,7 +197,7 @@ class KohaPanelApp(App):
         cards, keys, buttons and dropped files."""
         # Recovery must stay reachable when an installed state file cannot be read.
         # The adapter validates identity/ownership again before any operation.
-        if action in ("dspace-diagnose", "dspace-logs", "dspace-remove") and self.bridge.has_task("dspace-panel"):
+        if action in ("dspace-diagnose", "dspace-logs", "dspace-remove", "dspace-repair-web") and self.bridge.has_task("dspace-panel"):
             return False
         needed = requires_of(action)
         if self.platform_ready(needed):
