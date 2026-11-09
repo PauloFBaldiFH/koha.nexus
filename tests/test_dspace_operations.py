@@ -60,6 +60,21 @@ class Policies(unittest.TestCase):
             result=self.o.disable_plan('nightly')
         self.assertEqual(result['plan']['time'],'');crypto.assert_not_called();command.assert_not_called()
         self.rt.core.assert_not_called()
+    def test_stale_plan_disable_does_not_change_cron_or_private_plan(self):
+        current=dict(self.plan,schema=1,keep=14)
+        old=dict(current,keep=7)
+        with patch.object(ops,'private'), patch.object(ops,'trusted_json',side_effect=lambda *a:copy.deepcopy(current)), \
+             patch.object(ops.os,'geteuid',return_value=0),patch.object(self.o,'plan_lock',return_value=contextlib.nullcontext()), \
+             patch.object(ops,'atomic') as atomic:
+            with self.assertRaisesRegex(runtime.Refused,'changed since'):
+                self.o.disable_plan('nightly',True,old)
+        atomic.assert_not_called();self.rt.core.assert_not_called()
+    def test_plan_snapshot_guard_accepts_unchanged_and_rejects_changed_members(self):
+        current=dict(self.plan,schema=1)
+        self.o.expected_plan({'expected_plan':copy.deepcopy(current)},current)
+        with self.assertRaises(runtime.Refused):
+            self.o.expected_plan({'expected_plan':dict(current,members=['koha','dspace'])},current)
+
     def test_reading_absent_plans_creates_nothing(self):
         self.assertEqual(self.o.plans(),{'plans':[]});self.assertFalse(self.o.home.exists())
     def test_retention_leaves_other_folders_and_changed_content(self):

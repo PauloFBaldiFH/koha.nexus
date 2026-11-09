@@ -2549,14 +2549,15 @@
    "_en": "902427e27d"
   },
   "sec-schedules": {
-   "summary": "Tudo o que este servidor roda sozinho, de todos os arquivos que guardam um agendamento, numa lista do menu principal (tecla s): quando roda, a última e a próxima execução e onde é alterado.",
+   "summary": "Gerencie agendamentos em uma central: ativação, frequência e horário compatíveis, última/próxima execução e editor original.",
    "overview": [
-    "Ela só lê. As linhas vêm das tarefas do Koha (koha_tasks, com os backups na nuvem e as linhas escritas à mão), dos backups das plataformas (Tainacan), das tarefas que o instalador guarda em arquivos próprios (vigias da busca, mensagens, mapa do site do OPAC, sinal de vida do endereço gratuito, IA local) e do próprio pacote do Koha. Cada linha desses arquivos é uma linha da lista: nada aparece duas vezes, e um comando agendado em duas linhas avisa que roda duas vezes.",
-    "**Plataforma** e **Tipo** filtram a lista; o cartão **Agendamentos do Koha** do grupo Koha abre a lista já no Koha. A próxima execução é calculada a partir da linha, no fuso horário do servidor; a última execução vem só de um registro confiável (os logs de backup, o pacote mais novo do Tainacan, o teste de restauração), senão a linha diz **Sem registro**.",
-    "O WP-Cron é o agendador interno do WordPress dentro do Tainacan: ele roda quando o site recebe visitas, então aparece assim e nunca como um agendamento do servidor.",
-    "Os cartões são os editores: **Tarefas agendadas do Koha** abre Tarefas agendadas e automações, e **Agendar backups** define os backups do Tainacan. As linhas que o instalador guarda dizem qual tela as altera."
+    "Tarefas conhecidas do Koha têm chave de ativação, frequência diária/semanal/mensal ou personalizada compatível, dia e horário. Mudanças ficam como rascunho até Salvar e confirmar. Outras linhas cron e blocos manuais são preservados.",
+    "O Tainacan tem um controle diário de backup vinculado à manutenção semanal uma hora depois e ao teste mensal de restauração duas horas depois. Desativar desliga as três tarefas; repositório e retenção continuam configurados.",
+    "Planos explícitos do DSpace e de múltiplas plataformas têm ativação e horário diário. A edição mantém participantes, destino, retenção e cópia na nuvem; desativar não exige acesso à nuvem nem à chave de backup. Planos configurados e desativados continuam na lista.",
+    "Plataforma e Tipo filtram a lista sem perder rascunhos. Tarefas manuais, de pacotes, WP-Cron e manutenção vinculada são somente leitura e indicam a ferramenta original. Abrir ou filtrar nunca grava agendamento.",
+    "Salvar mostra o alvo e a mudança antes de aplicar. Edições concorrentes ou tarefas manuais inesperadas nos grupos são recusadas: atualize e revise novamente. Os horários seguem o fuso do servidor. A última execução só aparece quando há registro."
    ],
-   "_en": "007af7c2ef"
+   "_en": "515003abd0"
   },
   "admin-koha": {
    "summary": "Quem administra o Koha: se o instalador da web foi concluído (existe superbibliotecário), um novo superbibliotecário, uma nova senha para um deles e as credenciais de primeiro acesso.",

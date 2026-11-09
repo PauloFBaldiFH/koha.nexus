@@ -309,13 +309,17 @@ def test_all_three_platforms_remain_reachable_in_the_shared_backup_selector(monk
         async with app.run_test(size=size) as pilot:
             await pilot.pause(1.8)
             app.backup_scope='dspace';app.screen.action_show('backups')
-            await pilot.pause(1.8)
             view=app.screen.query_one('#view-backups')
+            async def ready(condition):
+                for _ in range(120):
+                    if condition(): return
+                    await pilot.pause(.1)
+                raise AssertionError('Backup selector did not reach the expected state')
+            await ready(lambda: view.facts is not None and not view.query_one('#platform-loader').display)
             button=view.query_one('#scope-all')
             button.focus()
-            await pilot.pause(.5)
+            await pilot.pause()
             assert button.region.intersection(view.region).width==button.region.width
             await pilot.click('#scope-all')
-            await pilot.pause(.4)
-            assert view.scope=='all' and app.backup_scope=='all'
+            await ready(lambda: view.scope=='all' and app.backup_scope=='all')
     asyncio.run(exercise())

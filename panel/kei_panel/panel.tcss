@@ -904,3 +904,26 @@ App.-plain #picker-drop {
 .sc-row { height: auto; padding: 0 1; margin-bottom: 1; border-left: outer $panel-lighten-2; }
 .sc-row.-on { border-left: outer $success; }
 .sc-row.-internal { border-left: outer $accent; }
+
+/* Unified schedule editor: controls wrap on SSH-sized terminals. */
+.sc-controls { height: auto; layout: horizontal; padding-top: 1; }
+.sc-controls Switch { width: 9; }
+.sc-controls Select { width: 19; margin-right: 1; }
+.sc-controls Input { width: 12; margin-right: 1; }
+.sc-controls Button { min-width: 9; width: 9; }
+.sc-note { height: auto; color: $text-muted; }
+.-narrow .sc-controls { layout: grid; grid-size: 2; grid-columns: 1fr 1fr; grid-rows: auto; }
+.-narrow .sc-controls Select, .-narrow .sc-controls Input { width: 100%; }
+
+/* Keep every backup target reachable without horizontal focus/resize races. */
+#bk-scopes {
+    layout: grid;
+    grid-size: 3;
+    grid-columns: 1fr 1fr 1fr;
+    grid-rows: auto;
+    overflow: hidden hidden;
+}
+#bk-scopes Label { column-span: 3; }
+#bk-scopes Button { width: 100%; min-width: 0; }
+.-narrow #bk-scopes { grid-size: 2; grid-columns: 1fr 1fr; }
+.-narrow #bk-scopes #scope-all { column-span: 2; }

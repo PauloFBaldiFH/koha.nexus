@@ -217,7 +217,7 @@ def state(view):
     from textual.widgets import Select
     from kei_panel.widgets.cards import ActionCard
     shown = schedules.shown(view.rows, view.platform, view.kind)
-    blocks = [str(w.render()) for w in view.query("#sc-rows Static")]
+    blocks = [str(w.render()) for w in view.query("#sc-rows .sc-description")]
     if shown:
         assert len(blocks) == len(shown) and all(r.name in b and r.editor in b for r, b in zip(shown, blocks))
     options = [v for _label, v in view.query_one("#sc-platform", Select)._options]
@@ -271,7 +271,7 @@ def test_the_koha_group_opens_it_filtered_and_its_card_opens_the_editor(server):
             filtered = {p for p, _n in state(view)["rows"]}
             chosen = view.query_one("#sc-platform", Select).value
             view.query_one("#sc-kind", Select).value = "backup"
-            await until(pilot, lambda: view.kind == "backup" and len(view.query("#sc-rows Static")) == 5)
+            await until(pilot, lambda: view.kind == "backup" and len(view.query("#sc-rows .sc-description")) == 5)
             backups = state(view)["rows"]
             from kei_panel.widgets.cards import ActionCard
             card = next(c for c in view.query(ActionCard) if c.entry.action == "crons")

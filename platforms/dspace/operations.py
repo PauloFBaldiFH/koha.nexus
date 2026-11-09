@@ -162,6 +162,7 @@ class Operations:
         with self.plan_lock(data['id']):
             path = self.plan_path(data['id'])
             old = trusted_json(path) if path.exists() else None
+            self.expected_plan(request, old)
             atomic(path, json.dumps(data) + '\n')
             try:
                 self.rt.core('plan-cron', data['id'], data['time'], ','.join(data['members']))
@@ -171,7 +172,11 @@ class Operations:
                 raise
         return {'saved': data, 'encrypted': True}
 
-    def disable_plan(self, name, confirm=False):
+    def expected_plan(self, request, current):
+        if 'expected_plan' in request and request['expected_plan'] != current:
+            raise Refused('This backup plan changed since it was displayed. Refresh before saving.')
+
+    def disable_plan(self, name, confirm=False, expected=None):
         private(self.home)
         data=trusted_json(self.plan_path(name))
         if data.get('schema')!=1 or data.get('id')!=name:raise Refused('Unknown backup plan.')
@@ -183,6 +188,8 @@ class Operations:
             # Disabling remains possible when the destination, credentials or key are lost.
             data=trusted_json(self.plan_path(name))
             if data.get('schema')!=1 or data.get('id')!=name:raise Refused('Unknown backup plan.')
+            if expected is not None:
+                self.expected_plan({'expected_plan': expected}, data)
             selected=members(data.get('members'));data['time']=''
             self.rt.core('plan-cron',name,'',','.join(selected))
             atomic(self.plan_path(name),json.dumps(data)+'\n')
@@ -494,7 +501,7 @@ class Operations:
     def dispatch(self, action, request, confirm=False):
         if action=='plans':return self.plans()
         if action=='plan-save':return self.save_plan(request,confirm)
-        if action=='plan-disable':return self.disable_plan(request['id'],confirm)
+        if action=='plan-disable':return self.disable_plan(request['id'],confirm,request.get('expected_plan'))
         if action=='plan-run':
             if not confirm:raise Refused('Explicit --confirm is required to run a backup.')
             return self.run_plan(request['id'])

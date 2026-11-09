@@ -21,6 +21,9 @@ on:
       - "panel/tests/test_dashboard.py"
       - "panel/tests/test_backup_center.py"
       - "panel/tests/test_schedules.py"
+      - "panel/tests/test_schedule_controls.py"
+      - "panel/tests/test_cron.py"
+      - "panel/tests/test_cron_view.py"
       - "panel/tests/test_admin_setup.py"
       - "panel/tests/test_tainacan_free.py"
       - "panel/tests/conftest.py"
@@ -37,6 +40,9 @@ on:
       - "panel/tests/test_dashboard.py"
       - "panel/tests/test_backup_center.py"
       - "panel/tests/test_schedules.py"
+      - "panel/tests/test_schedule_controls.py"
+      - "panel/tests/test_cron.py"
+      - "panel/tests/test_cron_view.py"
       - "panel/tests/test_admin_setup.py"
       - "panel/tests/test_tainacan_free.py"
       - "panel/tests/conftest.py"
@@ -66,7 +72,7 @@ jobs:
       - run: python -m pip install pytest -r panel/requirements.txt
       - name: Platforms screen, Tainacan section, dashboard tabs, Backup center, schedules and admin access
         working-directory: panel
-        run: python -m pytest -q tests/test_dspace_panel.py tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py tests/test_backup_center.py tests/test_schedules.py tests/test_admin_setup.py tests/test_tainacan_free.py --junitxml="$RUNNER_TEMP/platforms-panel.xml"
+        run: python -m pytest -q tests/test_dspace_panel.py tests/test_platforms.py tests/test_tainacan_view.py tests/test_dashboard.py tests/test_backup_center.py tests/test_schedules.py tests/test_schedule_controls.py tests/test_cron.py tests/test_cron_view.py tests/test_admin_setup.py tests/test_tainacan_free.py --junitxml="$RUNNER_TEMP/platforms-panel.xml"
       - name: Identify failing tests without exposing full diagnostic logs
         if: always()
         run: |

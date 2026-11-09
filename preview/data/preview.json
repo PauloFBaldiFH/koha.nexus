@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.188",
+ "panel_version": "1.5.189",
  "languages": [
   {
    "code": "en",
@@ -20567,12 +20567,13 @@
   },
   "sec-schedules": {
    "en": {
-    "summary": "Every job this server runs by itself, from every file that holds a schedule, in one list of the main menu (key s): when it runs, its last and next run and where it is changed.",
+    "summary": "Manage scheduled jobs in one center: activation, supported frequency and time, last/next run and original editor.",
     "overview": [
-     "It only reads. The rows come from Koha's jobs (koha_tasks, with the cloud backups and the lines written by hand), the backups of the platforms (Tainacan), the jobs the installer keeps in files of their own (search watchdogs, messaging, the OPAC sitemap, the free address heartbeat, the local AI) and Koha's own package. Each line of these files is one row: nothing is listed twice, and a command scheduled in two lines says it runs twice.",
-     "**Platform** and **Type** filter the list; the **Koha schedules** card of the Koha group opens it already on Koha. The next run is computed from the line in the server's time zone; the last run comes only from a reliable record (the backup logs, the newest Tainacan package, the restore test), otherwise the row says **No run recorded**.",
-     "WP-Cron is WordPress's own scheduler inside Tainacan: it runs when the site gets visits, so it is shown as such and never as a server schedule.",
-     "The cards are the editors: **Koha's scheduled jobs** opens Schedules & cron tasks, and **Schedule backups** sets the Tainacan backups. Rows that the installer keeps say which screen changes them."
+     "Known Koha jobs have a switch, daily/weekly/monthly or supported custom frequency, day and time. Changes remain drafts until Save and confirmation. Other cron lines and manual blocks are preserved.",
+     "Tainacan has one daily backup control linked to weekly maintenance one hour later and a monthly restore test two hours later. Disabling turns off all three; repository and retention remain configured.",
+     "Explicit DSpace and multi-platform backup plans have daily activation/time controls. Editing preserves participants, destination, retention and cloud copy; disabling does not require an available cloud account or backup key. Disabled configured plans remain listed.",
+     "Platform and Type filter the list without losing drafts. Manual, package, WP-Cron and related maintenance rows are read-only; their original tool is identified. Opening or filtering never writes a schedule.",
+     "Save shows the target and change before applying. Concurrent edits or unexpected manual group entries are refused: Refresh and review again. Times follow the server timezone. Last-run data come only from recorded results."
     ],
     "related": [
      "crons",
@@ -20581,12 +20582,13 @@
     ]
    },
    "pt-BR": {
-    "summary": "Tudo o que este servidor roda sozinho, de todos os arquivos que guardam um agendamento, numa lista do menu principal (tecla s): quando roda, a última e a próxima execução e onde é alterado.",
+    "summary": "Gerencie agendamentos em uma central: ativação, frequência e horário compatíveis, última/próxima execução e editor original.",
     "overview": [
-     "Ela só lê. As linhas vêm das tarefas do Koha (koha_tasks, com os backups na nuvem e as linhas escritas à mão), dos backups das plataformas (Tainacan), das tarefas que o instalador guarda em arquivos próprios (vigias da busca, mensagens, mapa do site do OPAC, sinal de vida do endereço gratuito, IA local) e do próprio pacote do Koha. Cada linha desses arquivos é uma linha da lista: nada aparece duas vezes, e um comando agendado em duas linhas avisa que roda duas vezes.",
-     "**Plataforma** e **Tipo** filtram a lista; o cartão **Agendamentos do Koha** do grupo Koha abre a lista já no Koha. A próxima execução é calculada a partir da linha, no fuso horário do servidor; a última execução vem só de um registro confiável (os logs de backup, o pacote mais novo do Tainacan, o teste de restauração), senão a linha diz **Sem registro**.",
-     "O WP-Cron é o agendador interno do WordPress dentro do Tainacan: ele roda quando o site recebe visitas, então aparece assim e nunca como um agendamento do servidor.",
-     "Os cartões são os editores: **Tarefas agendadas do Koha** abre Tarefas agendadas e automações, e **Agendar backups** define os backups do Tainacan. As linhas que o instalador guarda dizem qual tela as altera."
+     "Tarefas conhecidas do Koha têm chave de ativação, frequência diária/semanal/mensal ou personalizada compatível, dia e horário. Mudanças ficam como rascunho até Salvar e confirmar. Outras linhas cron e blocos manuais são preservados.",
+     "O Tainacan tem um controle diário de backup vinculado à manutenção semanal uma hora depois e ao teste mensal de restauração duas horas depois. Desativar desliga as três tarefas; repositório e retenção continuam configurados.",
+     "Planos explícitos do DSpace e de múltiplas plataformas têm ativação e horário diário. A edição mantém participantes, destino, retenção e cópia na nuvem; desativar não exige acesso à nuvem nem à chave de backup. Planos configurados e desativados continuam na lista.",
+     "Plataforma e Tipo filtram a lista sem perder rascunhos. Tarefas manuais, de pacotes, WP-Cron e manutenção vinculada são somente leitura e indicam a ferramenta original. Abrir ou filtrar nunca grava agendamento.",
+     "Salvar mostra o alvo e a mudança antes de aplicar. Edições concorrentes ou tarefas manuais inesperadas nos grupos são recusadas: atualize e revise novamente. Os horários seguem o fuso do servidor. A última execução só aparece quando há registro."
     ]
    }
   },
