@@ -616,16 +616,11 @@ class Runtime:
                 self.health()
                 self.core('audit')
                 self.mark(phase='proxy')
-                proxy_output = self.core('proxy').strip().splitlines()
-                proxy = proxy_output[-1] if proxy_output else ''
-                if proxy not in ('external', 'apache-configured'):
-                    raise Refused('The proxy driver returned an unknown result; public access was not assumed.')
-                publication = 'external-configuration-required' if proxy == 'external' else 'apache-configured'
-                self.mark(proxy_status=publication)
+                publication = self.configure_proxy()
                 self.public_health()
                 self.mark(status='installed', phase='ready', intended='running', proxy_status=publication)
                 result = {'status': 'installed', 'url': plan['url'], 'experimental': True, 'proxy_status': publication}
-                if proxy == 'external':
+                if publication == 'external-configuration-required':
                     result['note'] = 'Configure the external proxy /server and / routes; the public address has not been verified. See docs/dspace/PR2-installer.md.'
                 if not state.get('setup'):
                     self.mark(setup={'open': True, 'steps': {x: 'pending' for x in ('admin', 'public', 'backup')}})
@@ -633,6 +628,16 @@ class Runtime:
             except BaseException:
                 self.mark(status='failed')
                 raise
+
+    def configure_proxy(self):
+        """Reconcile the owned web route before claiming public readiness."""
+        output = self.core('proxy').strip().splitlines()
+        proxy = output[-1] if output else ''
+        if proxy not in ('external', 'apache-configured'):
+            raise Refused('The proxy driver returned an unknown result; public access was not assumed.')
+        publication = 'external-configuration-required' if proxy == 'external' else 'apache-configured'
+        self.mark(proxy_status=publication)
+        return publication
 
     def control(self, start):
         state = self.state()
@@ -654,6 +659,7 @@ class Runtime:
                 try:
                     self.health()
                     self.core('audit')
+                    self.configure_proxy()
                     self.public_health()
                 except BaseException:
                     self.mark(status='degraded', intended='running')

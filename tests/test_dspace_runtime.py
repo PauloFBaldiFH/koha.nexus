@@ -387,6 +387,42 @@ class RuntimeTests(unittest.TestCase):
         self.assertIn('Require all denied', config)
         self.assertIn('Listen 8100', config)
 
+    def test_start_recreates_the_web_route_after_keep_data_removal(self):
+        self.install()
+        before={name:ds.digest(self.root/name) for name in ('local.cfg','compose.json','db-password')}
+        self.rt.control(False)
+        self.rt.core('release-web')
+        self.rt.mark(status='data-kept',intended='stopped')
+        route={'configured':False}
+        original=self.rt.core
+        def core(action,*args):
+            result=original(action,*args)
+            if action=='proxy':route['configured']=True
+            return result
+        def public():
+            if not route['configured']:raise ds.Refused('The public route was removed')
+            return {'status':'verified-local-proxy'}
+        self.rt.core=core;self.rt.public_health=public
+        self.rt.control(True)
+        self.assertTrue(route['configured'])
+        self.assertEqual(self.rt.state()['status'],'installed')
+        self.assertEqual(before,{name:ds.digest(self.root/name) for name in before})
+        self.assertEqual(sum(c[:2]==('compose','run') and 'migrate' in c for c in self.rt.calls),1)
+
+    def test_start_does_not_report_installed_if_proxy_repair_fails(self):
+        self.install();self.rt.control(False)
+        self.rt.failure='proxy'
+        with self.assertRaisesRegex(ds.Refused,'proxy'):self.rt.control(True)
+        self.assertEqual(self.rt.state()['status'],'degraded')
+        self.assertEqual(self.rt.state()['migration'],'done')
+
+    def test_unknown_proxy_result_is_not_accepted_during_start(self):
+        self.install();self.rt.control(False)
+        original=self.rt.core
+        self.rt.core=lambda action,*args:'unexpected' if action=='proxy' else original(action,*args)
+        with self.assertRaisesRegex(ds.Refused,'unknown result'):self.rt.control(True)
+        self.assertEqual(self.rt.state()['status'],'degraded')
+
     def test_absent_status_neither_contacts_docker_nor_creates_files(self):
         self.assertEqual(self.rt.status()['status'], 'absent')
         self.assertEqual(self.rt.calls, [])
