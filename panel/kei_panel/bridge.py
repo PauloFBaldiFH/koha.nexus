@@ -37,6 +37,42 @@ if TYPE_CHECKING:
 
     from .tasks import Reporter
 
+STATUS_TIMEOUT = 15
+
+
+def decode_status_output(output: str) -> dict:
+    """Complete compact/multiline status, optionally after a legacy preamble.
+
+    Keep this small decoder compatible with nexus_core.status.last_json_line;
+    the standalone panel is distributed without the nexus_core package.
+    """
+    if len(output) > 4 * 1024 * 1024:
+        raise BridgeError("Status response exceeds its size limit")
+    decoder = json.JSONDecoder()
+    position = 0
+    while position < len(output):
+        newline = output.find("\n", position)
+        line_end = newline if newline >= 0 else len(output)
+        line = output[position:line_end]
+        if not line.lstrip().startswith("{"):
+            position = line_end + 1
+            continue
+        start = position + len(line) - len(line.lstrip())
+        try:
+            data, end = decoder.raw_decode(output, start)
+        except ValueError:
+            break
+        if not isinstance(data, dict):
+            break
+        if not output[end:].strip():
+            return data
+        newline = output.find("\n", end)
+        if newline < 0 or output[end:newline].strip():
+            break
+        position = newline + 1
+    raise BridgeError("Installer returned no complete status object")
+
+
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\r")
 
 # A question of an interactive routine: (outcome so far, kind, title, text,
@@ -508,12 +544,24 @@ class Bridge:
             return status | {"generated_at": int(time.time())}
         proc = await asyncio.create_subprocess_exec(
             *self._argv("--status-json"), stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, env=self.env.child_env())
-        out, _ = await proc.communicate()
-        lines = [ln for ln in out.decode("utf-8", "replace").splitlines() if ln.lstrip().startswith("{")]
-        if proc.returncode != 0 or not lines:
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            env=self.env.child_env(), start_new_session=True)
+        try:
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=STATUS_TIMEOUT)
+        except (asyncio.TimeoutError, asyncio.CancelledError) as error:
+            # A read may have children (Docker/curl). End our process group so
+            # repeated Refresh cannot leave orphan readers holding the pipes.
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            await proc.communicate()
+            if isinstance(error, asyncio.CancelledError):
+                raise
+            raise BridgeError("Status collection timed out; retry or open diagnostics") from None
+        if proc.returncode != 0:
             raise BridgeError(f"--status-json failed (exit {proc.returncode})")
-        return json.loads(lines[-1])
+        return decode_status_output(out.decode("utf-8", "replace"))
 
     async def koha_tables(self, reporter: "Reporter") -> list[tuple[str, int, int]]:
         """(table, rows, bytes) of the Koha database, largest first. Read-only."""

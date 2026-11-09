@@ -195,6 +195,10 @@ class KohaPanelApp(App):
         """True (after saying why) when `action` needs a platform this
         server does not have. Every way into a routine passes here: menu
         cards, keys, buttons and dropped files."""
+        # Recovery must stay reachable when an installed state file cannot be read.
+        # The adapter validates identity/ownership again before any operation.
+        if action in ("dspace-diagnose", "dspace-logs", "dspace-remove") and self.bridge.has_task("dspace-panel"):
+            return False
         needed = requires_of(action)
         if self.platform_ready(needed):
             return False

@@ -26,6 +26,7 @@ from rich.text import Text
 from textual.widgets import Button, Label, Select, Static
 
 from .. import backup_center, cloud, cron, platforms
+from ..backup_center import DSPACE_CODECS
 from ..i18n import t
 from ..widgets.cards import ActionCard, StatusCard
 from .backup import CODEC_NOTE, CODECS, RESULTS
@@ -55,6 +56,7 @@ class BackupCenterView(PlatformSectionView):
         super().__init__(section)
         self.scope = ""
         self.codec = ""
+        self.dspace_codec = ""
         self.facts = None
         self.plans: list[backup_center.PlanRow] = []
 
@@ -82,7 +84,19 @@ class BackupCenterView(PlatformSectionView):
                        "captured in turn with its own consistent copy (not at the same instant), and the assisted "
                        "restore brings back one or several of them. The automatic backups of each are below."),
                      id="bk-both", classes="view-prompt", markup=False)
-        yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Schedules, cloud copies and explicit platform sets are managed here."), id="bk-dspace", classes="view-prompt", markup=False)
+        with Vertical(id="bk-dspace"):
+            with Grid(classes="status-grid"):
+                yield StatusCard(t("Last backup"), id="bk-ds-age")
+                yield StatusCard(t("Size"), id="bk-ds-size")
+                yield StatusCard(t("Recovery packages"), id="bk-ds-count")
+            yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Schedules, cloud copies and explicit platform sets are managed here."), classes="view-prompt", markup=False)
+            yield Static(t("Container images are not included in these individual packages. Keep the matching images available for recovery on another server."), classes="view-prompt", markup=False)
+            with Vertical(classes="hub-box", id="bk-ds-codec-box"):
+                with Horizontal(classes="form-row"):
+                    yield Label(t("Compression"), classes="form-label")
+                    yield Select([(t(label), key) for key, label in DSPACE_CODECS.items()], value="gz",
+                                 allow_blank=False, id="bk-ds-codec", disabled=True)
+                yield Label(t("Used for new manual, scheduled and safety backups of DSpace. Compression runs after services resume; every package remains encrypted. Existing packages keep their format."), classes="ai-note")
         with Vertical(id="bk-tainacan"):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Tainacan backups"), id="pstatus-backups")
@@ -98,6 +112,7 @@ class BackupCenterView(PlatformSectionView):
 
     def on_mount(self) -> None:
         self.query_one("#bk-codec-box").border_title = t("Backup compression type")
+        self.query_one("#bk-ds-codec-box").border_title = t("Backup compression type")
         super().on_mount()        # hides the cards and titles, then refresh_data()
 
     def refresh_data(self) -> None:
@@ -196,6 +211,8 @@ class BackupCenterView(PlatformSectionView):
                 rows = await self._load_tainacan(facts)
             elif self.scope == backup_center.BOTH:
                 rows = await self._load_koha() + await self._load_tainacan(facts) + await self._load_set()
+            if self.scope == backup_center.DSPACE:
+                await self._load_dspace()
             if 'dspace' in backup_center.MEMBERS.get(self.scope, ()) and self.app.bridge.has_task('dspace-panel'):
                 from ..dspace import payload
                 rows += backup_center.operation_plans(payload(await self.app.bridge.task('dspace-panel','operations','plans')),self.scope)
@@ -273,6 +290,29 @@ class BackupCenterView(PlatformSectionView):
         _status, _plans, _history, remotes = await self._cloud()
         return backup_center.tainacan_plans(facts.backups, keep, remotes)
 
+    async def _load_dspace(self) -> None:
+        from ..dspace import payload
+        try:
+            out = await self.app.bridge.task('dspace-panel', 'backup-list')
+            data = payload(out) if out.ok else {}
+            if not data or data.get('compression') not in DSPACE_CODECS:
+                raise ValueError('Backup inventory unavailable')
+            details = data.get('details', [])
+            if not isinstance(details, list) or any(not isinstance(v, dict) for v in details):
+                raise ValueError('Invalid backup inventory')
+            newest = details[0] if details else {}
+            epoch = int(newest.get('modified_at') or 0)
+            self.query_one('#bk-ds-age', StatusCard).set(
+                time.strftime('%Y-%m-%d %H:%M', time.localtime(epoch)) if epoch else t('None yet'),
+                t('Test recovery to verify the package.') if epoch else '', '')
+            self.query_one('#bk-ds-size', StatusCard).set(human_bytes(newest.get('bytes')), t('Encrypted archive'), '')
+            self.query_one('#bk-ds-count', StatusCard).set(str(len(details)), str(data.get('directory', '')), '')
+            self._show_dspace_codec(data['compression'])
+        except Exception:
+            for key in ('age', 'size', 'count'):
+                self.query_one('#bk-ds-' + key, StatusCard).set(t('Unavailable'), t('Refresh or check the DSpace diagnosis.'), 'warn')
+            self.query_one('#bk-ds-codec', Select).disabled = True
+
     def _draw_plans(self, rows: list[backup_center.PlanRow]) -> None:
         self.plans = rows
         box = self.query_one("#bk-plans", Vertical)
@@ -284,6 +324,12 @@ class BackupCenterView(PlatformSectionView):
 
     # --- Koha: the compression of new backups ------------------------------------
     def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == 'bk-ds-codec':
+            event.stop()
+            value = event.value if isinstance(event.value, str) else ''
+            if self.dspace_codec and value != self.dspace_codec and value in DSPACE_CODECS:
+                self.run_worker(self._set_dspace_codec(value), exclusive=True, group='routine', exit_on_error=False)
+            return
         if event.select.id != "bk-codec":
             return
         event.stop()
@@ -291,6 +337,23 @@ class BackupCenterView(PlatformSectionView):
         if not self.codec or value == self.codec or value not in CODECS:
             return
         self.run_worker(self._set_codec(value), exclusive=True, group="routine", exit_on_error=False)
+
+    def _show_dspace_codec(self, codec: str) -> None:
+        self.dspace_codec = codec
+        select = self.query_one('#bk-ds-codec', Select)
+        select.value = codec
+        select.disabled = False
+
+    async def _set_dspace_codec(self, codec: str) -> None:
+        from ..routines.dspace import call
+        previous = self.dspace_codec
+        self.query_one('#bk-ds-codec', Select).disabled = True
+        result = await call(self.app, 'backup-settings', '--compression', codec, '--confirm')
+        if result is not None and result.get('compression') == codec:
+            self._show_dspace_codec(codec)
+            self.app.notify(t('New backups: ${name}', name=t(DSPACE_CODECS[codec])))
+        else:
+            self._show_dspace_codec(previous)
 
     async def _set_codec(self, codec: str) -> None:
         from ..routines.common import failed, run_task, show_failure

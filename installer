@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.187"
+PANEL_VERSION=" 1.5.188"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -273,6 +273,14 @@ export KOHA_PANEL_LANG_FULL KOHA_PANEL_LANG SYS_LANG
 declare -A _TRANS_CACHE=()
 
 declare -A _MENU_PT=(
+    ["➕  Add or remove instance"]="➕  Adicionar ou remover instância"
+    ["Instances"]="Instâncias"
+    ["➕  Add instance"]="➕  Adicionar instância"
+    ["🗑  Remove instance"]="🗑  Remover instância"
+    ["Starting operation…"]="Iniciando operação…"
+    ["Waiting for output. Some operations report only when a step finishes."]="Aguardando saída. Algumas operações informam o resultado somente ao concluir uma etapa."
+    ["Waiting for the current step. No new output for ${seconds} seconds."]="Aguardando a etapa atual. Sem nova saída há ${seconds} segundos."
+    ["DSpace is installed. Administrative access, addresses and backups are available in the menus."]="DSpace instalado. Acesso administrativo, endereços e backups estão disponíveis nos menus."
     ["Control Dashboard"]="Painel de Controle"
     ["Exit"]="Sair"
     ["Back"]="Voltar"
@@ -12449,8 +12457,8 @@ kei_docker_audit() {
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
 KEI_DSPACE_OPERATIONS_SHA="b9a4b980d6f2a5f2e9ef2c35d883ae170bc92cf0f3983ae77d2cfbdecc13cac2"
-KEI_DSPACE_RUNTIME_SHA="e1696046b7c49a034f9c94868cd40a50d59138554f3fc5f72212d533723d41b0"
-KEI_DSPACE_BACKUP_SHA="b032c9445047afc6cb0c2f654f5907085412177ad946c9295b0131ca81ef3d42"
+KEI_DSPACE_RUNTIME_SHA="38820452bf97918507b57866d994f5bd826e7230d5c4fb0de32e9626b881301b"
+KEI_DSPACE_BACKUP_SHA="975ded6ea59a40ff274c28bfdd6ea0fc5741ef6bc35de1280e1443f1f155540e"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
 KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
 KEI_DSPACE_BUILD_SHA="2e73bddbc34997ba983a8eac45c5f21eed5971fcd0a236449c5a2fd0edf886c4"
@@ -12601,7 +12609,7 @@ except Exception: d={}
 st=d.get("status","unknown"); units=d.get("services",{})
 values=list(units.values()) if isinstance(units,dict) else []
 services="active" if values and all(v=="running" for v in values) else "partial" if "running" in values else "inactive" if values else "unknown"
-print(json.dumps(dict(id="dspace",supported=True,detected=True,services=services,health="unknown",experimental=True,detail=d)))'
+sys.stdout.write(json.dumps(dict(id="dspace",supported=True,detected=True,services=services,health="unknown",experimental=True,detail=d), separators=(",", ":")))'
 }
 
 # Dependencies have their own plan/confirmation, before the platform plan.
@@ -16001,7 +16009,7 @@ kei_backup_status() {
 KEI_SET_KIND="koha-nexus-set"
 KEI_SET_FORMAT=1
 # The members a set may hold (anything else is refused before extracting).
-KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|dspace/|dspace/knx-dspace-[0-9-]+-[0-9a-f]{8}\.tar\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
+KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|dspace/|dspace/knx-dspace-[0-9-]+-[0-9a-f]{8}\.tar(\.(gz|bz2|xz))?\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
 
 # kei_set_platforms: the platforms of this server a set can hold.
 kei_set_platforms() {
@@ -16550,7 +16558,7 @@ PYCOPY
     chmod -R go-rwx "$stage"
     echo "stage=$stage"
     find "$stage/koha" -maxdepth 1 -type f -name '*.sql.*' -printf 'koha=%p\n' 2>/dev/null | head -n 1
-    find "$stage/dspace" -maxdepth 1 -type f -name 'knx-dspace-*.tar.gpg' -printf 'dspace=%p\n' 2>/dev/null | head -n 1
+    find "$stage/dspace" -maxdepth 1 -type f -name 'knx-dspace-*.tar*.gpg' -printf 'dspace=%p\n' 2>/dev/null | head -n 1
     find "$stage/tainacan" "$stage" -mindepth 1 -maxdepth 1 -type d -name 'knx-tainacan-*' 2>/dev/null | head -n 1 | while read -r p; do
         # The package is checked as a package too (its own manifest and checksums).
         if kei_backup_check "$p" tainacan >/dev/null 2>&1; then echo "tainacan=$p"; else echo "tainacan_bad=$p"; fi

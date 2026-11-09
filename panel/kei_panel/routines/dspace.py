@@ -91,7 +91,7 @@ async def install(app):
         app.check_platforms()
         if isinstance(result.get('note'), str) and result['note']:
             await app.push_screen_wait(MessageScreen(TITLE, t(result['note'])))
-        await assistant(app)
+        await app.push_screen_wait(MessageScreen(TITLE, t("DSpace is installed. Administrative access, addresses and backups are available in the menus.")))
 
 
 async def control(app, start):
@@ -211,9 +211,19 @@ async def assistant(app):
 
 
 async def backup_create(app):
-    if not await app.push_screen_wait(ConfirmScreen(TITLE, t('Create an encrypted DSpace backup? The repository pauses while PostgreSQL, files and all Solr cores are captured. The existing backup key must already be configured.'))):
+    settings = await call(app, 'backup-settings')
+    if settings is None:
         return
-    data = await call(app, 'backup-create', '--confirm', cancellable=False)
+    compression = settings.get('compression', 'gz')
+    from ..backup_center import DSPACE_CODECS
+    if compression not in DSPACE_CODECS:
+        await app.push_screen_wait(MessageScreen(TITLE, t('Could not read the backup compression setting.')))
+        return
+    text = t('Create an encrypted DSpace backup? The repository pauses while PostgreSQL, files and all Solr cores are captured. The existing backup key must already be configured.')
+    text += '\n\n' + t('Compression') + ': ' + t(DSPACE_CODECS[compression])
+    if not await app.push_screen_wait(ConfirmScreen(TITLE, text)):
+        return
+    data = await call(app, 'backup-create', '--compression', compression, '--confirm', cancellable=False)
     if data is not None:
         await app.push_screen_wait(MessageScreen(TITLE, str(data.get('package', ''))))
 

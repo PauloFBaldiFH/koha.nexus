@@ -2,7 +2,7 @@ import re
 
 from conftest import INSTALLER
 
-from kei_panel.menus import SECTIONS, all_actions
+from kei_panel.menus import SECTIONS, all_actions, PANEL_ONLY_ACTIONS
 
 TEXT = INSTALLER.read_text(encoding="utf-8")
 
@@ -13,7 +13,7 @@ def installer_actions():
 
 
 def test_every_action_exists_in_the_installer():
-    missing = all_actions() - installer_actions()
+    missing = all_actions() - installer_actions() - PANEL_ONLY_ACTIONS
     assert not missing, f"not in panel_action_function: {missing}"
 
 

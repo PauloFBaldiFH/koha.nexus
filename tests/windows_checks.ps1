@@ -133,6 +133,17 @@ $env:KOHAEASY_ROOT = Join-Path ([IO.Path]::GetTempPath()) ('koha-checks-' + [gui
 Import-Module (Join-Path $repo 'windows\KohaEasy.Lang.psm1') -Force
 Import-Module (Join-Path $repo 'windows\KohaEasy.Core.psm1') -Force
 Import-KeiLanguage -LangDir (Join-Path $repo 'lang') -Culture 'en-US'
+
+# The installed DSpace serializer historically inserted a newline inside the
+# JSON object. Read the complete response, never a nested fragment after a cut.
+$sample = 'Legacy notice' + "`n" + '{"schema":1,' + "`n" + '"state":"ok","platforms":[{"id":"dspace"}]}'
+$parsed = ConvertFrom-KohaStatusOutput -Output $sample
+Check 'status: multiline DSpace response' ($parsed.schema -eq 1 -and $parsed.state -eq 'ok' -and $parsed.platforms[0].id -eq 'dspace')
+$sample = '{"schema":1,"state":"old"}' + "`nnotice`n" + '{"schema":1,"state":"ok"}'
+Check 'status: final complete response after preamble' ((ConvertFrom-KohaStatusOutput -Output $sample).state -eq 'ok')
+$sample = '{"schema":1,"platforms":[' + "`n" + '{"id":"dspace"}'
+Check 'status: truncated outer object refused' ($null -eq (ConvertFrom-KohaStatusOutput -Output $sample))
+Check 'status: inline trailing text refused' ($null -eq (ConvertFrom-KohaStatusOutput -Output '{"schema":1} trailing'))
 $wsl = 'C:\Windows\System32\wsl.exe'
 
 # Console defaults (Paulo, 2026-10-29): later PowerShell windows open in

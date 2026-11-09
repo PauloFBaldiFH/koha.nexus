@@ -473,9 +473,36 @@ function Update-KohaHandshake {
 function Get-KohaLinuxStatus {
     $r = Invoke-KohaLinux -Command @($script:Cfg.PanelPath, '--status-json')
     if ($r.ExitCode -ne 0) { return $null }
-    $line = @($r.Output -split "`n" | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1)
-    if ($line.Count -eq 0) { return $null }
-    try { return ($line[0] | ConvertFrom-Json) } catch { return $null }
+    return ConvertFrom-KohaStatusOutput -Output $r.Output
+}
+
+function ConvertFrom-KohaStatusOutput {
+    param([string]$Output)
+    # Consume complete objects, including legacy multiline DSpace status.
+    # A truncated outer object must not fall back to one of its nested rows.
+    if ($Output.Length -gt 4MB) { return $null }
+    $buffer = ''
+    $value = $null
+    $collecting = $false
+    foreach ($line in @($Output -split "`n")) {
+        if (-not $collecting) {
+            if (-not $line.TrimStart().StartsWith('{')) {
+                if ($line.Trim()) { $value = $null }
+                continue
+            }
+            $buffer = $line
+            $collecting = $true
+        } else { $buffer += "`n" + $line }
+        try {
+            $parsed = $buffer | ConvertFrom-Json -ErrorAction Stop
+            if ($parsed -isnot [pscustomobject]) { return $null }
+            $value = $parsed
+            $collecting = $false
+            $buffer = ''
+        } catch { }
+    }
+    if ($collecting) { return $null }
+    return $value
 }
 
 # One-word state for the tray and the Status shortcut:

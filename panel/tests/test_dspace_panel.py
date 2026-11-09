@@ -200,9 +200,17 @@ def test_dspace_only_has_individual_scope_and_three_installed_platforms_have_exp
 
 @pytest.mark.parametrize('answer',[None,False])
 def test_declining_backup_never_stops_the_repository(monkeypatch,answer):
-    calls=mock_calls(monkeypatch,{})
+    calls=mock_calls(monkeypatch,{'backup-settings':{'compression':'xz'}})
     asyncio.run(dspace.backup_create(App([answer])))
-    assert calls==[]
+    assert [c[:2] for c in calls]==[('dspace-panel',('backup-settings',))]
+
+
+def test_backup_confirmation_displays_and_uses_the_selected_compression(monkeypatch):
+    calls=mock_calls(monkeypatch,{'backup-settings':{'compression':'xz'},
+                                'backup-create':{'package':'/backup/repo.tar.xz.gpg'}})
+    app=App([True]);asyncio.run(dspace.backup_create(app))
+    assert 'XZ / LZMA' in app.screens[0]._question
+    assert calls[-1][:2]==('dspace-panel',('backup-create','--compression','xz','--confirm'))
 
 
 def test_recovery_phrase_is_masked_and_only_in_task_environment(monkeypatch):
@@ -243,7 +251,7 @@ def test_dspace_only_backup_center_has_its_own_actions_without_writes(monkeypatc
             cards={c.entry.action for c in view.query(ActionCard) if c.display}
             assert {'dspace-backup-create','dspace-backup-test','dspace-backup-restore','dspace-backup-key'} <= cards
             assert not cards & {'backup-manual','tainacan-backup','set-backup','restore-assisted'}
-            assert all(not (name=='dspace-panel' and args and args[0].startswith('backup-')) for name,args in calls)
+            assert all(not (name=='dspace-panel' and args and args[0].startswith('backup-') and args[0]!='backup-list') for name,args in calls)
     asyncio.run(exercise())
 
 

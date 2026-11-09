@@ -31,6 +31,12 @@ MEMBERS = {KOHA:(KOHA,), TAINACAN:(TAINACAN,), DSPACE:(DSPACE,), BOTH:(KOHA,TAIN
            KOHA_DSPACE:(KOHA,DSPACE), TAINACAN_DSPACE:(TAINACAN,DSPACE), ALL:(KOHA,TAINACAN,DSPACE)}
 SCOPES = (KOHA, TAINACAN, DSPACE, BOTH, KOHA_DSPACE, TAINACAN_DSPACE, ALL)
 SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan", DSPACE: "DSpace", KOHA_DSPACE: "Koha + DSpace", TAINACAN_DSPACE: "Tainacan + DSpace", ALL: "Koha + Tainacan + DSpace"}
+DSPACE_CODECS = {
+    'gz': 'Gzip · balanced speed and size',
+    'bz2': 'Bzip2 · higher CPU use',
+    'xz': 'XZ / LZMA · slower, smaller archives',
+    'none': 'No compression · faster, more disk space',
+}
 
 NO_RECORD = "No run recorded"          # "Sem registro": no reliable history
 

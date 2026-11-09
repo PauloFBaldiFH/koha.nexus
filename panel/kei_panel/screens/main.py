@@ -112,7 +112,7 @@ class MainScreen(Screen):
                 if s.group in self.expanded and self.app.platform_ready(s.requires):
                     options.append(Option("   " + sidebar_prompt(s.label, plain, s.icon), id=s.id))
             else:
-                if not server and s.id != "dashboard":
+                if not server and s.id not in ("dashboard", "instances"):
                     server = True
                     rule = "--" if plain else "──"
                     options.append(Option(f"{rule} {t('Server')} {rule}", id="sidebar-server", disabled=True))

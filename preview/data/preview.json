@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.184",
+ "panel_version": "1.5.188",
  "languages": [
   {
    "code": "en",
@@ -233,6 +233,25 @@
    "media": [
     "docs/images/panel/dashboard.webp"
    ],
+   "single": ""
+  },
+  {
+   "id": "instances",
+   "item": "sec-instances",
+   "label": "➕  Add or remove instance",
+   "title": "Instances",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "instance-add",
+    "instance-remove"
+   ],
+   "features": [],
+   "media": [],
    "single": ""
   },
   {
@@ -1002,6 +1021,36 @@
    "media": [
     "docs/images/panel/dashboard.webp"
    ]
+  },
+  "instance-add": {
+   "id": "instance-add",
+   "type": "entry",
+   "section": "instances",
+   "label": "➕  Add instance",
+   "description": "Choose an available application driver and review its installation plan.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "instance-remove": {
+   "id": "instance-remove",
+   "type": "entry",
+   "section": "instances",
+   "label": "🗑  Remove instance",
+   "description": "Choose an installation and review whether to preserve or erase its data.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "sec-instances": {
+   "id": "sec-instances",
+   "type": "section",
+   "section": "instances",
+   "label": "➕  Add or remove instance",
+   "description": "",
+   "kind": "menu",
+   "status": "available",
+   "media": []
   },
   "install": {
    "id": "install",
@@ -4277,6 +4326,156 @@
    "zh": "控制面板",
    "ja": "コントロールパネル",
    "ko": "제어판"
+  },
+  "➕  Add or remove instance": {
+   "en": "➕  Add or remove instance",
+   "pt-BR": "➕  Adicionar ou remover instância",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Instances": {
+   "en": "Instances",
+   "pt-BR": "Instâncias",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "➕  Add instance": {
+   "en": "➕  Add instance",
+   "pt-BR": "➕  Adicionar instância",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Choose an available application driver and review its installation plan.": {
+   "en": "Choose an available application driver and review its installation plan.",
+   "pt-BR": "Escolha um aplicativo disponível e revise seu plano de instalação.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🗑  Remove instance": {
+   "en": "🗑  Remove instance",
+   "pt-BR": "🗑  Remover instância",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Choose an installation and review whether to preserve or erase its data.": {
+   "en": "Choose an installation and review whether to preserve or erase its data.",
+   "pt-BR": "Escolha uma instalação e revise se deseja manter ou apagar seus dados.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "📚  Koha (library)": {
    "en": "📚  Koha (library)",
@@ -17413,6 +17612,51 @@
     ]
    }
   },
+  "instance-add": {
+   "en": {
+    "summary": "Add instance",
+    "overview": [
+     "Choose Koha, Tainacan or DSpace and follow its existing driver. Installed applications are excluded to preserve existing data."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Adicionar instância",
+    "overview": [
+     "Escolha Koha, Tainacan ou DSpace e siga o driver existente. Aplicativos instalados não são oferecidos, preservando seus dados."
+    ]
+   }
+  },
+  "instance-remove": {
+   "en": {
+    "summary": "Remove instance",
+    "overview": [
+     "Choose Tainacan or DSpace, then review the driver removal plan. Data are kept by default; erasing requires separate confirmation. Native Koha removal is not yet offered here."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Remover instância",
+    "overview": [
+     "Escolha Tainacan ou DSpace e revise o plano de remoção. Os dados são mantidos por padrão; apagá-los exige confirmação separada. A remoção do Koha nativo ainda não é oferecida aqui."
+    ]
+   }
+  },
+  "sec-instances": {
+   "en": {
+    "summary": "Installations",
+    "overview": [
+     "Use Add instance to choose an application that is not installed, or Remove instance to review an existing container installation. Additional copies of the same application are not enabled by these shortcuts."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Instalações",
+    "overview": [
+     "Use Adicionar instância para escolher um aplicativo ainda não instalado, ou Remover instância para revisar uma instalação em contêiner. Estes atalhos ainda não habilitam cópias adicionais do mesmo aplicativo."
+    ]
+   }
+  },
   "install": {
    "en": {
     "summary": "Installs Koha and its server components through a guided flow with preflight checks, configuration and final validation.",
@@ -23247,165 +23491,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 172,
-   "manual_total": 172,
+   "manual": 175,
+   "manual_total": 175,
    "manual_outdated": [],
-   "strings": 519,
-   "strings_total": 519
+   "strings": 525,
+   "strings_total": 525
   },
   "pt-BR": {
-   "manual": 172,
-   "manual_total": 172,
+   "manual": 175,
+   "manual_total": 175,
    "manual_outdated": [],
-   "strings": 513,
-   "strings_total": 519
+   "strings": 519,
+   "strings_total": 525
   },
   "es": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 519
+   "strings_total": 525
   },
   "fr": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 519
+   "strings_total": 525
   },
   "it": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 400,
-   "strings_total": 519
+   "strings_total": 525
   },
   "de": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 399,
-   "strings_total": 519
+   "strings_total": 525
   },
   "nl": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "sv": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "pl": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "cs": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "ru": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "uk": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "tr": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "tl": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "id": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "ar": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "fa": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "hi": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "bn": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "vi": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "zh": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "ja": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   },
   "ko": {
    "manual": 0,
-   "manual_total": 172,
+   "manual_total": 175,
    "manual_outdated": [],
    "strings": 365,
-   "strings_total": 519
+   "strings_total": 525
   }
  }
 }
