@@ -52,7 +52,17 @@ def smoke(image, prefix):
                       "DSPACE_REST_PORT=8080", "DSPACE_REST_SSL=false", "DSPACE_REST_NAMESPACE=/server",
                       "DSPACE_REST_SSRBASEURL=http://127.0.0.1:8080/server"):
             options += ["-e", value]
-        probe = ["node", "-e", "fetch('http://127.0.0.1:4000/assets/images/dspace-logo.svg').then(async r=>{if(!r.ok || !(await r.text()).includes('<svg'))process.exit(1)}).catch(()=>process.exit(1))"]
+        probe = ["node", "-e", """const fs=require('fs');
+const c=JSON.parse(fs.readFileSync('/usr/local/share/nexus-dspace/languages.json'));
+const dir='/app/dist/browser/assets/i18n';const files=fs.readdirSync(dir);
+if(c.languages.length!==37)process.exit(1);
+for(const row of c.languages){
+ const file=files.find(f=>f.startsWith(row.code+'.')&&f.endsWith('.json'));
+ if(!file||typeof JSON.parse(fs.readFileSync(dir+'/'+file))!=='object')process.exit(1);
+}
+fetch('http://127.0.0.1:4000/assets/images/dspace-logo.svg').then(async r=>{
+ if(!r.ok || !(await r.text()).includes('<svg'))process.exit(1)
+}).catch(()=>process.exit(1))"""]
     else:
         probe = ["curl", "-fsS", "http://127.0.0.1:8983/solr/admin/cores?action=STATUS&wt=json"]
     try:
@@ -75,6 +85,8 @@ def smoke(image, prefix):
             if docker("inspect", "-f", "{{.State.Running}}", name).stdout.strip() != "true":
                 break
             time.sleep(2)
+        if result.stderr:
+            print("Last startup probe: " + result.stderr[-2000:])
         # Disposable containers have no credentials or institutional data.
         logs = docker("logs", "--tail", "60", name, check=False)
         print(logs.stdout, logs.stderr)

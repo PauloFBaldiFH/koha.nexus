@@ -61,6 +61,8 @@ COPY --from=build --chown=0:0 /dspace /dspace
 COPY --from=backend-source /LICENSE /usr/share/licenses/dspace/LICENSE
 COPY --from=backend-source /NOTICE /usr/share/licenses/dspace/NOTICE
 COPY --from=backend-source /LICENSES_THIRD_PARTY /usr/share/licenses/dspace/LICENSES_THIRD_PARTY
+COPY --chmod=0444 --from=nexus-license /platforms/dspace/languages.json /usr/local/share/nexus-dspace/languages.json
+RUN chmod 0755 /usr/local/share/nexus-dspace
 COPY --chmod=0555 backend-entrypoint.sh /usr/local/bin/nexus-dspace
 COPY --from=schema-guard /guard/ /usr/local/lib/nexus-dspace/
 COPY NexusSchemaGuard.java NexusAdmin.java /usr/share/licenses/nexus-dspace/

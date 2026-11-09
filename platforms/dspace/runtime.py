@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from languages import suggest as suggest_language
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -147,8 +148,25 @@ def local_docker_env():
     return env
 
 
+def reviewed_releases():
+    path=BASE/'release.json'; result={}; seen=set()
+    while True:
+        key=digest(path)
+        if key in seen:raise Refused('Cyclic DSpace release history.')
+        seen.add(key);data=read_json(path);result[key]=data
+        previous=data.get('previous_release')
+        if not previous:break
+        name=previous.get('file')
+        if name not in ('release-r3.json','release-r4.json'):
+            raise Refused('Unreviewed previous DSpace release file.')
+        path=BASE/name
+        if not path.is_file() or digest(path)!=previous.get('sha256'):
+            raise Refused('Previous DSpace release lock checksum mismatch.')
+    return result
+
+
 class Runtime:
-    def __init__(self, root=ROOT, catalog=None, lab=False, driver=None, progress=None, release_lock=None):
+    def __init__(self, root=ROOT, catalog=None, lab=False, driver=None, progress=None, release_lock=None, language=None):
         self.root = Path(root).absolute()
         self.release = read_json(BASE / 'release.json')
         self.release_hash = digest(BASE / 'release.json')
@@ -156,24 +174,21 @@ class Runtime:
         self.lab = lab
         self.driver = driver
         self.progress = progress
-        # Updating the panel must not silently change an installed image matrix.
-        # Recipe 3 remains available for same-release capture/recovery; only a
-        # deliberate later upgrade may replace its existing containers.
+        self.requested_language = language
+        # Select only a checked historical lock. A panel update never swaps
+        # installed images or makes a previous backup appear to be current.
         try:
             installed = self.state().get('release_sha256')
         except (Refused, OSError, ValueError):
-            installed = None  # operations still validate/refuse this state
+            installed = None
         selected = release_lock or installed
         if selected and selected != self.release_hash:
-            previous = self.release.get('previous_release', {})
-            if selected == previous.get('sha256') and previous.get('file') == 'release-r3.json':
-                path = BASE / 'release-r3.json'
-                if digest(path) != selected:
-                    raise Refused('Previous DSpace release lock checksum mismatch.')
-                self.release = read_json(path)
+            known = reviewed_releases()
+            if selected in known:
+                self.release = known[selected]
                 self.release_hash = selected
             elif release_lock:
-                raise Refused('Only the current and explicitly reviewed previous release locks are supported.')
+                raise Refused('Only explicitly reviewed DSpace release locks are supported.')
 
     def docker(self, *args, timeout=60, input_text=None, log_failure=True):
         # Do not inherit an unrelated remote Docker context / DOCKER_HOST.
@@ -349,6 +364,7 @@ class Runtime:
         proxy = self.core('plan', url).strip()
         return {'schema': 1, 'experimental': True, 'url': url, 'api': url + '/server',
                 'images': images, 'release_sha256': self.release_hash, 'ports': ports,
+                'language': suggest_language(self.requested_language, self.release['recipe']) if not old.get('prepared') else None,
                 'project': PROJECT, 'volumes': [PROJECT + '-' + n for n in VOLUMES],
                 'proxy': proxy, 'migration': old.get('migration', 'not-started'),
                 'notes': ['No default administrator is created; guided account setup is optional.', 'Encrypted recovery and explicit platform-set plans are available in the shared backup center.',
@@ -400,6 +416,7 @@ class Runtime:
             'ports': ['127.0.0.1:%s:4000' % plan['ports']['ui']], 'mem_limit': '1536m',
             'environment': {'DSPACE_UI_BASEURL': plan['url'], 'DSPACE_UI_HOST': '0.0.0.0',
                             'DSPACE_UI_PORT': '4000', 'DSPACE_UI_SSL': 'false',
+                            'DSPACE_FALLBACKLANGUAGE': plan.get('language') or 'en',
                             'DSPACE_REST_HOST': u.hostname, 'DSPACE_REST_PORT': str(u.port or (443 if u.scheme == 'https' else 80)),
                             'DSPACE_REST_SSL': str(u.scheme == 'https').lower(), 'DSPACE_REST_NAMESPACE': '/server',
                             'DSPACE_REST_SSRBASEURL': 'http://backend:8080/server',
@@ -751,6 +768,18 @@ class Runtime:
                     raise Refused('DSpace image preparation failed. Read the build log and retry installation; existing application data were preserved.') from None
             return {'prepared': True, 'images': self.images()}
 
+    def prepare_upgrade_images(self):
+        from backup import Recovery
+        Recovery(self).checked()
+        target=read_json(BASE/'release.json')
+        if self.release_hash==digest(BASE/'release.json'):
+            return {'catalog':str(self.catalog_path),'already_current':True}
+        target_catalog=self.catalog_path.parent/('dspace-images-r'+str(target['recipe'])+'.json')
+        candidate=Runtime(self.root.parent.parent/'image-preparation'/'dspace',target_catalog,
+                          self.lab,self.driver,self.progress,release_lock=digest(BASE/'release.json'))
+        candidate.prepare_images()
+        return {'catalog':str(target_catalog),'already_current':False}
+
     def admin(self, operation, request=None):
         if self.state().get('migration') != 'done':
             raise Refused('Finish the DSpace installation before managing administrators.')
@@ -767,8 +796,12 @@ class Runtime:
             email, first, last, language, password = values
             if not re.fullmatch(r'[^@\s|=]+@[^@\s|=]+\.[^@\s|=]+', email) or len(password) < 10:
                 raise Refused('Provide a valid e-mail and a password of at least 10 characters.')
-            if operation == 'create' and (not first.strip() or not last.strip() or language not in ('pt_BR', 'en', 'es')):
+            if operation == 'create':
+                from languages import account_code
+                language = account_code(language, self.release['recipe'])
+            if operation == 'create' and (not first.strip() or not last.strip() or not language):
                 raise Refused('Provide first name, last name and a supported language.')
+            values[3] = language
             payload = '\n'.join(values) + '\n'
         # Do not save subprocess output from account operations: a failed upstream
         # library could include sensitive input in its diagnostic.
@@ -786,6 +819,10 @@ class Runtime:
             if len(lines) != 1:
                 raise Refused('The administrator helper returned no valid result; no success was assumed.')
             result = json.loads(lines[0])
+            if operation == 'status':
+                from languages import catalog, account_code
+                result['languages']=[dict(code=account_code(r['code'],self.release['recipe']),ui_code=r['code'],label=r['label'])
+                                     for r in catalog(self.release['recipe']) if account_code(r['code'],self.release['recipe'])]
             if operation != 'status':
                 if result.get('changed') is not True:
                     raise Refused('The administrator helper did not confirm the operation.')
@@ -884,12 +921,14 @@ def main():
     for name in ('plan', 'install'):
         cmd = sub.add_parser(name)
         cmd.add_argument('--url')
+        cmd.add_argument('--language', help='Preferred initial UI fallback; existing configuration is kept')
         if name == 'install':
             cmd.add_argument('--confirm', action='store_true')
             cmd.add_argument('--retry-migration', action='store_true')
     for name in ('start', 'stop'):
         sub.add_parser(name).add_argument('--confirm', action='store_true')
     sub.add_parser('prepare-images').add_argument('--confirm', action='store_true')
+    sub.add_parser('prepare-upgrade-images').add_argument('--confirm', action='store_true')
     for name in ('admin-create', 'admin-password'):
         sub.add_parser(name).add_argument('--confirm', action='store_true')
     sub.add_parser('setup-mark').add_argument('values', nargs=2)
@@ -910,7 +949,7 @@ def main():
         child.add_argument('--confirm', action='store_true')
     sub.add_parser('backup-list')
     ops = sub.add_parser('operations')
-    ops.add_argument('action', choices=('plans','plan-save','plan-disable','plan-run','address','upgrade','remove','rollback','repair-web'))
+    ops.add_argument('action', choices=('plans','plan-save','plan-disable','plan-run','address','upgrade','remove','rollback','repair-web','languages','language-save'))
     ops.add_argument('--confirm', action='store_true')
     args = parser.parse_args()
     # The bridge's one-task environment carries the password only into Python.
@@ -926,16 +965,16 @@ def main():
     try:
         runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
                           progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True),
-                          release_lock=args.release_lock)
-        if args.command in ('install','start','stop','admin-create','admin-password','backup-create','backup-test','backup-restore','backup-rollback'):
+                          release_lock=args.release_lock, language=getattr(args,'language',None))
+        if args.command in ('install','start','stop','admin-create','admin-password','backup-create','backup-test','backup-restore','backup-rollback','prepare-upgrade-images'):
             from operations import Operations
             Operations(runtime).pending()
-        if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password', 'prepare-images') and not args.confirm:
+        if args.command in ('install', 'start', 'stop', 'admin-create', 'admin-password', 'prepare-images', 'prepare-upgrade-images') and not args.confirm:
             raise Refused('Explicit --confirm is required after reviewing the plan.')
         if args.command == 'operations':
             from operations import Operations
             from backup import Error
-            raw = operations_request if operations_request is not None else (sys.stdin.read(16385) if args.action != 'plans' else '{}')
+            raw = operations_request if operations_request is not None else (sys.stdin.read(16385) if args.action not in ('plans','languages') else '{}')
             if len(raw) > 16384: raise Refused('Operation input is too large.')
             request = json.loads(raw or '{}')
             if not isinstance(request, dict): raise Refused('Operation input must be an object.')
@@ -968,6 +1007,8 @@ def main():
                 raise Refused(str(error)) from None
         elif args.command == 'availability':
             result = runtime.availability()
+        elif args.command == 'prepare-upgrade-images':
+            result = runtime.prepare_upgrade_images()
         elif args.command == 'prepare-images':
             result = runtime.prepare_images()
         elif args.command == 'plan':

@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.190",
+ "panel_version": "1.5.192",
  "languages": [
   {
    "code": "en",
@@ -914,8 +914,8 @@
   {
    "id": "languages",
    "item": "sec-languages",
-   "label": "🌍  Koha languages",
-   "title": "🌍 Koha & Panel Languages",
+   "label": "🌍  Languages",
+   "title": "🌍 Panel & application languages",
    "prompt": "Choose an action:",
    "icon": "",
    "key": "",
@@ -923,6 +923,7 @@
    "sidebar": true,
    "parent": "",
    "entries": [
+    "dspace-languages",
     "languages",
     "lang-download",
     "lang-activate",
@@ -2295,6 +2296,16 @@
    "status": "available",
    "media": []
   },
+  "dspace-languages": {
+   "id": "dspace-languages",
+   "type": "entry",
+   "section": "languages",
+   "label": "🏛  DSpace interface languages",
+   "description": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "languages": {
    "id": "languages",
    "type": "entry",
@@ -2339,7 +2350,7 @@
    "id": "sec-languages",
    "type": "section",
    "section": "languages",
-   "label": "🌍  Koha languages",
+   "label": "🌍  Languages",
    "description": "Choose an action:",
    "kind": "menu",
    "status": "available",
@@ -10288,38 +10299,88 @@
    "ja": null,
    "ko": null
   },
-  "🌍  Koha languages": {
-   "en": "🌍  Koha languages",
-   "pt-BR": "🌍  Idiomas do Koha e do Painel",
-   "es": "🌍  Idiomas de Koha y del panel",
-   "fr": "🌍  Langues de Koha et du panneau",
-   "it": "🌍  Lingue di Koha e del pannello",
-   "de": "🌍  Sprachen von Koha und Panel",
-   "nl": "🌍  Talen van Koha en het paneel",
-   "sv": "🌍  Språk för Koha och panelen",
-   "pl": "🌍  Języki Koha i panelu",
-   "cs": "🌍  Jazyky Koha a panelu",
-   "ru": "🌍  Языки Koha и панели",
-   "uk": "🌍  Мови Koha та панелі",
-   "tr": "🌍  Koha ve panel dilleri",
-   "tl": "🌍  Mga wika ng Koha at ng panel",
-   "id": "🌍  Bahasa Koha dan panel",
-   "ar": "🌍  لغات Koha واللوحة",
-   "fa": "🌍  زبان‌های Koha و پنل",
-   "hi": "🌍  Koha और पैनल की भाषाएँ",
-   "bn": "🌍  Koha ও প্যানেলের ভাষা",
-   "vi": "🌍  Ngôn ngữ của Koha và bảng điều khiển",
-   "zh": "🌍  Koha 与面板语言",
-   "ja": "🌍  Koha とパネルの言語",
-   "ko": "🌍  Koha 및 패널 언어"
+  "🌍  Languages": {
+   "en": "🌍  Languages",
+   "pt-BR": "🌍  Idiomas",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
-  "🌍 Koha & Panel Languages": {
-   "en": "🌍 Koha & Panel Languages",
-   "pt-BR": "🌍 Idiomas do Koha e do Painel",
-   "es": "🌍 Idiomas de Koha y del panel",
-   "fr": "🌍 Langues de Koha et du panneau",
-   "it": "🌍 Lingue di Koha e del pannello",
-   "de": "🌍 Koha- und Panel-Sprachen",
+  "🌍 Panel & application languages": {
+   "en": "🌍 Panel & application languages",
+   "pt-BR": "🌍 Idiomas do painel e dos sistemas",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🏛  DSpace interface languages": {
+   "en": "🏛  DSpace interface languages",
+   "pt-BR": "🏛  Idiomas da interface do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.": {
+   "en": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
+   "pt-BR": "Seleciona as traduções incluídas na interface e o idioma alternativo. As preferências da conta, do navegador e do painel continuam independentes.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
    "nl": null,
    "sv": null,
    "pl": null,
@@ -21101,6 +21162,35 @@
     ]
    }
   },
+  "dspace-languages": {
+   "en": {
+    "summary": "Select the DSpace interface languages already bundled in the installed image and the fallback for visitors without a matching preference.",
+    "steps": [
+     "Select the languages available to visitors, then choose an active fallback. The panel language supplies the first suggestion.",
+     "Review and confirm before restarting only the interface. Existing accounts, data, domains and schedules are preserved."
+    ],
+    "tips": [
+     "Visitors keep saved account, cookie or browser preferences when supported. Translation completeness varies.",
+     "Image recipes 3 and 4 offer 35 interface languages and three account languages. Recipe 5 offers 37 interface/account languages; an image update is separate from a panel update."
+    ],
+    "related": [
+     "dspace-admin",
+     "dspace-upgrade",
+     "languages"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Selecione os idiomas da interface do DSpace já incluídos na imagem instalada e o idioma alternativo para visitantes sem preferência compatível.",
+    "steps": [
+     "Escolha os idiomas dos visitantes e, depois, um idioma alternativo ativo. O idioma do painel fornece a primeira sugestão.",
+     "Confira e confirme antes de reiniciar apenas a interface. Contas existentes, dados, domínios e agendamentos são preservados."
+    ],
+    "tips": [
+     "Os visitantes mantêm as preferências compatíveis da conta, dos cookies ou do navegador. A cobertura das traduções varia.",
+     "As receitas 3 e 4 oferecem 35 idiomas da interface e três de conta. A receita 5 oferece 37 idiomas de interface/conta; atualizar as imagens é uma etapa separada de atualizar o painel."
+    ]
+   }
+  },
   "languages": {
    "en": {
     "summary": "Downloads a Koha language pack and makes it the language of the OPAC, the staff interface and this panel in one go.",
@@ -23575,165 +23665,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 176,
-   "manual_total": 176,
+   "manual": 177,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 527,
-   "strings_total": 527
+   "strings": 529,
+   "strings_total": 529
   },
   "pt-BR": {
-   "manual": 176,
-   "manual_total": 176,
+   "manual": 177,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 521,
-   "strings_total": 527
+   "strings": 523,
+   "strings_total": 529
   },
   "es": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 400,
-   "strings_total": 527
+   "strings": 398,
+   "strings_total": 529
   },
   "fr": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 400,
-   "strings_total": 527
+   "strings": 398,
+   "strings_total": 529
   },
   "it": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 400,
-   "strings_total": 527
+   "strings": 398,
+   "strings_total": 529
   },
   "de": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 399,
-   "strings_total": 527
+   "strings": 397,
+   "strings_total": 529
   },
   "nl": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "sv": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "pl": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "cs": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "ru": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "uk": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "tr": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "tl": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "id": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "ar": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "fa": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "hi": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "bn": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "vi": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "zh": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "ja": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   },
   "ko": {
    "manual": 0,
-   "manual_total": 176,
+   "manual_total": 177,
    "manual_outdated": [],
-   "strings": 365,
-   "strings_total": 527
+   "strings": 364,
+   "strings_total": 529
   }
  }
 }

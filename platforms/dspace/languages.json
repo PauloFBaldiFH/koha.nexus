@@ -1,0 +1,265 @@
+{
+  "schema": 1,
+  "ui_source_commit": "694ed051465faadff20ebdd973720190cbd40b9f",
+  "languages": [
+    {
+      "code": "en",
+      "label": "English",
+      "active": true,
+      "legacy_index": 0,
+      "sha256": "f5bdabe521053fec97a314e138f8ad4acf7fdac8d732c8358772a9c258b1986a"
+    },
+    {
+      "code": "ar",
+      "label": "العربية",
+      "active": true,
+      "legacy_index": 1,
+      "sha256": "8378de996d1ca302e1505c86de26e7136f71d1dc7af2ce5d29c066d92e496adc"
+    },
+    {
+      "code": "bn",
+      "label": "বাংলা",
+      "active": true,
+      "legacy_index": 2,
+      "sha256": "380ddbffdb31c83f07593b2b9933a0929b537c1e3d4826e636a8d30242ad99aa"
+    },
+    {
+      "code": "ca",
+      "label": "Català",
+      "active": true,
+      "legacy_index": 3,
+      "sha256": "018907ec783e742ebe612674ee9e71e1fb9419f047a31acde5cf6450c0a86340"
+    },
+    {
+      "code": "cs",
+      "label": "Čeština",
+      "active": true,
+      "legacy_index": 4,
+      "sha256": "b5e764e8be3fde2e2bcde4864594310e7e35f7e7c980607191ff8e26a4b0a00d"
+    },
+    {
+      "code": "de",
+      "label": "Deutsch",
+      "active": true,
+      "legacy_index": 5,
+      "sha256": "bf5e0d3d1375b501c4f3afcf9ceacd18f6bdd673ecb6f3f81e112fa9f0b77f17"
+    },
+    {
+      "code": "el",
+      "label": "Ελληνικά",
+      "active": true,
+      "legacy_index": 6,
+      "sha256": "f4f67ee3589cfb55949361776aba11db3a36479dddaa900210443687fd0c388b"
+    },
+    {
+      "code": "es",
+      "label": "Español",
+      "active": true,
+      "legacy_index": 7,
+      "sha256": "ab5c6a81d832cd74d433f99a36fd8cc9693c38891d9df99b64b312ca79a335fc"
+    },
+    {
+      "code": "fa",
+      "label": "فارسی",
+      "active": true,
+      "legacy_index": 8,
+      "sha256": "9b1ad59dc89b6d8080f733580170ca84eb24ab27091e3137be7e98de53a8ff4b"
+    },
+    {
+      "code": "fi",
+      "label": "Suomi",
+      "active": true,
+      "legacy_index": 9,
+      "sha256": "5617a6b22c69656885691467c325a3e777657b4a3fe2365f82b0a8e88f15c34a"
+    },
+    {
+      "code": "fr",
+      "label": "Français",
+      "active": true,
+      "legacy_index": 10,
+      "sha256": "7d7c02009a8404f4c32858f7e447ed96971c0242ca4821ee2a528d9b322d1b6c"
+    },
+    {
+      "code": "gd",
+      "label": "Gàidhlig",
+      "active": true,
+      "legacy_index": 11,
+      "sha256": "634454ef664d519c1485d88271483b01f4259dfdf48b6291c364bf2b3c82d8fb"
+    },
+    {
+      "code": "gu",
+      "label": "ગુજરાતી",
+      "active": true,
+      "legacy_index": 12,
+      "sha256": "ece6d1fdb5371f628a06a262ac00e8c71ca25be66047d63216255d4826bfee61"
+    },
+    {
+      "code": "hi",
+      "label": "हिंदी",
+      "active": true,
+      "legacy_index": 13,
+      "sha256": "9926660a12b57c0beead4f67e958379afe72b3d656a958209b6d05813ed1d782"
+    },
+    {
+      "code": "hu",
+      "label": "Magyar",
+      "active": true,
+      "legacy_index": 14,
+      "sha256": "ee4234affa6c704eab323353c64708e435e9539ec1877255836b144f0f3bbd77"
+    },
+    {
+      "code": "it",
+      "label": "Italiano",
+      "active": true,
+      "legacy_index": 15,
+      "sha256": "be34c0487fdadcdeb6f571bc3de3fc37362bde460979d199aa7c8dfaf00fff8c"
+    },
+    {
+      "code": "ja",
+      "label": "日本語",
+      "active": true,
+      "legacy_index": null,
+      "sha256": "086ec0ff63084b68c4506b46f55c2095423ee26707b29a31767304a553cf6c37"
+    },
+    {
+      "code": "kk",
+      "label": "Қазақ",
+      "active": true,
+      "legacy_index": 16,
+      "sha256": "d7ebf0ad32102737a5d0647398dcbfae8774e9c48b800349af591d0b0e052d93"
+    },
+    {
+      "code": "lv",
+      "label": "Latviešu",
+      "active": true,
+      "legacy_index": 17,
+      "sha256": "795cdbfcc4dfff079f2ea4595bf27d6a19a1ca0a91c6b6c6551b94cf9f761a30"
+    },
+    {
+      "code": "ml",
+      "label": "മലയാളം",
+      "active": true,
+      "legacy_index": 18,
+      "sha256": "4cedde94b8861fc2834be38849e2e0181b6f4f609cd6e3221245c8d68a4c0663"
+    },
+    {
+      "code": "mr",
+      "label": "मराठी",
+      "active": true,
+      "legacy_index": 19,
+      "sha256": "afb6170d593950fe5754876ccdd638e0feff28c9a9c834cc66592a46c6d3f648"
+    },
+    {
+      "code": "nl",
+      "label": "Nederlands",
+      "active": true,
+      "legacy_index": 20,
+      "sha256": "74e5258126b7c29dd419454a6dd1756644279a5ab1d87348726ebda43f419fc4"
+    },
+    {
+      "code": "od",
+      "label": "ଓଡିଆ",
+      "active": true,
+      "legacy_index": 21,
+      "sha256": "ff64ac1e8605bc9c8a26eb2e0ccb31d4288fdd8dabed9278643a018cc76d6f72"
+    },
+    {
+      "code": "pl",
+      "label": "Polski",
+      "active": true,
+      "legacy_index": 22,
+      "sha256": "9094aabc61a7f6bce9a42c56884dc500ed2cdbe02745f29065bb7907e8675192"
+    },
+    {
+      "code": "pt-BR",
+      "label": "Português do Brasil",
+      "active": true,
+      "legacy_index": 24,
+      "sha256": "b5bf2c67fcc39c84ea23396ebdc32cb28f0f2595708d4f45b34566ed67367931"
+    },
+    {
+      "code": "pt-PT",
+      "label": "Português",
+      "active": true,
+      "legacy_index": 23,
+      "sha256": "4f43922399ab76ef406f4af4bd3d1a47e49a5ff7bb663a9f7f73b9e3977f2f80"
+    },
+    {
+      "code": "ru",
+      "label": "Русский",
+      "active": true,
+      "legacy_index": 25,
+      "sha256": "da828f430a3654242a60d455ec52ffc155a951f40fd27d6df6ad6f5ed02336c7"
+    },
+    {
+      "code": "sr-cyr",
+      "label": "Српски",
+      "active": true,
+      "legacy_index": 27,
+      "sha256": "c675a3d43f81e8db2fe94424f1887994053a4f2440172582d536271a2304a40a"
+    },
+    {
+      "code": "sr-lat",
+      "label": "Srpski (lat)",
+      "active": true,
+      "legacy_index": 26,
+      "sha256": "a68a871dc225be5e52825b0f5c17e3f368d2d1bd70d22bcb04a67233d073d4ae"
+    },
+    {
+      "code": "sv",
+      "label": "Svenska",
+      "active": true,
+      "legacy_index": 28,
+      "sha256": "e72045d764ff11e06d34f045aa9a2b71e9e6f9cff61ee426e351f042eca1aea8"
+    },
+    {
+      "code": "sw",
+      "label": "Kiswahili",
+      "active": true,
+      "legacy_index": null,
+      "sha256": "086ec0ff63084b68c4506b46f55c2095423ee26707b29a31767304a553cf6c37"
+    },
+    {
+      "code": "ta",
+      "label": "தமிழ்",
+      "active": true,
+      "legacy_index": 30,
+      "sha256": "ebb18e5494f9d4799c3d059078f6648dd06a7f4b1c8a65de784856d48f6d4197"
+    },
+    {
+      "code": "te",
+      "label": "తెలుగు",
+      "active": true,
+      "legacy_index": 29,
+      "sha256": "89802a190d1d6a5486b7cb8ede5b9511268520fc2489504c3810ad2b6efe1b3d"
+    },
+    {
+      "code": "tr",
+      "label": "Türkçe",
+      "active": true,
+      "legacy_index": 31,
+      "sha256": "9d4e7a67cc2e890e200a0018005ea732b648e4ac0371eb269b0bc4461b3fd463"
+    },
+    {
+      "code": "uk",
+      "label": "Yкраї́нська",
+      "active": true,
+      "legacy_index": 32,
+      "sha256": "66b138f7f8fcb975942972119e38dfe5ce0fc62349a542e62f8716a9cf89ad99"
+    },
+    {
+      "code": "vi",
+      "label": "Tiếng Việt",
+      "active": true,
+      "legacy_index": 33,
+      "sha256": "82c857b6f04e8a56a3fb120d25e3178aa980475be2745609effd281f556957c7"
+    },
+    {
+      "code": "zh-TW",
+      "label": "繁体中文",
+      "active": true,
+      "legacy_index": 34,
+      "sha256": "8d6f2474f68fc93837da10aeeb1145c7ccc6261e49843c6ad8786d826bcbb0da"
+    }
+  ]
+}

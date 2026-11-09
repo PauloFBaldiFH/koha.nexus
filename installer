@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.191"
+PANEL_VERSION=" 1.5.192"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -304,6 +304,23 @@ declare -A _MENU_PT=(
     ["Waiting for output. Some operations report only when a step finishes."]="Aguardando saída. Algumas operações informam o resultado somente ao concluir uma etapa."
     ["Waiting for the current step. No new output for ${seconds} seconds."]="Aguardando a etapa atual. Sem nova saída há ${seconds} segundos."
     ["Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion."]="Corrige o endereço da interface/API e o proxy gerenciado, com cópia privada da configuração para desfazer. Não migra o banco, troca imagens nem apaga dados."
+    ["DSpace is stopped. Save these languages for its next start without starting any service?"]="O DSpace está parado. Salvar estes idiomas para a próxima inicialização, sem iniciar nenhum serviço?"
+    ["Languages saved for the next DSpace start. Services remain stopped."]="Idiomas salvos para a próxima inicialização do DSpace. Os serviços continuam parados."
+    ["Languages saved and the DSpace interface restarted."]="Idiomas salvos e interface do DSpace reiniciada."
+    ["🌍  Languages"]="🌍  Idiomas"
+    ["🌍 Panel & application languages"]="🌍 Idiomas do painel e dos sistemas"
+    ["🏛  DSpace interface languages"]="🏛  Idiomas da interface do DSpace"
+    ["Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent."]="Seleciona as traduções incluídas na interface e o idioma alternativo. As preferências da conta, do navegador e do painel continuam independentes."
+    ["These translations are already included in the installed image. Choose the languages available to visitors."]="Estas traduções já estão incluídas na imagem instalada. Escolha os idiomas disponíveis aos visitantes."
+    ["Keep at least one language active."]="Mantenha pelo menos um idioma ativo."
+    ["Fallback language. Visitors keep their own saved or browser preference when available. The first suggestion follows the panel language."]="Idioma alternativo quando não houver preferência compatível. Os visitantes mantêm as escolhas salvas ou do navegador. A primeira sugestão segue o idioma do painel."
+    ["Apply these languages and restart only the DSpace interface? Existing accounts, repository data, domains and schedules are kept."]="Aplicar estes idiomas e reiniciar apenas a interface do DSpace? As contas existentes, os dados do repositório, os domínios e os agendamentos são preservados."
+    ["Use the current reviewed image recipe, preserving the repository and verifying a safety backup before replacing images."]="Use as imagens revisadas da versão atual, preservando o repositório e verificando um backup de segurança antes de substituir as imagens."
+    ["Prepare the reviewed images on this server"]="Preparar as imagens revisadas neste servidor"
+    ["Choose an existing reviewed image catalog"]="Escolher um catálogo de imagens revisado existente"
+    ["Build the reviewed update images? This can take 30–90 minutes or longer. Current repository images and data remain until the separate update plan is confirmed."]="Compilar as imagens revisadas da atualização? Isso pode levar de 30 a 90 minutos ou mais. As imagens e os dados atuais permanecem até a confirmação do plano de atualização separado."
+    ["The repository already uses the current reviewed image recipe."]="O repositório já usa as imagens revisadas da versão atual."
+    ["Choose the reviewed image catalog for this update. Database migrations are not performed."]="Escolha o catálogo de imagens revisado para esta atualização. Não são feitas migrações do banco."
     ["🔧  Repair DSpace web access"]="🔧  Corrigir acesso web do DSpace"
     ["Repair web access without reinstalling DSpace or changing repository data. Local access uses localhost on this computer; network publication remains in the address assistant."]="Corrija o acesso web sem reinstalar o DSpace nem alterar os dados. O acesso local usa localhost neste computador; a publicação fica no assistente de endereços."
     ["Use localhost on this computer"]="Usar localhost neste computador"
@@ -12491,12 +12508,15 @@ kei_docker_audit() {
 # ======================================================================
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
-KEI_DSPACE_OPERATIONS_SHA="de776b7f25a8cce90af4e180a109653a2c83429c5534d39ca8144e7da2c08148"
-KEI_DSPACE_RUNTIME_SHA="5978d18336846de9bdc0d14d3b3464897301c5c79f8db5df9992816f4de34907"
+KEI_DSPACE_OPERATIONS_SHA="237449d79e30137611af73a7211e671eef32844101644a58a7c439d6349f306a"
+KEI_DSPACE_RUNTIME_SHA="2fee27fd37f08aeeb3fa385ece462bc5de88c99e08e91ab124a6b54750bbcdb0"
 KEI_DSPACE_BACKUP_SHA="efd5fae6805cabbe048e53337c9ecd382f17ccc35027be368c0c29b636cf94ad"
+KEI_DSPACE_R4_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
+KEI_DSPACE_LANGUAGES_SHA="78da0fd86aef9f4145e7f22f17ab5e5d71665a32e05e48ae94bd7fbc28f1df5d"
+KEI_DSPACE_LANGUAGE_DATA_SHA="d74040a2b3c88620b166258afdefa610d45064f620b50f646e4e0266bd294ddc"
 KEI_DSPACE_PREVIOUS_SHA="72c8cec876cbc1ae991c07f19253d2d5bddfe62123e0cfc5572b57480149d608"
-KEI_DSPACE_RELEASE_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
-KEI_DSPACE_BUILD_SHA="2e73bddbc34997ba983a8eac45c5f21eed5971fcd0a236449c5a2fd0edf886c4"
+KEI_DSPACE_RELEASE_SHA="ea6eefdc4569349956401f171681f26642813dfb134110bad6f26f2f6c69078c"
+KEI_DSPACE_BUILD_SHA="3165ea5038aa44a7a27ee3afec092883d8e472522bbfd42ac453c4d6450e0c28"
 
 # Prints the canonical form of a root-only path. A symbolic link on the way
 # is accepted only when root owns it and every directory it passes through
@@ -12596,8 +12616,8 @@ kei_dspace_runtime() (
     tmp=$(mktemp -d /tmp/koha-dspace-adapter.XXXXXXXX) || return 1
     trap 'rm -rf "$tmp"' EXIT
     cache="$KEI_DSPACE_ADAPTER_DIR/$KEI_DSPACE_RUNTIME_SHA-$KEI_DSPACE_RELEASE_SHA-$KEI_DSPACE_BACKUP_SHA-${KEI_DSPACE_OPERATIONS_SHA:0:16}"
-    for file in runtime.py release.json backup.py release-r3.json operations.py; do
-        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; backup.py) expected="$KEI_DSPACE_BACKUP_SHA" ;; release-r3.json) expected="$KEI_DSPACE_PREVIOUS_SHA" ;; operations.py) expected="$KEI_DSPACE_OPERATIONS_SHA" ;; esac
+    for file in runtime.py release.json backup.py release-r3.json release-r4.json languages.py languages.json operations.py; do
+        case "$file" in runtime.py) expected="$KEI_DSPACE_RUNTIME_SHA" ;; release.json) expected="$KEI_DSPACE_RELEASE_SHA" ;; backup.py) expected="$KEI_DSPACE_BACKUP_SHA" ;; release-r3.json) expected="$KEI_DSPACE_PREVIOUS_SHA" ;; release-r4.json) expected="$KEI_DSPACE_R4_SHA" ;; languages.py) expected="$KEI_DSPACE_LANGUAGES_SHA" ;; languages.json) expected="$KEI_DSPACE_LANGUAGE_DATA_SHA" ;; operations.py) expected="$KEI_DSPACE_OPERATIONS_SHA" ;; esac
         src="${_SCRIPT_DIR}/platforms/dspace/$file"
         if [ -f "$src" ] && [ ! -L "$src" ] && [ "$(sha256sum "$src" | cut -d' ' -f1)" = "$expected" ]; then
             cp "$src" "$tmp/$file" || return 1
@@ -12618,7 +12638,7 @@ kei_dspace_runtime() (
     # offline even when config.sh has no checkout next to it.
     if { [ "$install:$confirm" = 1:1 ] || [ "${1:-}" = cache ]; } && [ "$(id -u)" = 0 ]; then
         mkdir -p "$cache" && chmod 700 "$cache" || return 1
-        for file in runtime.py release.json backup.py release-r3.json operations.py; do
+        for file in runtime.py release.json backup.py release-r3.json release-r4.json languages.py languages.json operations.py; do
             cp "$tmp/$file" "$cache/$file.new" && chmod 400 "$cache/$file.new" \
                 && mv -f "$cache/$file.new" "$cache/$file" || return 1
         done
