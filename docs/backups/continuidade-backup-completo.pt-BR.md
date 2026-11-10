@@ -41,14 +41,14 @@ bash -n installer
 sha256sum -c installer.sha256
 ```
 
-Validações locais: pacote/chaveiro com GnuPG real nos quatro codecs, frase errada,
+Validações locais: 23 testes do pacote/chaveiro com GnuPG real nos quatro codecs, frase errada,
 kit desatualizado, corrupção, links, mudança de dados, cancelamento, concorrência,
 retomada, rollback após interrupção e distribuição offline. Docker save/remove/load
 com imagem descartável confirmou o ID após remover a original. O Debian descartável
 validou o driver instalado fora do checkout e a recuperação das configurações após
 remover o chaveiro ativo, **sem aplicativos instalados nessa rodada local**.
 
-Os 53 testes existentes dos motores de backup/conjuntos/agendas passaram no Debian.
+O teste real de importação de imagem passou (1 caso). Os 53 testes existentes dos motores de backup/conjuntos/agendas passaram no Debian.
 Os testes de backup e operações do DSpace também passaram no Debian: 31 e 36 casos
 (um skip de plataforma já existente). As telas e rotinas novas são cobertas pelo
 painel, incluindo 80×24/160×48 e abertura só de leitura. O teste antigo de backup
