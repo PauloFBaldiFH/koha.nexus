@@ -2836,7 +2836,7 @@
    "summary": "Whether events are on, both plugins and the data kept (events, bookings, attendance, certificates)."
   },
   "tainacan-backup": {
-   "summary": "A full backup now: database, files and configuration, as a package of the platform backups."
+   "summary": "A consistent backup of the database, files and configuration. The Backup center selects Gzip, Bzip2, XZ or no compression for new manual, scheduled and safety captures. Restic references remain tied to their repository."
   },
   "tainacan-restore-test": {
    "summary": "Restores a backup in an isolated copy and compares collections, items and attachments. The Tainacan in use does not change."

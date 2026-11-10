@@ -26,7 +26,7 @@ from rich.text import Text
 from textual.widgets import Button, Label, Select, Static
 
 from .. import backup_center, cloud, cron, platforms
-from ..backup_center import DSPACE_CODECS
+from ..backup_center import DSPACE_CODECS, TAINACAN_CODECS
 from ..i18n import t
 from ..widgets.cards import ActionCard, StatusCard
 from .backup import CODEC_NOTE, CODECS, RESULTS
@@ -57,6 +57,7 @@ class BackupCenterView(PlatformSectionView):
         self.scope = ""
         self.codec = ""
         self.dspace_codec = ""
+        self.tainacan_codec = ""
         self.facts = None
         self.plans: list[backup_center.PlanRow] = []
 
@@ -99,8 +100,16 @@ class BackupCenterView(PlatformSectionView):
                 yield Label(t("Used for new manual, scheduled and safety backups of DSpace. Compression runs after services resume; every package remains encrypted. Existing packages keep their format."), classes="ai-note")
         with Vertical(id="bk-tainacan"):
             with Grid(classes="status-grid"):
-                yield StatusCard(t("Tainacan backups"), id="pstatus-backups")
+                yield StatusCard(t("Last backup"), id="bk-tn-age")
+                yield StatusCard(t("Size"), id="bk-tn-size")
+                yield StatusCard(t("Recovery packages"), id="pstatus-backups")
                 yield StatusCard(t("Backup key"), id="pstatus-vault")
+            with Vertical(id="bk-tn-codec-box", classes="hub-box"):
+                with Horizontal(classes="form-row"):
+                    yield Label(t("Compression"), classes="form-label")
+                    yield Select([(t(label), key) for key, label in TAINACAN_CODECS.items()], value="gz",
+                                 allow_blank=False, id="bk-tn-codec", disabled=True)
+                yield Label(t("Used for new Tainacan manual, scheduled and safety backups. Additional compression runs after WordPress resumes. Existing backups keep their format. Restic controls compression inside its own repository."), classes="ai-note")
             yield Static(t(ENCRYPTION_NOTE), classes="view-prompt", id="encryption-note", markup=False)
         yield Label(t("Automatic backups"), classes="view-prompt", id="bk-plans-title")
         # One block per automatic backup (it wraps on a small terminal,
@@ -112,6 +121,7 @@ class BackupCenterView(PlatformSectionView):
 
     def on_mount(self) -> None:
         self.query_one("#bk-codec-box").border_title = t("Backup compression type")
+        self.query_one("#bk-tn-codec-box").border_title = t("Backup compression type")
         self.query_one("#bk-ds-codec-box").border_title = t("Backup compression type")
         super().on_mount()        # hides the cards and titles, then refresh_data()
 
@@ -197,8 +207,14 @@ class BackupCenterView(PlatformSectionView):
             for grid in self.query(f"#zone-{zone_id(z)}"):
                 grid.display = visible.get(z, False)
         if self.scope == backup_center.TAINACAN:
-            self.query_one("#pstatus-backups", StatusCard).set(*platforms.describe_backups(facts.backups))
-            self.query_one("#pstatus-vault", StatusCard).set(*platforms.describe_vault(facts.backups))
+            backup = facts.backups
+            tested = backup.verified.split()
+            note = t('last restore test passed') if tested[-1:] == ['ok'] else t('last restore test failed') if tested else t('no restore test yet')
+            self.query_one("#pstatus-backups", StatusCard).set(str(backup.count) if backup.known else '-', note, 'ok' if tested[-1:] == ['ok'] else 'warn')
+            value, detail, state = platforms.describe_vault(backup)
+            card = self.query_one("#pstatus-vault", StatusCard)
+            card.set(value, t('recovery kit saved') if backup.kit else t('recovery kit not saved yet'), state)
+            card.tooltip = detail
 
     # --- loading ------------------------------------------------------------------
     async def _load(self) -> None:
@@ -285,8 +301,21 @@ class BackupCenterView(PlatformSectionView):
             if bridge.has_task("platform-backup-status"):
                 out = await bridge.task("platform-backup-status", "tainacan")
                 keep = out.results.get("tainacan.keep", "") if isinstance(out.results, dict) else ""
+                codec = out.get("tainacan.compression", "")
+                if codec in TAINACAN_CODECS and bridge.has_task('platform-backup-compression'):
+                    self._show_tainacan_codec(codec)
+                else:
+                    self.tainacan_codec = ""
+                    self.query_one('#bk-tn-codec', Select).disabled = True
+                newest = out.get('tainacan.last', '').split('|')
+                self.query_one('#bk-tn-age', StatusCard).set(newest[1] if len(newest) > 1 else t('None yet'), '')
+                size = out.get('tainacan.last_bytes', '')
+                self.query_one('#bk-tn-size', StatusCard).set(human_bytes(int(size)) if size.isdigit() else '-', t('Restic snapshot excluded') if facts.backups.repo else t('Package on this server'))
         except Exception:  # noqa: BLE001
-            pass
+            self.query_one('#bk-tn-codec', Select).disabled = True
+            self.tainacan_codec = ""
+            for key in ('age', 'size'):
+                self.query_one('#bk-tn-' + key, StatusCard).set(t('Unavailable'), '', 'warn')
         _status, _plans, _history, remotes = await self._cloud()
         return backup_center.tainacan_plans(facts.backups, keep, remotes)
 
@@ -324,6 +353,12 @@ class BackupCenterView(PlatformSectionView):
 
     # --- Koha: the compression of new backups ------------------------------------
     def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == 'bk-tn-codec':
+            event.stop()
+            value = event.value if isinstance(event.value, str) else ''
+            if self.tainacan_codec and value != self.tainacan_codec and value in TAINACAN_CODECS:
+                self.run_worker(self._set_tainacan_codec(value), exclusive=True, group='routine', exit_on_error=False)
+            return
         if event.select.id == 'bk-ds-codec':
             event.stop()
             value = event.value if isinstance(event.value, str) else ''
@@ -337,6 +372,24 @@ class BackupCenterView(PlatformSectionView):
         if not self.codec or value == self.codec or value not in CODECS:
             return
         self.run_worker(self._set_codec(value), exclusive=True, group="routine", exit_on_error=False)
+
+    def _show_tainacan_codec(self, codec: str) -> None:
+        self.tainacan_codec = codec
+        select = self.query_one('#bk-tn-codec', Select)
+        select.value = codec
+        select.disabled = False
+
+    async def _set_tainacan_codec(self, codec: str) -> None:
+        from ..routines.common import failed, run_task, show_failure
+        previous = self.tainacan_codec
+        self.query_one('#bk-tn-codec', Select).disabled = True
+        result = await run_task(self.app, t('Saving the backup settings'), 'platform-backup-compression', 'tainacan', codec)
+        if failed(result) or result.get('compression', '') != codec:
+            await show_failure(self.app, t('Compression'), result)
+            self._show_tainacan_codec(previous)
+            return
+        self._show_tainacan_codec(codec)
+        self.app.notify(t('New backups: ${name}', name=t(TAINACAN_CODECS[codec])))
 
     def _show_dspace_codec(self, codec: str) -> None:
         self.dspace_codec = codec

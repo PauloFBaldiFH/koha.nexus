@@ -675,3 +675,76 @@ def test_dspace_inventory_and_persisted_compression_are_available_without_captur
             assert select.value == 'xz'
             assert not any(args and args[0] in ('backup-create','backup-restore','backup-test') for name,args in calls)
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize('size', [(80, 24), (160, 48)])
+@pytest.mark.parametrize('save_ok', [True, False])
+def test_tainacan_compression_persists_without_backup_and_failed_save_keeps_previous(monkeypatch, size, save_ok):
+    from textual.widgets import Select
+    from kei_panel.bridge import TaskOutcome
+    from kei_panel.widgets.cards import StatusCard
+    from kei_panel.screens.dialogs import MessageScreen
+    monkeypatch.setenv('KEI_PANEL_DEMO_KOHA', '0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_TAINACAN', '1')
+    monkeypatch.setenv('KEI_PANEL_DEMO_DSPACE', '0')
+    async def exercise():
+        app = KohaPanelApp(PanelEnv(installer=None, lang='en', plain=True, demo=True))
+        original = app.bridge.task
+        calls = []; preference = {'codec': 'gz'}
+        async def task(name, *args, **kwargs):
+            calls.append((name,args))
+            if name == 'platform-backup-status':
+                return TaskOutcome(results={'key':'', 'tainacan.compression':preference['codec'],
+                    'tainacan.last':'knx-tainacan-20261110-020000|2026-11-10 02:00:00|self',
+                    'tainacan.last_bytes':'2048','tainacan.count':'1'})
+            if name == 'platform-backup-compression':
+                assert args == ('tainacan', 'xz')
+                if save_ok:
+                    preference['codec'] = 'xz'
+                    return TaskOutcome(results={'compression':'xz'})
+                return TaskOutcome(rc=4)
+            return await original(name,*args,**kwargs)
+        app.bridge.task = task
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause(1.0)
+            app.backup_scope='tainacan'; app.screen.action_show('backups')
+            await until(pilot, loaded(app))
+            view = current_view(app); select = view.query_one('#bk-tn-codec', Select)
+            assert not select.disabled and select.value == 'gz'
+            assert '2 KB' in str(view.query_one('#bk-tn-size', StatusCard).query_one('.card-value').render())
+            assert not any(n=='platform-backup-compression' for n,a in calls)
+            select.value='xz'
+            if not save_ok:
+                await until(pilot,lambda:isinstance(app.screen,MessageScreen))
+                app.screen.dismiss(None)
+            await until(pilot,lambda:not select.disabled)
+            assert select.value == ('xz' if save_ok else 'gz')
+            view.refresh_data(); await until(pilot,loaded(app))
+            assert select.value == preference['codec']
+            assert not any(n in ('tainacan-backup','tainacan-restore-test','tainacan-restore') for n,a in calls)
+    asyncio.run(exercise())
+
+
+def test_repeated_refresh_finishes_without_leaking_cancelled_loader_coroutines(monkeypatch):
+    import gc
+    import warnings
+    monkeypatch.setenv('KEI_PANEL_DEMO_KOHA', '0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_TAINACAN', '1')
+    monkeypatch.setenv('KEI_PANEL_DEMO_DSPACE', '0')
+    async def exercise():
+        app = KohaPanelApp(PanelEnv(installer=None, lang='en', plain=True, demo=True))
+        async with app.run_test(size=(80,24)) as pilot:
+            await pilot.pause(.5)
+            app.backup_scope='tainacan';app.screen.action_show('backups')
+            await until(pilot,loaded(app))
+            view=current_view(app)
+            for _ in range(15):view.refresh_data()
+            await until(pilot,loaded(app))
+            assert view.facts.backups.known
+            assert view.tainacan_codec=='gz'
+        gc.collect()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always', RuntimeWarning)
+        asyncio.run(exercise())
+        gc.collect()
+    assert not [w for w in caught if 'BackupCenterView._load' in str(w.message) and 'never awaited' in str(w.message)]

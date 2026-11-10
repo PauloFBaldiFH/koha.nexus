@@ -2429,8 +2429,8 @@
    "_en": "4968d2afe8"
   },
   "tainacan-backup": {
-   "summary": "Um backup completo agora: banco, arquivos e configuração, num pacote dos backups das plataformas.",
-   "_en": "3c345328f5"
+   "summary": "Um backup consistente do banco, arquivos e configuração. A Central de backups permite escolher Gzip, Bzip2, XZ ou sem compactação para novas capturas manuais, agendadas e de segurança. Referências restic continuam dependendo do seu repositório.",
+   "_en": "1dc1cd4cee"
   },
   "tainacan-restore-test": {
    "summary": "Restaura um backup numa cópia isolada e compara coleções, itens e anexos. O Tainacan em uso não muda.",

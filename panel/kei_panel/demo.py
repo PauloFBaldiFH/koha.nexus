@@ -563,7 +563,8 @@ _SCRIPTS: dict[str, list[str]] = {
                                "@@result kit=/var/lib/koha-nexus/backup/recovery-kit.txt",
                                "@@result tainacan.repo=/var/backups/koha-nexus/restic/tainacan",
                                "@@result tainacan.copy=gdrive:koha-nexus", "@@result tainacan.schedule=02:30",
-                               "@@result tainacan.keep=7 7 4 6",
+                               "@@result tainacan.keep=7 7 4 6", "@@result tainacan.compression=gz",
+                               "@@result tainacan.last_bytes=1048576",
                                "@@result tainacan.last=knx-tainacan-20261105-023000|2026-11-05 02:30:00|ref",
                                "@@result tainacan.count=9", "@@result tainacan.incomplete=1",
                                "@@result tainacan.verified=2026-11-01 04:30:12 knx-tainacan-20261002-023000 ok",
@@ -948,6 +949,13 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         if name in ("admin-status", "admin-password", "admin-create", "setup-status", "setup-mark",
                     "setup-close"):
             lines = _admin_lines(name, args)
+        if name == "platform-backup-compression":
+            value = args[1] if len(args) > 1 else env.get("DEMO_TAINACAN_CODEC", "gz")
+            if value in ("gz", "bz2", "xz", "none"):
+                env["DEMO_TAINACAN_CODEC"] = value
+                lines = ["@@result compression=" + value]
+        if name == "platform-backup-status":
+            lines = [line.replace("tainacan.compression=gz", "tainacan.compression=" + env.get("DEMO_TAINACAN_CODEC", "gz")) for line in lines]
         if name == "set-inspect":
             lines = lines + _set_conflicts()
     if lines is None:
@@ -958,7 +966,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                             "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
                             "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups",
                             "tainacan-restore-notes",
-                            "platform-backup-status", "platform-backup-plan", "platform-backup-incomplete",
+                            "platform-backup-status", "platform-backup-compression", "platform-backup-plan", "platform-backup-incomplete",
                             "set-inspect", "set-cleanup", "set-schedule-status", "admin-status", "setup-status", "setup-mark",
                             "setup-close") \
         else 0.05 if name == "install" else 0.15

@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.192"
+PANEL_VERSION=" 1.5.193"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -273,6 +273,13 @@ export KOHA_PANEL_LANG_FULL KOHA_PANEL_LANG SYS_LANG
 declare -A _TRANS_CACHE=()
 
 declare -A _MENU_PT=(
+    ["Restic snapshot excluded"]="Sem o snapshot restic"
+    ['Compressing captured backup (${codec}); WordPress has resumed.']="Compactando o backup capturado (\${codec}); o WordPress voltou a funcionar."
+    ["Backup compression failed. The captured data were kept; resume this backup."]="A compactação do backup falhou. Os dados capturados foram preservados; retome este backup."
+    ["Invalid backup compression setting."]="Configuração de compactação de backup inválida."
+    ["Unknown backup compression."]="Compactação de backup desconhecida."
+    ["Package on this server"]="Pacote neste servidor"
+    ["Used for new Tainacan manual, scheduled and safety backups. Additional compression runs after WordPress resumes. Existing backups keep their format. Restic controls compression inside its own repository."]="Usada nos novos backups manuais, agendados e de segurança do Tainacan. A compactação adicional ocorre depois de o WordPress voltar a funcionar. Os backups existentes mantêm seu formato. O restic controla a compactação no próprio repositório."
     ["Other editors"]="Outros editores"
     ["Configure the backup key in the Backup center first."]="Configure primeiro a chave de backup na Central de backups."
     ["Cron expression"]="Expressão cron"
@@ -13770,11 +13777,12 @@ _kei_tn_resolve() {
 # files.tar.gz, or from the restic snapshot of files.ref.json, restored and
 # checked in a staging area first.
 _kei_tn_fill_files() {
-    local vol="$1" bdir="$2" st stage tree rc
-    if [ -f "$bdir/files.tar.gz" ]; then
-        timeout 14400 docker run --rm --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
-            --security-opt no-new-privileges -v "$vol":/data -v "$bdir/files.tar.gz":/backup/files.tar.gz:ro --entrypoint sh \
-            "$(_kei_tn_image wp)" -c 'find /data -mindepth 1 -delete && tar -C /data -xzpf /backup/files.tar.gz' >/dev/null 2>&1
+    local vol="$1" bdir="$2" st stage tree rc payload
+    payload=$(_kei_bk_payload "$bdir" files) || return $?
+    if [ -f "$payload" ]; then
+        _kei_bk_read_payload "$payload" | timeout 14400 docker run --rm -i --network none --label "$KEI_DOCKER_LABEL.managed=true" --label "$KEI_DOCKER_LABEL.platform=$KEI_TAINACAN_ID" \
+            --security-opt no-new-privileges -v "$vol":/data --entrypoint sh \
+            "$(_kei_tn_image wp)" -c 'find /data -mindepth 1 -delete && tar -C /data -xpf -' >/dev/null 2>&1
         return
     fi
     st=$(_kei_bk_stage_ref "$bdir" tainacan) || return 1
@@ -13793,7 +13801,7 @@ _kei_tn_load_db() {
     [ -n "$cid" ] || return 1
     _kei_docker exec -i -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD "$dir")" "$cid" mariadb -uroot \
         -e "DROP DATABASE IF EXISTS wordpress; CREATE DATABASE wordpress CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL ON wordpress.* TO 'wordpress'@'%';" || return 1
-    gzip -dc "$bdir/db.sql.gz" | timeout 7200 docker exec -i -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD "$dir")" "$cid" mariadb -uroot wordpress
+    _kei_bk_read_payload "$(_kei_bk_payload "$bdir" db)" | timeout 7200 docker exec -i -e MYSQL_PWD="$(_kei_tn_env KN_DB_ROOT_PASSWORD "$dir")" "$cid" mariadb -uroot wordpress
 }
 
 # _kei_tn_validate [rt] BACKUP_DIR: the data matches the manifest:
@@ -15086,7 +15094,8 @@ kei_tainacan_events_status() {
 # backup (backup_sql.sh, MARC21, cloud plans) does not use it and does not
 # change.
 #
-# A package (format 2), /var/backups/koha-nexus/<platform>/knx-<platform>-<time>/:
+# A package (format 2 for gzip, format 3 for bz2/xz/none),
+# /var/backups/koha-nexus/<platform>/knx-<platform>-<time>/:
 #   journal.jsonl      one line per step, from the start
 #   db.sql.gz          the database (written as .part, renamed when done)
 #   files.tar.gz       the files tree (self-contained package), or
@@ -15140,6 +15149,88 @@ _kei_bk_set() {
 _kei_bk_sha() { sha256sum "$1" | awk '{ print $1 }'; }
 _kei_bk_size() { stat -c %s "$1" 2>/dev/null || echo 0; }
 _kei_bk_now() { printf '%s' "${_KEI_BK_NOW:-$(date +%s)}"; }
+
+# The preference applies only to new captures. Each package records its own
+# choice, so resuming/restoring never depends on today's preference.
+kei_backup_compression() {
+    local p="${1:-}" value
+    _kei_bk_known "$p" || return 2
+    if [ "$#" -gt 1 ]; then
+        case "$2" in gz|bz2|xz|none) ;; *) echo "$(t "Unknown backup compression.")" >&2; return 2 ;; esac
+        _kei_bk_lock "$p" || return $?
+        _kei_bk_set "compression_$p" "$2" || return 1
+    fi
+    value=$(_kei_bk_get "compression_$p"); value=${value:-gz}
+    case "$value" in gz|bz2|xz|none) printf '%s\n' "$value" ;; *) echo "$(t "Invalid backup compression setting.")" >&2; return 4 ;; esac
+}
+
+_kei_bk_package_codec() {
+    local value=gz
+    if [ -f "$1/manifest.json" ]; then value=$(_kei_bk_mget "$1" compression); value=${value:-gz}
+    elif [ -f "$1/.compression" ]; then value=$(cat "$1/.compression"); fi
+    case "$value" in gz|bz2|xz|none) printf '%s' "$value" ;; *) return 4 ;; esac
+}
+
+_kei_bk_payload() {
+    local codec base
+    codec=$(_kei_bk_package_codec "$1") || return $?
+    case "$2" in db) base=db.sql ;; files) base=files.tar ;; *) return 2 ;; esac
+    [ "$codec" = none ] || base+=".$codec"
+    printf '%s/%s' "$1" "$base"
+}
+
+# Read the actual stream, checking magic against its declared suffix. Python's
+# standard codecs avoid adding binaries to the server or WordPress image.
+_kei_bk_read_payload() {
+    python3 -I -c '
+import bz2,gzip,lzma,shutil,sys
+import resource
+soft,hard=resource.getrlimit(resource.RLIMIT_AS)
+cap=min([512<<20]+[v for v in (soft,hard) if v>=0])
+resource.setrlimit(resource.RLIMIT_AS,(cap,hard))
+path=sys.argv[1]
+with open(path,"rb") as f: magic=f.read(6)
+codec="gz" if magic.startswith(b"\x1f\x8b") else "bz2" if magic.startswith(b"BZh") else "xz" if magic.startswith(b"\xfd7zXZ\x00") else "none"
+declared=next((c for c in ("gz","bz2","xz") if path.endswith("."+c)),"none")
+if codec!=declared: raise SystemExit("Payload compression does not match its bytes.")
+try:
+    with {"gz":gzip.open,"bz2":bz2.open,"xz":lzma.open,"none":open}[codec](path,"rb") as source:
+        shutil.copyfileobj(source,sys.stdout.buffer,1024*1024)
+except BrokenPipeError: sys.exit(1)
+' "$1"
+}
+
+# Gzip capture keeps the established short writer-pause path. Recompression
+# happens only after writers resume, and never nests one codec inside another.
+_kei_bk_recompress() {
+    local dir="$1" codec base source target expected
+    _kei_bk_has "$dir" manifest && return 0
+    codec=$(_kei_bk_package_codec "$dir") || return $?
+    [ "$codec" != gz ] || return 0
+    echo "$(t "Compressing captured backup (\${codec}); WordPress has resumed.")" >&2
+    for base in db.sql files.tar; do
+        source="$dir/$base.gz"; target="$dir/$base"; [ "$codec" = none ] || target+=".$codec"
+        if [ -f "$source" ]; then
+            expected=$(_kei_bk_part_sha "$dir" "$base.gz")
+            [ -n "$expected" ] && [ "$expected" = "$(_kei_bk_sha "$source")" ] || return 4
+            ( umask 077; python3 -I -c '
+import bz2,gzip,lzma,os,shutil,sys
+source,target,codec=sys.argv[1:]
+with gzip.open(source,"rb") as inp, {"bz2":bz2.open,"xz":lzma.open,"none":open}[codec](target,"wb") as out:
+    shutil.copyfileobj(inp,out,1024*1024)
+with open(target,"rb") as f: os.fsync(f.fileno())
+' "$source" "$target.part" "$codec" ) || return 1
+            mv -f "$target.part" "$target" || return 1
+            _kei_bk_journal "$dir" compressed file "${target##*/}" bytes "$(_kei_bk_size "$target")" sha256 "$(_kei_bk_sha "$target")" codec "$codec"
+            rm -f "$source" || return 1
+        elif [ "$base" = files.tar ] && [ -f "$dir/files.ref.json" ]; then
+            continue
+        else
+            expected=$(_kei_bk_part_sha "$dir" "${target##*/}")
+            [ -f "$target" ] && [ -n "$expected" ] && [ "$expected" = "$(_kei_bk_sha "$target")" ] || return 4
+        fi
+    done
+}
 
 # _kei_bk_journal DIR STEP [KEY VALUE]...
 _kei_bk_journal() {
@@ -15452,15 +15543,17 @@ kei_backup_copy() {
 # ----------------------------------------------------------------------
 # kei_backup_run PLATFORM [LABEL]: a package; prints its directory.
 kei_backup_run() {
-    local p="${1:-}" label="${2:-manual}" pd ts dir n need free
+    local p="${1:-}" label="${2:-manual}" pd ts dir n need free codec
     _kei_bk_known "$p" || { echo "$(t "Unknown platform.")" >&2; return 2; }
     [[ "$label" =~ ^[a-z0-9-]{1,20}$ ]] || label=manual
     _kei_bk_lock "$p" || return $?
     _kei_bk_recover "$p" || return 1
+    codec=$(kei_backup_compression "$p") || return $?
     "_kei_bk_${p}_preflight" || return $?
     pd=$(_kei_bk_pdir "$p")
     mkdir -p "$pd" && chmod 700 "$pd" "${pd%/*}" 2>/dev/null
     need=$("_kei_bk_${p}_size"); need=$(( ${need:-0} * 12 / 10 + 50 ))
+    [ "$codec" = gz ] || need=$((need * 2))
     free=$(df -Pm "$pd" 2>/dev/null | awk 'NR == 2 { print $4 }')
     if [ -n "$free" ] && [ "$free" -lt "$need" ]; then
         echo "$(a="$free"; b="$need"; t "Not enough free disk for the backup: \${a} MB free, about \${b} MB needed.")" >&2; return 5
@@ -15468,6 +15561,7 @@ kei_backup_run() {
     ts=$(date '+%Y%m%d-%H%M%S'); dir="$pd/knx-$p-$ts"; n=1
     while [ -e "$dir" ]; do dir="$pd/knx-$p-$ts-$n"; n=$((n + 1)); done
     mkdir -m 700 "$dir" || return 1
+    ( umask 077; printf '%s\n' "$codec" > "$dir/.compression" ) || return 1
     _kei_bk_journal "$dir" start label "$label" platform "$p"
     _kei_bk_capture "$p" "$dir" || return 1
     _kei_bk_post "$p" "$dir" || return 1
@@ -15544,7 +15638,14 @@ _kei_bk_capture() {
 
 # _kei_bk_post PLATFORM DIR: secrets, manifest, copy; each step once.
 _kei_bk_post() {
-    local p="$1" dir="$2" fpr tmp f files k v dest name secrets=plain label ps
+    local p="$1" dir="$2" fpr tmp f files k v dest name secrets=plain label ps dbfile filepart codec
+    if ! _kei_bk_recompress "$dir"; then
+        echo "$(t "Backup compression failed. The captured data were kept; resume this backup.")" >&2
+        return 1
+    fi
+    codec=$(_kei_bk_package_codec "$dir") || return $?
+    dbfile=$(_kei_bk_payload "$dir" db) || return $?
+    filepart=$(_kei_bk_payload "$dir" files) || return $?
     if ! _kei_bk_has "$dir" secrets; then
         rm -rf "$dir/secrets" "$dir/secrets.tar.gpg" "$dir"/*.part
         fpr=$(_kei_bk_fpr)
@@ -15571,7 +15672,8 @@ _kei_bk_post() {
         label=$(sed -n 's/.*"step":"start".*"label":"\([a-z0-9-]*\)".*/\1/p' "$dir/journal.jsonl" | head -n 1)
         {
             printf '{\n'
-            printf '  "format": 2,\n'
+            printf '  "format": %s,\n' "$([ "$codec" = gz ] && echo 2 || echo 3)"
+            printf '  "compression": %s,\n' "$(json_str "$codec")"
             printf '  "platform": %s,\n' "$(json_str "$p")"
             printf '  "created": %s,\n' "$(json_str "$(date '+%Y-%m-%d %H:%M:%S')")"
             printf '  "label": %s,\n' "$(json_str "${label:-manual}")"
@@ -15579,8 +15681,8 @@ _kei_bk_post() {
             printf '  "mode": %s,\n' "$(json_str "$([ -f "$dir/files.ref.json" ] && echo ref || echo self)")"
             printf '  "secrets": %s,\n' "$(json_str "$secrets")"
             printf '  "key": %s,\n' "$(json_str "$([ "$secrets" = gpg ] && _kei_bk_fpr)")"
-            printf '  "db_bytes": %s,\n' "$(json_num "$(_kei_bk_size "$dir/db.sql.gz")")"
-            if [ -f "$dir/files.tar.gz" ]; then printf '  "files_bytes": %s,\n' "$(json_num "$(_kei_bk_size "$dir/files.tar.gz")")"; fi
+            printf '  "db_bytes": %s,\n' "$(json_num "$(_kei_bk_size "$dbfile")")"
+            if [ -f "$filepart" ]; then printf '  "files_bytes": %s,\n' "$(json_num "$(_kei_bk_size "$filepart")")"; fi
             while IFS=$'\t' read -r k v; do
                 [[ "$k" =~ ^[a-z_]{1,40}$ ]] || continue
                 printf '  "%s": %s,\n' "$k" "$v"
@@ -15588,13 +15690,13 @@ _kei_bk_post() {
             printf '  "complete": true\n'
             printf '}\n'
         } > "$dir/manifest.json.part"
-        files="db.sql.gz"
-        for f in files.tar.gz files.ref.json secrets.tar.gpg; do [ -f "$dir/$f" ] && files+=" $f"; done
+        files="${dbfile##*/}"
+        for f in "${filepart##*/}" files.ref.json secrets.tar.gpg; do [ -f "$dir/$f" ] && files+=" $f"; done
         [ -d "$dir/secrets" ] && for f in "$dir"/secrets/* "$dir"/secrets/.[!.]*; do [ -f "$f" ] && files+=" secrets/${f##*/}"; done
         # shellcheck disable=SC2086
         ( cd "$dir" && sha256sum $files manifest.json.part | sed 's/manifest.json.part$/manifest.json/' > SHA256SUMS ) || return 1
         mv -f "$dir/manifest.json.part" "$dir/manifest.json" || return 1
-        chmod 600 "$dir"/*.gz "$dir"/*.json "$dir"/*.gpg "$dir/SHA256SUMS" 2>/dev/null
+        chmod 600 "$dbfile" "$filepart" "$dir"/*.json "$dir"/*.gpg "$dir/SHA256SUMS" 2>/dev/null
         _kei_bk_journal "$dir" manifest file manifest.json sha256 "$(_kei_bk_sha "$dir/manifest.json")"
     fi
     dest=""
@@ -15615,7 +15717,7 @@ _kei_bk_post() {
         fi
         _kei_bk_journal "$dir" copy dest "${dest%/}/$name"
     fi
-    rm -f "$dir/.meta" "$dir/.meta.after" "$dir/.files.list"
+    rm -f "$dir/.meta" "$dir/.meta.after" "$dir/.files.list" "$dir/.compression"
     _kei_bk_journal "$dir" done
     log "$p: backup $dir"
     return 0
@@ -15635,7 +15737,8 @@ kei_backup_resume() {
         rm -rf "$dir"/db.sql.gz "$dir"/files.tar.gz "$dir"/files.ref.json "$dir"/*.part "$dir"/.meta "$dir"/.files.list* "$dir/secrets" "$dir/secrets.tar.gpg"
         _kei_bk_capture "$p" "$dir" || return 1
     else
-        for f in db.sql.gz files.tar.gz files.ref.json; do
+        _kei_bk_recompress "$dir" || return $?
+        for f in db.sql db.sql.gz db.sql.bz2 db.sql.xz files.tar files.tar.gz files.tar.bz2 files.tar.xz files.ref.json; do
             [ -f "$dir/$f" ] || continue
             sha=$(_kei_bk_part_sha "$dir" "$f")
             [ -n "$sha" ] && [ "$sha" = "$(_kei_bk_sha "$dir/$f")" ] || {
@@ -15692,6 +15795,10 @@ _kei_bk_platform_of() {
 kei_bk_check_tar() {
     python3 -I - "$1" "${2:-0}" "$KEI_BK_RATIO" "$KEI_BK_RATIO_FLOOR_MB" <<'PYEOF'
 import os, posixpath, sys, tarfile
+import resource
+soft,hard=resource.getrlimit(resource.RLIMIT_AS)
+cap=min([512<<20]+[v for v in (soft,hard) if v>=0])
+resource.setrlimit(resource.RLIMIT_AS,(cap,hard))
 path, free, ratio, floor = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]) << 20
 bad = []
 total = 0
@@ -15759,25 +15866,28 @@ _kei_bk_free_bytes() {
 # kei_backup_check DIR [PLATFORM]: complete, valid manifest and checksums,
 # nothing unsafe; 4 otherwise.
 kei_backup_check() {
-    local dir="$1" p="${2:-}" free out limit n
+    local dir="$1" p="${2:-}" free out limit n codec dbfile filepart
     [ -f "$dir/manifest.json" ] && [ "$(_kei_bk_mget "$dir" complete)" = true ] \
         || { echo "$(t "This backup is not complete (no manifest): it cannot be restored.")" >&2; return 4; }
-    python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if isinstance(d, dict) and d.get("complete") is True else 1)' "$dir/manifest.json" 2>/dev/null \
+    python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if isinstance(d, dict) and d.get("complete") is True and d.get("format",1) in (1,2,3) and (d.get("format",1)==3 or d.get("compression","gz")=="gz") else 1)' "$dir/manifest.json" 2>/dev/null \
         || { echo "$(t "The backup manifest is damaged.")" >&2; return 4; }
     if [ -n "$p" ] && [ "$(_kei_bk_mget "$dir" platform)" != "$p" ]; then
         echo "$(t "This backup is of another platform.")" >&2; return 4
     fi
+    codec=$(_kei_bk_package_codec "$dir") || { echo 'Unsupported backup compression.' >&2; return 4; }
+    dbfile=$(_kei_bk_payload "$dir" db) || return 4
+    filepart=$(_kei_bk_payload "$dir" files) || return 4
     [ -f "$dir/SHA256SUMS" ] || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
     # Only names of the package itself.
-    n=$(grep -cvE '^[0-9a-f]{64}  (db\.sql\.gz|files\.tar\.gz|files\.ref\.json|secrets\.tar\.gpg|manifest\.json|secrets/(\.env|compose\.yml|state))$' "$dir/SHA256SUMS")
+    n=$(grep -cvE '^[0-9a-f]{64}  (db\.sql(\.(gz|bz2|xz))?|files\.tar(\.(gz|bz2|xz))?|files\.ref\.json|secrets\.tar\.gpg|manifest\.json|secrets/(\.env|compose\.yml|state))$' "$dir/SHA256SUMS")
     [ "$n" = 0 ] || { echo "$(t "The backup checksum list names files outside the package.")" >&2; return 4; }
-    grep -qE '  db\.sql\.gz$' "$dir/SHA256SUMS" && grep -qE '  manifest\.json$' "$dir/SHA256SUMS" \
-        && grep -qE '  files\.(tar\.gz|ref\.json)$' "$dir/SHA256SUMS" \
+    grep -qF "  ${dbfile##*/}" "$dir/SHA256SUMS" && grep -qE '  manifest\.json$' "$dir/SHA256SUMS" \
+        && { grep -qF "  ${filepart##*/}" "$dir/SHA256SUMS" || grep -qF '  files.ref.json' "$dir/SHA256SUMS"; } \
         || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
     ( cd "$dir" && sha256sum -c --quiet SHA256SUMS >/dev/null 2>&1 ) || { echo "$(t "The backup files do not match their checksums.")" >&2; return 4; }
     free=$(_kei_bk_free_bytes)
-    if [ -f "$dir/files.tar.gz" ]; then
-        out=$(kei_bk_check_tar "$dir/files.tar.gz" "$free") || { echo "$(t "The backup archive has unsafe entries:") $out" >&2; return 4; }
+    if [ -f "$filepart" ]; then
+        out=$(kei_bk_check_tar "$filepart" "$free") || { echo "$(t "The backup archive has unsafe entries:") $out" >&2; return 4; }
     else
         python3 -I -c '
 import json, re, sys
@@ -15787,13 +15897,31 @@ ok = isinstance(d, dict) and re.fullmatch(r"[0-9a-f]{8,64}", str(d.get("snapshot
     and re.fullmatch(r"[0-9a-f]{64}", str(d.get("list_sha256", ""))) and isinstance(d.get("repository"), str)
 sys.exit(0 if ok else 1)' "$dir/files.ref.json" 2>/dev/null || { echo "$(t "The reference to the restic snapshot is damaged.")" >&2; return 4; }
     fi
-    gzip -t "$dir/db.sql.gz" 2>/dev/null || { echo "$(t "The database dump is damaged.")" >&2; return 4; }
     limit=$free; [ "${limit:-0}" -gt 0 ] || limit=$((1 << 40))
-    n=$(gzip -dc "$dir/db.sql.gz" 2>/dev/null | head -c "$((limit + 1))" | wc -c)
-    [ "$n" -le "$limit" ] || { echo "$(t "The database dump is larger than the free disk.")" >&2; return 4; }
-    if [ "$n" -gt "$((KEI_BK_RATIO_FLOOR_MB << 20))" ] && [ "$n" -gt "$((KEI_BK_RATIO * $(_kei_bk_size "$dir/db.sql.gz")))" ]; then
-        echo "$(t "The database dump expands too much to be trusted.")" >&2; return 4
-    fi
+    python3 -I - "$dbfile" "$limit" "$KEI_BK_RATIO" "$KEI_BK_RATIO_FLOOR_MB" <<'PYDB' || return 4
+import bz2,gzip,lzma,os,sys
+import resource
+soft,hard=resource.getrlimit(resource.RLIMIT_AS)
+cap=min([512<<20]+[v for v in (soft,hard) if v>=0])
+resource.setrlimit(resource.RLIMIT_AS,(cap,hard))
+path,limit,ratio,floor=sys.argv[1],int(sys.argv[2]),int(sys.argv[3]),int(sys.argv[4])<<20
+codec=next((c for c in ("gz","bz2","xz") if path.endswith("."+c)),"none")
+try:
+    with open(path,"rb") as f: magic=f.read(6)
+    actual="gz" if magic.startswith(b"\x1f\x8b") else "bz2" if magic.startswith(b"BZh") else "xz" if magic.startswith(b"\xfd7zXZ\x00") else "none"
+    if actual!=codec: raise ValueError("compression does not match its bytes")
+    total=0
+    with {"gz":gzip.open,"bz2":bz2.open,"xz":lzma.open,"none":open}[codec](path,"rb") as source:
+        while True:
+            chunk=source.read(1024*1024)
+            if not chunk:break
+            total+=len(chunk)
+            if total>limit:raise ValueError("database dump is larger than the free disk")
+            if total>floor and total>ratio*max(1,os.path.getsize(path)):raise ValueError("database dump expands too much")
+    if not total:raise ValueError("database dump is empty")
+except Exception as error:
+    print("Invalid database dump: "+str(error),file=sys.stderr);sys.exit(1)
+PYDB
     return 0
 }
 
@@ -16092,7 +16220,7 @@ _kei_backup_schedule() {
 
 # kei_backup_status [PLATFORM]: key=value lines for the panel.
 kei_backup_status() {
-    local p last inc
+    local p last inc latest
     printf 'key=%s\n' "$(_kei_bk_has_key && _kei_bk_fpr)"
     printf 'gpg=%s\n' "$(command -v gpg >/dev/null 2>&1 && echo yes || echo no)"
     printf 'restic=%s\n' "$(command -v restic >/dev/null 2>&1 && restic version 2>/dev/null | awk '{ print $2; exit }')"
@@ -16101,6 +16229,13 @@ kei_backup_status() {
         _kei_bk_known "$p" || continue
         last=$(kei_backup_list "$p" | head -n 1)
         inc=$(kei_backup_incomplete "$p" | grep -c .)
+        printf '%s.compression=%s\n' "$p" "$(kei_backup_compression "$p")"
+        printf '%s.directory=%s\n' "$p" "$(_kei_bk_pdir "$p")"
+        latest=${last%%$'\t'*}
+        if [ -n "$latest" ]; then
+            printf '%s.last_bytes=%s\n' "$p" "$(du -sb "$latest" 2>/dev/null | cut -f1)"
+            printf '%s.last_compression=%s\n' "$p" "$(_kei_bk_package_codec "$latest")"
+        fi
         printf '%s.repo=%s\n' "$p" "$(_kei_bk_get "repo_$p")"
         printf '%s.copy=%s\n' "$p" "$(_kei_bk_get "copy_$p")"
         printf '%s.schedule=%s\n' "$p" "$(_kei_bk_get "schedule_$p")"
@@ -16137,7 +16272,7 @@ kei_backup_status() {
 KEI_SET_KIND="koha-nexus-set"
 KEI_SET_FORMAT=1
 # The members a set may hold (anything else is refused before extracting).
-KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|dspace/|dspace/knx-dspace-[0-9-]+-[0-9a-f]{8}\.tar(\.(gz|bz2|xz))?\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
+KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|dspace/|dspace/knx-dspace-[0-9-]+-[0-9a-f]{8}\.tar(\.(gz|bz2|xz))?\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql(\.(gz|bz2|xz))?|files\.tar(\.(gz|bz2|xz))?|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
 
 # kei_set_platforms: the platforms of this server a set can hold.
 kei_set_platforms() {
@@ -16462,9 +16597,9 @@ _kei_set_why() {
 }
 _kei_set_read() {
     python3 -I - "$1" "$KEI_SET_KIND" "$KEI_SET_MEMBERS" "$(_kei_bk_free_bytes)" <<'PYEOF'
-import gzip, hashlib, io, json, lzma, posixpath, re, sys, tarfile
+import bz2, gzip, hashlib, io, json, lzma, posixpath, re, sys, tarfile
 path, kind_set, members_re, free = sys.argv[1], sys.argv[2], re.compile(sys.argv[3]), int(sys.argv[4] or 0)
-pkg_re = re.compile(r"^knx-tainacan-[0-9-]{1,40}/((db\.sql\.gz|files\.tar\.gz|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/(\.env|compose\.yml|state))|secrets/)?$")
+pkg_re = re.compile(r"^knx-tainacan-[0-9-]{1,40}/((db\.sql(\.(gz|bz2|xz))?|files\.tar(\.(gz|bz2|xz))?|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/(\.env|compose\.yml|state))|secrets/)?$")
 def out(k, v): print("%s=%s" % (k, str(v).replace("\n", " ")))
 with open(path, "rb") as fh:
     head = fh.read(4096)
@@ -16475,6 +16610,8 @@ plain = head
 try:
     if head[:2] == b"\x1f\x8b":
         plain = gzip.open(path).read(4096); comp = "gzip"
+    elif head[:3] == b"BZh":
+        plain = bz2.open(path).read(4096); comp = "bzip2"
     elif head[:6] == b"\xfd7zXZ\x00":
         plain = lzma.open(path).read(4096); comp = "xz"
     elif head[:4] == b"\x28\xb5\x2f\xfd":
@@ -46431,6 +46568,12 @@ kei_task() {
             return "$rc" ;;
         setup-mark)       kei_setup_mark "${1:-}" "${2:-}" "${3:-}" ;;
         setup-close)      kei_setup_close "${1:-}" ;;
+        platform-backup-compression)
+            local value
+            if [ -n "${2:-}" ]; then value=$(kei_backup_compression "${1:-tainacan}" "$2") || return $?
+            else value=$(kei_backup_compression "${1:-tainacan}") || return $?; fi
+            kei_result compression "$value"
+            return 0 ;;
         platform-backup-incomplete)
             local d l r
             while IFS=$'\t' read -r d l r; do [ -n "$d" ] && kei_result incomplete "${d##*/}|$l|$r"; done < <(kei_backup_incomplete "$@")

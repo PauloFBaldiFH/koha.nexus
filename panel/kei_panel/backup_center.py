@@ -38,6 +38,8 @@ DSPACE_CODECS = {
     'none': 'No compression · faster, more disk space',
 }
 
+TAINACAN_CODECS = dict(DSPACE_CODECS)
+
 NO_RECORD = "No run recorded"          # "Sem registro": no reliable history
 
 

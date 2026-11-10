@@ -98,7 +98,7 @@ class PlatformSectionView(SectionView):
 
     def refresh_data(self) -> None:
         self.query_one("#platform-loader").display = True
-        self.run_worker(self._load(), exclusive=True, group=f"platform-{self.section.id}", exit_on_error=False)
+        self.run_worker(self._load, exclusive=True, group=f"platform-{self.section.id}", exit_on_error=False)
 
     def needs_backups(self) -> bool:
         return self.section.id == "tainacan"
