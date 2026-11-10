@@ -15,6 +15,8 @@ on:
       - 'tools/dspace_smoke.py'
       - 'tools/dspace_catalog.py'
       - 'tools/dspace_install_test.py'
+      - 'tools/dspace_acceptance.py'
+      - 'tests/test_dspace_acceptance.py'
       - 'tools/dspace_browser_test.py'
       - 'tools/dspace_recovery_test.py'
       - 'tests/test_dspace_backup.py'
@@ -30,7 +32,7 @@ on:
       - 'tests/test_dspace_images.py'
       - '.github/workflows/dspace-images.yml'
   push:
-    branches: [main, 'feat/dspace-*', 'feat/nexus-*']
+    branches: [main, 'feat/dspace-*', 'feat/nexus-*', 'fix/dspace-*']
     paths:
       - 'platforms/dspace/**'
       - 'platforms/nexus/**'
@@ -44,6 +46,8 @@ on:
       - 'tools/dspace_smoke.py'
       - 'tools/dspace_catalog.py'
       - 'tools/dspace_install_test.py'
+      - 'tools/dspace_acceptance.py'
+      - 'tests/test_dspace_acceptance.py'
       - 'tools/dspace_browser_test.py'
       - 'tools/dspace_recovery_test.py'
       - 'tests/test_dspace_backup.py'
@@ -105,6 +109,7 @@ jobs:
       - run: sudo $(which python) -m unittest discover -s tests -p test_dspace_web.py -v
       - run: sudo $(which python) -m unittest discover -s tests -p test_dspace_languages.py -v
       - run: python -m unittest discover -s tests -p test_dspace_browser_support.py -v
+      - run: python -m unittest discover -s tests -p test_dspace_acceptance.py -v
       - run: bash -n installer
       - name: Validate runtime shell scripts
         run: |
@@ -320,10 +325,17 @@ jobs:
           path: ${{ runner.temp }}/dspace-upgrade-acceptance.json
           if-no-files-found: ignore
 
-  installation:
+  integration:
+    # The combined lifecycle/recovery/operations script exceeded an hour while
+    # still progressing. Each suite starts its own real installation and browser
+    # fixture; both are required for publication. Graceful service timeouts stay.
     needs: [images, dependencies]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [lifecycle, backup-operations]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -347,17 +359,18 @@ jobs:
           "$RUNNER_TEMP/dspace-browser/bin/python" -m playwright install --with-deps chromium
       - name: Resolve the canonical disposable repository address
         run: echo "127.0.0.1 repository.kei.test" | sudo tee -a /etc/hosts
-      - name: Real integrated lifecycle (no VM reboot claim)
+      - name: Real integrated acceptance (${{ matrix.suite }}; no VM reboot claim)
         run: >-
           sudo env RUNNER_TEMP="$RUNNER_TEMP" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/dspace-browsers"
           KEI_DOCKER_ISOLATION_CMD="/bin/bash $GITHUB_WORKSPACE/installer --task docker-isolation"
-          "$RUNNER_TEMP/dspace-browser/bin/python" tools/dspace_install_test.py --disposable
+          "$RUNNER_TEMP/dspace-browser/bin/python" tools/dspace_install_test.py --disposable --suite ${{ matrix.suite }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dspace-integrated-acceptance
+          name: dspace-integrated-acceptance-${{ matrix.suite }}
           path: |
             ${{ runner.temp }}/dspace-acceptance.json
+            ${{ runner.temp }}/dspace-phase-timings-${{ matrix.suite }}.json
             ${{ runner.temp }}/nexus-full-dspace-acceptance.json
             ${{ runner.temp }}/dspace-operations-acceptance.json
             ${{ runner.temp }}/dspace-recovery-acceptance.json
@@ -365,6 +378,23 @@ jobs:
             ${{ runner.temp }}/dspace-public-item.png
           if-no-files-found: ignore
           retention-days: 7
+
+  installation:
+    # Preserve the existing required check name and reject a skipped/cancelled
+    # matrix. Both independently installed real suites must have succeeded.
+    if: always()
+    needs: integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require both real acceptance suites
+        env:
+          ACCEPTANCE_RESULT: ${{ needs.integration.result }}
+        run: |
+          if [ "$ACCEPTANCE_RESULT" != success ]; then
+            echo 'Both DSpace integration suites must pass; inspect their logs and phase timings.' >&2
+            exit 1
+          fi
 
   publish:
     # A PR/push never publishes packages. Publication is a separate explicit action.
