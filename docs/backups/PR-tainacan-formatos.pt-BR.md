@@ -49,6 +49,11 @@ individual nem muda a proteção das cópias de nuvem.
 
 ## Validação
 
+A rodada completa do painel, menus e documentação passou com 296 testes.
+Após o ajuste final de recarregamento e cartões, nove testes focados passaram
+novamente, sem os avisos de corrotinas de leitura abandonadas. A CI executa
+a suíte completa da versão final.
+
 - 53 testes Bats aprovados (motor, conjuntos e controles de agendamento),
   com GnuPG, restic e rclone reais em Debian descartável. A aplicação nesses
   testes é uma plataforma de teste: quatro codecs, conteúdo
@@ -57,7 +62,8 @@ individual nem muda a proteção das cópias de nuvem.
 - Conjuntos reais sobre dados de teste: membros Tainacan nos três formatos novos
   entram, são inspecionados e saem para recuperação separada. Leitores de gzip
   e pacotes antigos continuam cobertos.
-- Painel em 80×24 e 160×48: abrir não captura, alteração persistida, atualização
+- Nove verificações finais de recarregamento e seleção do painel passaram,
+  sem corrotinas de leitura abandonadas. Painel em 80×24 e 160×48: abrir não captura, alteração persistida, atualização
   da tela e falha ao salvar sem perder a escolha anterior.
 - CI Tainacan com WordPress/plugin/navegador reais ampliada para capturar e testar
   recuperação isolada nos quatro formatos. Seu resultado deve ser conferido no
@@ -66,3 +72,6 @@ individual nem muda a proteção das cópias de nuvem.
 Esta entrega não é a imagem completa do servidor nem o motor de múltiplas
 instâncias. O backup completo do Nexus continua uma etapa separada, com seu
 manifesto, dependências e procedimento de recuperação a validar.
+
+Capturas em `capturas/` são do modo de demonstração, com dados simulados.
+Não representam backups ou validação do servidor de Paulo.

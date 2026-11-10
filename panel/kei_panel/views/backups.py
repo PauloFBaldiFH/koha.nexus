@@ -102,7 +102,7 @@ class BackupCenterView(PlatformSectionView):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Last backup"), id="bk-tn-age")
                 yield StatusCard(t("Size"), id="bk-tn-size")
-                yield StatusCard(t("Tainacan backups"), id="pstatus-backups")
+                yield StatusCard(t("Recovery packages"), id="pstatus-backups")
                 yield StatusCard(t("Backup key"), id="pstatus-vault")
             with Vertical(id="bk-tn-codec-box", classes="hub-box"):
                 with Horizontal(classes="form-row"):
@@ -207,8 +207,14 @@ class BackupCenterView(PlatformSectionView):
             for grid in self.query(f"#zone-{zone_id(z)}"):
                 grid.display = visible.get(z, False)
         if self.scope == backup_center.TAINACAN:
-            self.query_one("#pstatus-backups", StatusCard).set(*platforms.describe_backups(facts.backups))
-            self.query_one("#pstatus-vault", StatusCard).set(*platforms.describe_vault(facts.backups))
+            backup = facts.backups
+            tested = backup.verified.split()
+            note = t('last restore test passed') if tested[-1:] == ['ok'] else t('last restore test failed') if tested else t('no restore test yet')
+            self.query_one("#pstatus-backups", StatusCard).set(str(backup.count) if backup.known else '-', note, 'ok' if tested[-1:] == ['ok'] else 'warn')
+            value, detail, state = platforms.describe_vault(backup)
+            card = self.query_one("#pstatus-vault", StatusCard)
+            card.set(value, t('recovery kit saved') if backup.kit else t('recovery kit not saved yet'), state)
+            card.tooltip = detail
 
     # --- loading ------------------------------------------------------------------
     async def _load(self) -> None:
@@ -302,9 +308,9 @@ class BackupCenterView(PlatformSectionView):
                     self.tainacan_codec = ""
                     self.query_one('#bk-tn-codec', Select).disabled = True
                 newest = out.get('tainacan.last', '').split('|')
-                self.query_one('#bk-tn-age', StatusCard).set(newest[1] if len(newest) > 1 else t('None yet'), t('Test recovery to verify the package.'))
+                self.query_one('#bk-tn-age', StatusCard).set(newest[1] if len(newest) > 1 else t('None yet'), '')
                 size = out.get('tainacan.last_bytes', '')
-                self.query_one('#bk-tn-size', StatusCard).set(human_bytes(int(size)) if size.isdigit() else '-', t('Package on this server; restic files are stored separately.') if facts.backups.repo else t('Package on this server'))
+                self.query_one('#bk-tn-size', StatusCard).set(human_bytes(int(size)) if size.isdigit() else '-', t('Restic snapshot excluded') if facts.backups.repo else t('Package on this server'))
         except Exception:  # noqa: BLE001
             self.query_one('#bk-tn-codec', Select).disabled = True
             self.tainacan_codec = ""

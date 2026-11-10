@@ -723,3 +723,28 @@ def test_tainacan_compression_persists_without_backup_and_failed_save_keeps_prev
             assert select.value == preference['codec']
             assert not any(n in ('tainacan-backup','tainacan-restore-test','tainacan-restore') for n,a in calls)
     asyncio.run(exercise())
+
+
+def test_repeated_refresh_finishes_without_leaking_cancelled_loader_coroutines(monkeypatch):
+    import gc
+    import warnings
+    monkeypatch.setenv('KEI_PANEL_DEMO_KOHA', '0')
+    monkeypatch.setenv('KEI_PANEL_DEMO_TAINACAN', '1')
+    monkeypatch.setenv('KEI_PANEL_DEMO_DSPACE', '0')
+    async def exercise():
+        app = KohaPanelApp(PanelEnv(installer=None, lang='en', plain=True, demo=True))
+        async with app.run_test(size=(80,24)) as pilot:
+            await pilot.pause(.5)
+            app.backup_scope='tainacan';app.screen.action_show('backups')
+            await until(pilot,loaded(app))
+            view=current_view(app)
+            for _ in range(15):view.refresh_data()
+            await until(pilot,loaded(app))
+            assert view.facts.backups.known
+            assert view.tainacan_codec=='gz'
+        gc.collect()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always', RuntimeWarning)
+        asyncio.run(exercise())
+        gc.collect()
+    assert not [w for w in caught if 'BackupCenterView._load' in str(w.message) and 'never awaited' in str(w.message)]

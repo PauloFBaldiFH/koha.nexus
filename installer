@@ -273,12 +273,12 @@ export KOHA_PANEL_LANG_FULL KOHA_PANEL_LANG SYS_LANG
 declare -A _TRANS_CACHE=()
 
 declare -A _MENU_PT=(
+    ["Restic snapshot excluded"]="Sem o snapshot restic"
     ['Compressing captured backup (${codec}); WordPress has resumed.']="Compactando o backup capturado (\${codec}); o WordPress voltou a funcionar."
     ["Backup compression failed. The captured data were kept; resume this backup."]="A compactação do backup falhou. Os dados capturados foram preservados; retome este backup."
     ["Invalid backup compression setting."]="Configuração de compactação de backup inválida."
     ["Unknown backup compression."]="Compactação de backup desconhecida."
     ["Package on this server"]="Pacote neste servidor"
-    ["Package on this server; restic files are stored separately."]="Pacote neste servidor; os arquivos do restic ficam armazenados separadamente."
     ["Used for new Tainacan manual, scheduled and safety backups. Additional compression runs after WordPress resumes. Existing backups keep their format. Restic controls compression inside its own repository."]="Usada nos novos backups manuais, agendados e de segurança do Tainacan. A compactação adicional ocorre depois de o WordPress voltar a funcionar. Os backups existentes mantêm seu formato. O restic controla a compactação no próprio repositório."
     ["Other editors"]="Outros editores"
     ["Configure the backup key in the Backup center first."]="Configure primeiro a chave de backup na Central de backups."
