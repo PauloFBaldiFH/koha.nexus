@@ -68,6 +68,10 @@ A CI passou a executar o pacote com aplicações reais:
 - Testes de envelope e Docker em Python 3.9 e 3.13; testes das rotinas do painel
   em `Platforms panel`. O job pesado também roda nesta branch `feat/nexus-*`.
 
-O resultado desses novos testes com aplicações reais precisa ser conferido na CI
-antes de recomendar a mesclagem. Não há validação desta etapa no servidor de Paulo.
+O #365 foi mesclado. O job `proxy / koha-set` concluiu com os aplicativos reais.
+O log da main também comprova a recuperação completa real do DSpace depois da
+perda do chaveiro; a execução foi cancelada mais tarde, nas operações adicionais,
+ao atingir o limite de 60 minutos. A suíte inteira ainda precisa terminar. A
+correção divide esses testes em jobs obrigatórios independentes, com tempos por
+fase: [dspace-validacao-tempo.pt-BR.md](dspace-validacao-tempo.pt-BR.md). Não há validação desta etapa no servidor de Paulo.
 Não houve publicação de broker, alteração de produção ou merge automático.
