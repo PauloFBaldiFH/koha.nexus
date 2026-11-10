@@ -111,13 +111,17 @@ counts=$(in_vm 'bash -c "source /usr/local/bin/config.sh >/dev/null 2>&1; _kei_t
 B public || fail "browser public after the reboot"
 
 section "9. backup and isolated restore test"
-if task tainacan-backup; then ok "backup"; else fail "backup"; fi
-# The message is in the installer's language: the exit status and the
-# counts it compared ("(ok COLLECTIONS ITEMS ATTACHMENTS)") are what count.
-if rt=$(task tainacan-restore-test latest); then rt_ok=1; else rt_ok=0; fi
-echo "$rt"
-[ "$rt_ok" = 1 ] && printf '%s' "$rt" | grep -q '(ok [0-9]* [0-9]* [0-9]*)' && ok "isolated restore test" \
-    || fail "isolated restore test"
+for codec in gz bz2 xz none; do
+    if ! task platform-backup-compression tainacan "$codec"; then fail "select compression $codec"; continue; fi
+    if task tainacan-backup; then ok "backup $codec"; else fail "backup $codec"; continue; fi
+    # Real WordPress/Tainacan counts, attachment files and API are verified in
+    # an isolated restored copy for every codec, not just checksum extraction.
+    if rt=$(task tainacan-restore-test latest); then rt_ok=1; else rt_ok=0; fi
+    echo "$rt"
+    [ "$rt_ok" = 1 ] && printf '%s' "$rt" | grep -q '(ok [0-9]* [0-9]* [0-9]*)' && ok "isolated restore $codec" \
+        || fail "isolated restore $codec"
+done
+task platform-backup-compression tainacan gz || fail "restore default compression preference"
 
 section "probe at the end"
 in_vm kn-probe | tee "$out/probe-end.txt"

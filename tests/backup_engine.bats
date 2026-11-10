@@ -395,3 +395,99 @@ nope() { ! "$@"; }
         [ "$status" -ne 0 ]
     done
 }
+
+@test "compression settings are read-only when queried and reject invalid choices without changes" {
+    run lib 'kei_backup_compression demo'
+    [ "$status" -eq 0 ] && [ "$output" = gz ]
+    [ ! -e "$KEI_OWNED_DIR/backup/config" ]
+    run lib 'kei_backup_compression demo xz'
+    [ "$status" -eq 0 ] && [ "$output" = xz ]
+    before=$(sha256sum "$KEI_OWNED_DIR/backup/config")
+    run lib 'kei_backup_compression demo unknown'
+    [ "$status" -eq 2 ]
+    [ "$before" = "$(sha256sum "$KEI_OWNED_DIR/backup/config")" ]
+    [ "$(cat "$DEMO/state")" = running ]
+}
+
+@test "all four codecs preserve the SQL and WordPress tree and keep legacy gzip readable" {
+    for codec in gz bz2 xz none; do
+        run lib "kei_backup_compression demo '$codec' >/dev/null; kei_backup_run demo"
+        [ "$status" -eq 0 ] || { echo "$output"; false; }
+        B="${lines[-1]}"
+        [ "$(cat "$DEMO/state")" = running ]
+        [ "$(lib "_kei_bk_mget '$B' compression")" = "$codec" ]
+        [ "$(lib "_kei_bk_mget '$B' format")" = "$([ "$codec" = gz ] && echo 2 || echo 3)" ]
+        ext=".$codec"; [ "$codec" != none ] || ext=""
+        [ -f "$B/db.sql$ext" ] && [ -f "$B/files.tar$ext" ]
+        [ "$(stat -c %a "$B/db.sql$ext")" = 600 ]
+        run lib "kei_backup_check '$B' demo && _kei_bk_read_payload '$B/db.sql$ext'"
+        [ "$status" -eq 0 ] && [[ "$output" == *"INSERT INTO t VALUES (1);"* ]]
+        run lib "_kei_bk_read_payload '$B/files.tar$ext' | tar -xOf - ./sub/b.txt"
+        [ "$status" -eq 0 ] && [ "$output" = two ]
+    done
+}
+
+@test "recompression runs after writers resume and interrupted conversion keeps its own codec" {
+    run lib "kei_backup_compression demo xz >/dev/null
+    eval \"\$(declare -f _kei_bk_recompress | sed '1s/_kei_bk_recompress/_real_recompress/')\"
+    _kei_bk_recompress() { [ \"\$(cat \"\$DEMO/state\")\" = running ] || return 99; _real_recompress \"\$@\"; }
+    _KEI_BK_CRASH_AFTER=compressed kei_backup_run demo"
+    [ "$status" -eq 137 ]
+    B=$(ls -d "$KEI_BK_ROOT"/demo/knx-demo-*)
+    [ -f "$B/db.sql.xz" ] && [ -f "$B/db.sql.gz" ]
+    run lib "kei_backup_compression demo none >/dev/null; kei_backup_resume '$B'"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [ -f "$B/db.sql.xz" ] && [ ! -f "$B/db.sql.gz" ]
+    [ "$(lib "_kei_bk_mget '$B' compression")" = xz ]
+    [ "$(grep -c '"step":"capture-done"' "$B/journal.jsonl")" = 1 ]
+    run lib "kei_backup_check '$B' demo"
+    [ "$status" -eq 0 ]
+}
+
+@test "failed recompression preserves the captured backup and can resume without recapturing" {
+    run lib "kei_backup_compression demo bz2 >/dev/null; _kei_bk_recompress() { return 1; }; kei_backup_run demo"
+    [ "$status" -eq 1 ]
+    B=$(ls -d "$KEI_BK_ROOT"/demo/knx-demo-*)
+    [ "$(cat "$DEMO/state")" = running ] && [ -f "$B/db.sql.gz" ] && [ ! -f "$B/manifest.json" ]
+    run lib "kei_backup_resume '$B' && kei_backup_check '$B' demo"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [ "$(grep -c '"step":"capture-done"' "$B/journal.jsonl")" = 1 ]
+}
+
+@test "resume refuses tampered converted parts before retrying a cloud copy" {
+    run lib "kei_backup_compression demo xz >/dev/null; _KEI_BK_CRASH_AFTER=secrets kei_backup_run demo"
+    [ "$status" -eq 137 ]
+    B=$(ls -d "$KEI_BK_ROOT"/demo/knx-demo-*)
+    printf changed > "$B/db.sql.xz"
+    run lib "kei_backup_resume '$B'"
+    [ "$status" -ne 0 ]
+    [ ! -f "$B/manifest.json" ] && [ "$(cat "$DEMO/state")" = running ]
+}
+
+@test "compressed archives still reject traversal and excessive expansion before restoring" {
+    run lib 'kei_backup_compression demo xz >/dev/null; kei_backup_run demo'
+    [ "$status" -eq 0 ]; B="${lines[-1]}"
+    python3 - "$B/files.tar.xz" <<'PY'
+import io,sys,tarfile
+with tarfile.open(sys.argv[1],'w:xz') as archive:
+    entry=tarfile.TarInfo('../outside');entry.size=1;archive.addfile(entry,io.BytesIO(b'x'))
+PY
+    (cd "$B"; sha256sum db.sql.xz files.tar.xz secrets/.env manifest.json > SHA256SUMS)
+    run lib "kei_backup_check '$B' demo"
+    [ "$status" -eq 4 ] && [[ "$output" == *"unsafe entries"* ]]
+}
+
+@test "restic references keep their repository while the SQL uses the selected codec" {
+    command -v restic >/dev/null || skip "restic not installed"
+    run lib 'kei_backup_repo demo local >/dev/null; kei_backup_compression demo xz >/dev/null; kei_backup_run demo'
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    B="${lines[-1]}"
+    [ -f "$B/db.sql.xz" ] && [ -f "$B/files.ref.json" ] && [ ! -e "$B/files.tar.xz" ]
+    run lib "kei_backup_check '$B' demo"
+    [ "$status" -eq 0 ]
+    run lib "_kei_bk_stage_ref '$B' demo"
+    [ "$status" -eq 0 ]
+    line="${lines[-1]}"; stage="${line%%$'\t'*}"; tree="${line#*$'\t'}"
+    [ "$(cat "$tree/sub/b.txt")" = two ]
+    rm -rf "$stage"
+}

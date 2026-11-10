@@ -588,3 +588,23 @@ PY
     [ "$output" = 'koha tainacan' ]
     done
 }
+
+@test "Tainacan compressed members roundtrip inside combined sets and standalone archives" {
+    for codec in bz2 xz none; do
+        target="$OUT/$codec"; mkdir -p "$target"
+        run lib "kei_backup_compression tainacan '$codec' >/dev/null; kei_set_backup '$target' '' no-secrets"
+        [ "$status" -eq 0 ] || { echo "$output"; false; }
+        SET=$(ls "$target"/knx-set-*.tar)
+        run lib "kei_set_unpack '$SET'"
+        [ "$status" -eq 0 ] || { echo "$output"; false; }
+        STAGE=$(field stage "$output"); TN=$(field tainacan "$output")
+        [ -n "$TN" ]
+        run lib "kei_backup_check '$TN' tainacan && _kei_bk_read_payload \"\$(_kei_bk_payload '$TN' db)\""
+        [ "$status" -eq 0 ] && [[ "$output" == *"CREATE TABLE t"* ]]
+        tar -C "${TN%/*}" -cf "$T/standalone-$codec.tar" "${TN##*/}"
+        run lib "kei_set_inspect '$T/standalone-$codec.tar'"
+        [ "$(field kind "$output")" = tainacan-archive ]
+        run lib "kei_set_cleanup '$STAGE'"
+        [ "$status" -eq 0 ]
+    done
+}

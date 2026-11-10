@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.192",
+ "panel_version": "1.5.193",
  "languages": [
   {
    "code": "en",
@@ -20485,11 +20485,11 @@
   },
   "tainacan-backup": {
    "en": {
-    "summary": "A full backup now: database, files and configuration, as a package of the platform backups.",
+    "summary": "A consistent backup of the database, files and configuration. The Backup center selects Gzip, Bzip2, XZ or no compression for new manual, scheduled and safety captures. Restic references remain tied to their repository.",
     "related": []
    },
    "pt-BR": {
-    "summary": "Um backup completo agora: banco, arquivos e configuração, num pacote dos backups das plataformas."
+    "summary": "Um backup consistente do banco, arquivos e configuração. A Central de backups permite escolher Gzip, Bzip2, XZ ou sem compactação para novas capturas manuais, agendadas e de segurança. Referências restic continuam dependendo do seu repositório."
    }
   },
   "tainacan-restore-test": {
