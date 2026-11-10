@@ -17,6 +17,34 @@ sys.path.insert(0, str(REPO / 'platforms/dspace'))
 import runtime as module
 
 
+def restart_docker(rt):
+    """Wait for a new healthy daemon invocation, not just an accepted restart job."""
+    def state():
+        text = module.command(['systemctl', 'show', 'docker', '--property=InvocationID',
+                               '--property=ActiveState', '--property=SubState', '--property=Result'], timeout=15)
+        return dict(line.split('=', 1) for line in text.splitlines() if '=' in line)
+    before = state().get('InvocationID')
+    if not before:
+        raise module.Refused('Docker has no systemd invocation to prove a real restart.')
+    module.command(['systemctl', '--no-block', 'restart', 'docker'], timeout=30)
+    observed = {}
+    def ready():
+        observed.clear(); observed.update(state())
+        if observed.get('ActiveState') == 'failed':
+            raise module.Refused('Docker restart failed: ' + observed.get('Result', 'unknown'))
+        if (not observed.get('InvocationID') or observed['InvocationID'] == before or
+                observed.get('ActiveState') != 'active' or observed.get('SubState') != 'running'):
+            return False
+        rt.docker('info', '--format', '{{.ServerVersion}}', timeout=15)
+        return True
+    try:
+        rt.wait('Docker restart and a new ready daemon invocation', ready, 360)
+    except module.Refused:
+        print('Disposable Docker restart state: ' + json.dumps(observed, sort_keys=True), flush=True)
+        raise
+    print('PASS: Docker restarted with a different systemd invocation and answers requests', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--disposable', action='store_true')
@@ -138,7 +166,7 @@ def main():
                    "WHERE installed_rank=(SELECT MAX(installed_rank) FROM schema_version)")
         rt.control(True)
         # Restart Docker itself: not a VM reboot, and report it as such.
-        module.command(['systemctl', 'restart', 'docker'], timeout=120)
+        restart_docker(rt)
         rt.dependencies()
         rt.health()
         check(rt.status()['status'] == 'installed', 'containers recover after Docker service restart')
