@@ -245,8 +245,8 @@ def test_without_koha_a_key_shows_the_reason_and_loads_nothing(no_koha):
     current, reason, after, real_views, none, koha, shown = asyncio.run(main())
     assert current == "view-database-off" and real_views == []
     assert "Koha is not installed" in reason
-    assert after == "view-backups" and none and not koha
-    assert shown == ["cloud-connections"]
+    assert after == "view-backups" and not none and not koha  # Full Nexus recovery is available before installing apps.
+    assert set(shown) == {"cloud-connections", "nexus-backup-create", "nexus-backup-verify", "nexus-backup-restore", "nexus-backup-sessions", "nexus-backup-key", "nexus-backup-kit"}
 
 
 def test_without_koha_routines_are_refused_with_a_reason(no_koha, tmp_path):

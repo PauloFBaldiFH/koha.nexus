@@ -3172,6 +3172,68 @@
     "dspace-upgrade",
     "languages"
    ]
+  },
+  "nexus-backup-create": {
+   "summary": "Capture every installed application, Nexus configuration and immutable container images in one encrypted portable .nexus file.",
+   "steps": [
+    "Configure the shared recovery key and save its kit. Choose the compression and a server folder.",
+    "Review the installed members and space estimate, then confirm. Captures are sequential, with each application using its existing consistent-backup engine.",
+    "Keep the package and recovery phrase in separate places; verify the package before relying on it."
+   ],
+   "warnings": [
+    "This is an application recovery bundle, not a bootable disk or Windows/WSL export. Old backups, external object storage and operating-system packages are not copied.",
+    "A compatible prepared destination is required. Source cloud/tunnel identities and arbitrary shell configuration are kept privately for review; they are not activated automatically."
+   ]
+  },
+  "nexus-backup-verify": {
+   "summary": "Verify the protected key, phrase, encryption and every archived checksum using an isolated temporary keyring.",
+   "steps": [
+    "Choose a full .nexus package and type its recovery phrase.",
+    "The original server key is not required and the destination keyring is unchanged."
+   ],
+   "warnings": [
+    "This verifies archive contents. It does not boot the applications or prove full recovery on an untested machine."
+   ]
+  },
+  "nexus-backup-restore": {
+   "summary": "Open a full package, inspect destination compatibility and confirm sequential application recovery.",
+   "steps": [
+    "Use the same OS release/architecture, native Koha version and compatible application images. DSpace also requires the same release and URL.",
+    "Review which settings will be applied and which stay as private references. A different destination backup key is preserved and must be resolved before recovery.",
+    "Confirm. Native restores verify their copies and create safety backups; completed components are recorded. Target addresses and existing jobs remain unchanged."
+   ],
+   "warnings": [
+    "Recovery is not one atomic transaction across all applications. If a later member fails, use Recovery sessions to review and resume.",
+    "New recovered backup plans are disabled. Source cron commands, cloud accounts, publication identity and archived code require review and are never executed automatically."
+   ]
+  },
+  "nexus-backup-sessions": {
+   "summary": "Review, resume or explicitly clean private decrypted recovery sessions.",
+   "steps": [
+    "Select a session and review its completed components and destination requirements.",
+    "Resume an interrupted recovery, import stored image IDs without installing applications, or delete an opened/completed staging area."
+   ],
+   "warnings": [
+    "Sessions contain decrypted data accessible only to root. Interrupted application recovery is preserved for review; cleanup does not remove the encrypted package or native safety backups."
+   ]
+  },
+  "nexus-backup-key": {
+   "summary": "Configure the same shared OpenPGP backup key used by the platform backups.",
+   "steps": [
+    "Review the key setup, choose a strong recovery phrase and save the recovery kit."
+   ],
+   "warnings": [
+    "There is no separate full-backup password. Losing the recovery phrase prevents encrypted recovery."
+   ]
+  },
+  "nexus-backup-kit": {
+   "summary": "Save the current protected recovery kit separately from the server.",
+   "steps": [
+    "Copy the kit to another device and keep its phrase separately."
+   ],
+   "warnings": [
+    "The full .nexus envelope also carries a protected key export; the human recovery phrase is never stored in either file."
+   ]
   }
  }
 }

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import (dspace, instances, admin_access, backup, backup_set, database, diagnostics, install, platforms, search, security, setup,
+from . import (dspace, instances, admin_access, backup, backup_set, nexus_backup, database, diagnostics, install, platforms, search, security, setup,
                settings, tools)
 
 Routine = Callable[[object], Awaitable[None]]
@@ -33,6 +33,12 @@ ROUTINES: dict[str, Routine] = {
     "backup-marc": backup.marc_backup,
     "backup-cloud": backup.cloud_backup,
     "cloud-connections": backup.cloud_connections,      # Backup center, any platform
+    "nexus-backup-create": nexus_backup.create,
+    "nexus-backup-verify": nexus_backup.verify,
+    "nexus-backup-restore": nexus_backup.restore,
+    "nexus-backup-sessions": nexus_backup.sessions,
+    "nexus-backup-key": platforms.backup_setup,
+    "nexus-backup-kit": platforms.backup_kit,
     "set-backup": backup_set.set_backup,                # Backup center, Koha and Tainacan
     "set-schedule": backup_set.set_schedule,            # Backup center and Schedules, Koha and Tainacan
     "restore-assisted": backup_set.restore_assisted,    # Backup center, any backup

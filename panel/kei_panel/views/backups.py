@@ -58,6 +58,7 @@ class BackupCenterView(PlatformSectionView):
         self.codec = ""
         self.dspace_codec = ""
         self.tainacan_codec = ""
+        self.nexus_codec = ""
         self.facts = None
         self.plans: list[backup_center.PlanRow] = []
 
@@ -111,6 +112,19 @@ class BackupCenterView(PlatformSectionView):
                                  allow_blank=False, id="bk-tn-codec", disabled=True)
                 yield Label(t("Used for new Tainacan manual, scheduled and safety backups. Additional compression runs after WordPress resumes. Existing backups keep their format. Restic controls compression inside its own repository."), classes="ai-note")
             yield Static(t(ENCRYPTION_NOTE), classes="view-prompt", id="encryption-note", markup=False)
+        with Vertical(id="bk-nexus"):
+            from ..routines.nexus_backup import NOTE
+            yield Static(t(NOTE), classes="view-prompt", markup=False)
+            with Grid(classes="status-grid"):
+                yield StatusCard(t("Last full backup"), id="bk-nexus-age")
+                yield StatusCard(t("Size"), id="bk-nexus-size")
+                yield StatusCard(t("Recovery sessions"), id="bk-nexus-sessions")
+            with Vertical(classes="hub-box"):
+                with Horizontal(classes="form-row"):
+                    yield Label(t("Compression"), classes="form-label")
+                    yield Select([(t(label), key) for key, label in DSPACE_CODECS.items()], value="gz",
+                                 allow_blank=False, id="bk-nexus-codec", disabled=True)
+            yield Static(t('Restore on compatible prepared applications. Review the recovery plan before applying it; source addresses and schedules require review.'), classes="view-prompt", markup=False)
         yield Label(t("Automatic backups"), classes="view-prompt", id="bk-plans-title")
         # One block per automatic backup (it wraps on a small terminal,
         # where a six-column table would not fit).
@@ -134,7 +148,10 @@ class BackupCenterView(PlatformSectionView):
 
     # --- the platform shown -------------------------------------------------------
     def offered(self) -> list[str]:
-        return backup_center.scopes(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"), self.app.platform_ready("dspace"))
+        offered = backup_center.scopes(self.app.platform_ready("koha"), self.app.platform_ready("tainacan"), self.app.platform_ready("dspace"))
+        if self.app.bridge.has_task('nexus-full'):
+            offered.append(backup_center.NEXUS)
+        return offered
 
     def set_scope(self, scope: str) -> None:
         """Called when a platform group opens the center already filtered."""
@@ -154,14 +171,17 @@ class BackupCenterView(PlatformSectionView):
             button = self.query_one(f"#scope-{scope}", Button)
             button.display = scope in offered and len(offered) > 1
             button.variant = "primary" if scope == self.scope else "default"
+            if scope == self.scope and button.display:
+                self.call_after_refresh(button.scroll_visible, animate=False)
         self.query_one("#bk-scopes").display = len(offered) > 1
         self.query_one("#bk-none").display = not offered
         self.query_one("#bk-koha").display = self.scope == backup_center.KOHA
         self.query_one("#bk-tainacan").display = self.scope == backup_center.TAINACAN
         self.query_one("#bk-dspace").display = self.scope == backup_center.DSPACE
+        self.query_one("#bk-nexus").display = self.scope == backup_center.NEXUS
         self.query_one("#bk-both").display = len(backup_center.MEMBERS.get(self.scope, ())) > 1
-        self.query_one("#bk-plans-title").display = bool(self.scope)
-        self.query_one("#bk-plans").display = bool(self.scope)
+        self.query_one("#bk-plans-title").display = bool(self.scope) and self.scope != backup_center.NEXUS
+        self.query_one("#bk-plans").display = bool(self.scope) and self.scope != backup_center.NEXUS
         if self.facts is not None:
             self.show(self.facts)
 
@@ -181,6 +201,8 @@ class BackupCenterView(PlatformSectionView):
     def card_shown(self, entry, facts: platforms.Facts) -> bool:
         # A platform's cards in its view; the set's in "both"; the assisted
         # restore wherever a platform is; the cloud connections always.
+        if self.scope == backup_center.NEXUS:
+            return entry.scope == 'nexus' or entry.action == 'cloud-connections'
         if entry.action in ('dspace-plan','dspace-plan-run'):
             return 'dspace' in backup_center.MEMBERS.get(self.scope, ())
         if entry.action == 'set-backup' and len(backup_center.MEMBERS.get(self.scope, ())) > 1:
@@ -229,6 +251,8 @@ class BackupCenterView(PlatformSectionView):
                 rows = await self._load_koha() + await self._load_tainacan(facts) + await self._load_set()
             if self.scope == backup_center.DSPACE:
                 await self._load_dspace()
+            if self.scope == backup_center.NEXUS:
+                await self._load_nexus()
             if 'dspace' in backup_center.MEMBERS.get(self.scope, ()) and self.app.bridge.has_task('dspace-panel'):
                 from ..dspace import payload
                 rows += backup_center.operation_plans(payload(await self.app.bridge.task('dspace-panel','operations','plans')),self.scope)
@@ -353,6 +377,12 @@ class BackupCenterView(PlatformSectionView):
 
     # --- Koha: the compression of new backups ------------------------------------
     def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == 'bk-nexus-codec':
+            event.stop()
+            value = event.value if isinstance(event.value, str) else ''
+            if self.nexus_codec and value != self.nexus_codec and value in DSPACE_CODECS:
+                self.run_worker(self._set_nexus_codec(value), exclusive=True, group='routine', exit_on_error=False)
+            return
         if event.select.id == 'bk-tn-codec':
             event.stop()
             value = event.value if isinstance(event.value, str) else ''
@@ -372,6 +402,39 @@ class BackupCenterView(PlatformSectionView):
         if not self.codec or value == self.codec or value not in CODECS:
             return
         self.run_worker(self._set_codec(value), exclusive=True, group="routine", exit_on_error=False)
+
+    async def _load_nexus(self) -> None:
+        from ..dspace import payload
+        try:
+            out = await self.app.bridge.task('nexus-full', 'status')
+            data = payload(out) if out.ok else {}
+            if data.get('compression') not in DSPACE_CODECS:
+                raise ValueError('Full backup status unavailable')
+            epoch = data.get('created')
+            stamp = time.strftime('%Y-%m-%d %H:%M', time.localtime(epoch)) if isinstance(epoch, (int, float)) else t('None yet')
+            self.query_one('#bk-nexus-age', StatusCard).set(stamp, str(data.get('file') or ''))
+            self.query_one('#bk-nexus-size', StatusCard).set(human_bytes(data.get('bytes')), t('Encrypted portable package'))
+            self.query_one('#bk-nexus-sessions', StatusCard).set(str(len(data.get('sessions', []))), t('Private decrypted staging; review or resume explicitly'))
+            self._show_nexus_codec(data['compression'])
+        except Exception:
+            self.nexus_codec = ''
+            self.query_one('#bk-nexus-codec', Select).disabled = True
+            for key in ('age', 'size', 'sessions'):
+                self.query_one('#bk-nexus-' + key, StatusCard).set(t('Unavailable'), t('Refresh or check the task log.'), 'warn')
+
+    def _show_nexus_codec(self, codec: str) -> None:
+        self.nexus_codec = codec
+        self.app.nexus_backup_codec = codec
+        select = self.query_one('#bk-nexus-codec', Select)
+        select.value = codec
+        select.disabled = False
+
+    async def _set_nexus_codec(self, codec: str) -> None:
+        from ..routines.nexus_backup import call
+        previous = self.nexus_codec
+        self.query_one('#bk-nexus-codec', Select).disabled = True
+        result = await call(self.app, 'settings', '--compression', codec, '--confirm')
+        self._show_nexus_codec(codec if result and result.get('compression') == codec else previous)
 
     def _show_tainacan_codec(self, codec: str) -> None:
         self.tainacan_codec = codec

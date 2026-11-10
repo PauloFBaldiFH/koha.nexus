@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'platforms/dspace/**'
+      - 'platforms/nexus/**'
+      - 'tools/nexus_recovery_test.py'
+      - 'tests/test_nexus_recovery.py'
+      - 'tests/test_nexus_docker.py'
       - 'tools/dspace_images.py'
       - 'tools/dspace_bootstrap.py'
       - 'tools/dspace_build_bundle.py'
@@ -26,9 +30,13 @@ on:
       - 'tests/test_dspace_images.py'
       - '.github/workflows/dspace-images.yml'
   push:
-    branches: [main, 'feat/dspace-*']
+    branches: [main, 'feat/dspace-*', 'feat/nexus-*']
     paths:
       - 'platforms/dspace/**'
+      - 'platforms/nexus/**'
+      - 'tools/nexus_recovery_test.py'
+      - 'tests/test_nexus_recovery.py'
+      - 'tests/test_nexus_docker.py'
       - 'tools/dspace_images.py'
       - 'tools/dspace_bootstrap.py'
       - 'tools/dspace_build_bundle.py'
@@ -91,6 +99,8 @@ jobs:
       - run: python -m unittest discover -s tests -p test_dspace_images.py -v
       - run: python -m unittest discover -s tests -p test_dspace_runtime.py -v
       - run: python -m unittest discover -s tests -p test_dspace_backup.py -v
+      - run: python -m unittest discover -s tests -p test_nexus_recovery.py -v
+      - run: KEI_NEXUS_DOCKER_TESTS=1 python -m unittest discover -s tests -p test_nexus_docker.py -v
       - run: python -m unittest discover -s tests -p test_dspace_operations.py -v
       - run: sudo $(which python) -m unittest discover -s tests -p test_dspace_web.py -v
       - run: sudo $(which python) -m unittest discover -s tests -p test_dspace_languages.py -v
@@ -348,6 +358,7 @@ jobs:
           name: dspace-integrated-acceptance
           path: |
             ${{ runner.temp }}/dspace-acceptance.json
+            ${{ runner.temp }}/nexus-full-dspace-acceptance.json
             ${{ runner.temp }}/dspace-operations-acceptance.json
             ${{ runner.temp }}/dspace-recovery-acceptance.json
             ${{ runner.temp }}/dspace-browser-acceptance.json

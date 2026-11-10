@@ -2733,6 +2733,68 @@
     "languages"
    ],
    "_en": "1644ab19ee"
+  },
+  "nexus-backup-create": {
+   "summary": "Captura todos os sistemas instalados, as configurações do Nexus e as imagens imutáveis dos contêineres em um arquivo portátil .nexus criptografado.",
+   "steps": [
+    "Configure a chave compartilhada de recuperação e salve o kit. Escolha a compactação e uma pasta no servidor.",
+    "Revise os sistemas e a estimativa de espaço, depois confirme. As capturas são sequenciais; cada sistema usa seu motor de backup consistente já existente.",
+    "Guarde o pacote e a frase de recuperação em locais separados; verifique o arquivo antes de depender dele."
+   ],
+   "warnings": [
+    "É um pacote de recuperação dos aplicativos, não um disco inicializável ou exportação do Windows/WSL. Backups antigos, armazenamento externo de objetos e pacotes do sistema operacional não são copiados.",
+    "O destino precisa estar preparado e ser compatível. Identidades da nuvem/túneis e configurações shell ficam em local privado para revisão; não são ativadas automaticamente."
+   ]
+  },
+  "nexus-backup-verify": {
+   "summary": "Verifica a chave protegida, a frase, a criptografia e todos os arquivos usando um chaveiro temporário isolado.",
+   "steps": [
+    "Escolha um pacote .nexus completo e digite a frase de recuperação.",
+    "A chave do servidor original não é necessária e o chaveiro do destino não é alterado."
+   ],
+   "warnings": [
+    "A verificação confere o conteúdo do arquivo. Ela não inicia os aplicativos nem comprova a recuperação em uma máquina ainda não testada."
+   ]
+  },
+  "nexus-backup-restore": {
+   "summary": "Abre um pacote completo, mostra a compatibilidade do destino e pede confirmação para a recuperação sequencial.",
+   "steps": [
+    "Use a mesma versão/arquitetura do sistema operacional, versão nativa do Koha e imagens compatíveis. O DSpace exige também a mesma receita e URL.",
+    "Revise as configurações a aplicar e as que ficam como referências privadas. Uma chave de backup diferente no destino é preservada e precisa ser resolvida antes da recuperação.",
+    "Confirme. As rotinas nativas verificam as cópias e criam backups de segurança; os componentes concluídos são registrados. Os endereços e as agendas existentes do destino são preservados."
+   ],
+   "warnings": [
+    "A recuperação não é uma única transação atômica entre todos os sistemas. Se um componente posterior falhar, use Sessões de recuperação para revisar e retomar.",
+    "Os novos planos recuperados ficam desativados. Comandos cron, contas na nuvem, identidade de publicação e código arquivado da origem precisam de revisão e nunca são executados automaticamente."
+   ]
+  },
+  "nexus-backup-sessions": {
+   "summary": "Revisa, retoma ou limpa explicitamente sessões privadas de recuperação com dados descriptografados.",
+   "steps": [
+    "Selecione uma sessão e confira os componentes concluídos e os requisitos do destino.",
+    "Retome uma recuperação interrompida, importe as imagens por ID sem instalar os sistemas ou apague uma sessão aberta/concluída."
+   ],
+   "warnings": [
+    "As sessões contêm dados descriptografados acessíveis apenas ao root. Uma recuperação interrompida é preservada para revisão; a limpeza não remove o pacote criptografado nem os backups de segurança nativos."
+   ]
+  },
+  "nexus-backup-key": {
+   "summary": "Configura a mesma chave OpenPGP compartilhada usada pelos backups dos sistemas.",
+   "steps": [
+    "Revise a configuração da chave, escolha uma frase de recuperação forte e salve o kit."
+   ],
+   "warnings": [
+    "Não há outra senha para o backup completo. Perder a frase impede a recuperação criptografada."
+   ]
+  },
+  "nexus-backup-kit": {
+   "summary": "Salva o kit de recuperação protegido atual em local separado do servidor.",
+   "steps": [
+    "Copie o kit para outro dispositivo e guarde a frase separadamente."
+   ],
+   "warnings": [
+    "O envelope .nexus também inclui uma exportação protegida da chave; a frase não é gravada em nenhum dos arquivos."
+   ]
   }
  }
 }

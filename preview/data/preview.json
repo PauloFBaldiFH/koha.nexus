@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.193",
+ "panel_version": "1.5.194",
  "languages": [
   {
    "code": "en",
@@ -797,7 +797,13 @@
     "set-backup",
     "set-schedule",
     "restore-assisted",
-    "cloud-connections"
+    "cloud-connections",
+    "nexus-backup-create",
+    "nexus-backup-verify",
+    "nexus-backup-restore",
+    "nexus-backup-sessions",
+    "nexus-backup-key",
+    "nexus-backup-kit"
    ],
    "features": [
     "backup-status",
@@ -2140,6 +2146,66 @@
    "section": "backups",
    "label": "🔌  Cloud connections",
    "description": "The cloud accounts this server can send backups to, for any platform",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "nexus-backup-create": {
+   "id": "nexus-backup-create",
+   "type": "entry",
+   "section": "backups",
+   "label": "📦  Create full Nexus backup",
+   "description": "All installed applications, Nexus settings and immutable container images in one encrypted portable package",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "nexus-backup-verify": {
+   "id": "nexus-backup-verify",
+   "type": "entry",
+   "section": "backups",
+   "label": "🧾  Verify full Nexus package",
+   "description": "Verify the recovery phrase and every archived checksum without using the original server keyring",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "nexus-backup-restore": {
+   "id": "nexus-backup-restore",
+   "type": "entry",
+   "section": "backups",
+   "label": "♻  Recover full Nexus backup",
+   "description": "Review compatible application recovery and preserve destination addresses and publication identities",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "nexus-backup-sessions": {
+   "id": "nexus-backup-sessions",
+   "type": "entry",
+   "section": "backups",
+   "label": "⏯  Recovery sessions",
+   "description": "Review or resume interrupted recoveries; remove completed private staging explicitly",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "nexus-backup-key": {
+   "id": "nexus-backup-key",
+   "type": "entry",
+   "section": "backups",
+   "label": "🔐  Shared recovery key",
+   "description": "Configure the existing shared OpenPGP recovery key",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "nexus-backup-kit": {
+   "id": "nexus-backup-kit",
+   "type": "entry",
+   "section": "backups",
+   "label": "🧰  Save recovery kit",
+   "description": "Save the current protected key and recovery instructions separately",
    "kind": "native",
    "status": "available",
    "media": []
@@ -9602,6 +9668,306 @@
   "The cloud accounts this server can send backups to, for any platform": {
    "en": "The cloud accounts this server can send backups to, for any platform",
    "pt-BR": "As contas de nuvem para onde este servidor pode enviar backups, de qualquer plataforma",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "📦  Create full Nexus backup": {
+   "en": "📦  Create full Nexus backup",
+   "pt-BR": "📦  Criar backup completo do Nexus",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "All installed applications, Nexus settings and immutable container images in one encrypted portable package": {
+   "en": "All installed applications, Nexus settings and immutable container images in one encrypted portable package",
+   "pt-BR": "Todos os sistemas instalados, as configurações do Nexus e as imagens imutáveis dos contêineres em um pacote portátil criptografado",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🧾  Verify full Nexus package": {
+   "en": "🧾  Verify full Nexus package",
+   "pt-BR": "🧾  Verificar pacote completo do Nexus",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Verify the recovery phrase and every archived checksum without using the original server keyring": {
+   "en": "Verify the recovery phrase and every archived checksum without using the original server keyring",
+   "pt-BR": "Verifica a frase de recuperação e todos os arquivos sem usar o chaveiro do servidor original",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "♻  Recover full Nexus backup": {
+   "en": "♻  Recover full Nexus backup",
+   "pt-BR": "♻  Recuperar backup completo do Nexus",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Review compatible application recovery and preserve destination addresses and publication identities": {
+   "en": "Review compatible application recovery and preserve destination addresses and publication identities",
+   "pt-BR": "Mostra o plano de recuperação em sistemas compatíveis e preserva os endereços e as identidades de publicação do destino",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "⏯  Recovery sessions": {
+   "en": "⏯  Recovery sessions",
+   "pt-BR": "⏯  Sessões de recuperação",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Review or resume interrupted recoveries; remove completed private staging explicitly": {
+   "en": "Review or resume interrupted recoveries; remove completed private staging explicitly",
+   "pt-BR": "Revisa ou retoma recuperações interrompidas; permite remover explicitamente as sessões privadas concluídas",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🔐  Shared recovery key": {
+   "en": "🔐  Shared recovery key",
+   "pt-BR": "🔐  Chave compartilhada de recuperação",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Configure the existing shared OpenPGP recovery key": {
+   "en": "Configure the existing shared OpenPGP recovery key",
+   "pt-BR": "Configura a chave OpenPGP compartilhada de recuperação que o painel já usa",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🧰  Save recovery kit": {
+   "en": "🧰  Save recovery kit",
+   "pt-BR": "🧰  Salvar kit de recuperação",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Save the current protected key and recovery instructions separately": {
+   "en": "Save the current protected key and recovery instructions separately",
+   "pt-BR": "Salva separadamente a chave protegida atual e as instruções de recuperação",
    "es": null,
    "fr": null,
    "it": null,
@@ -20663,6 +21029,148 @@
     ]
    }
   },
+  "nexus-backup-create": {
+   "en": {
+    "summary": "Capture every installed application, Nexus configuration and immutable container images in one encrypted portable .nexus file.",
+    "steps": [
+     "Configure the shared recovery key and save its kit. Choose the compression and a server folder.",
+     "Review the installed members and space estimate, then confirm. Captures are sequential, with each application using its existing consistent-backup engine.",
+     "Keep the package and recovery phrase in separate places; verify the package before relying on it."
+    ],
+    "warnings": [
+     "This is an application recovery bundle, not a bootable disk or Windows/WSL export. Old backups, external object storage and operating-system packages are not copied.",
+     "A compatible prepared destination is required. Source cloud/tunnel identities and arbitrary shell configuration are kept privately for review; they are not activated automatically."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Captura todos os sistemas instalados, as configurações do Nexus e as imagens imutáveis dos contêineres em um arquivo portátil .nexus criptografado.",
+    "steps": [
+     "Configure a chave compartilhada de recuperação e salve o kit. Escolha a compactação e uma pasta no servidor.",
+     "Revise os sistemas e a estimativa de espaço, depois confirme. As capturas são sequenciais; cada sistema usa seu motor de backup consistente já existente.",
+     "Guarde o pacote e a frase de recuperação em locais separados; verifique o arquivo antes de depender dele."
+    ],
+    "warnings": [
+     "É um pacote de recuperação dos aplicativos, não um disco inicializável ou exportação do Windows/WSL. Backups antigos, armazenamento externo de objetos e pacotes do sistema operacional não são copiados.",
+     "O destino precisa estar preparado e ser compatível. Identidades da nuvem/túneis e configurações shell ficam em local privado para revisão; não são ativadas automaticamente."
+    ]
+   }
+  },
+  "nexus-backup-verify": {
+   "en": {
+    "summary": "Verify the protected key, phrase, encryption and every archived checksum using an isolated temporary keyring.",
+    "steps": [
+     "Choose a full .nexus package and type its recovery phrase.",
+     "The original server key is not required and the destination keyring is unchanged."
+    ],
+    "warnings": [
+     "This verifies archive contents. It does not boot the applications or prove full recovery on an untested machine."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Verifica a chave protegida, a frase, a criptografia e todos os arquivos usando um chaveiro temporário isolado.",
+    "steps": [
+     "Escolha um pacote .nexus completo e digite a frase de recuperação.",
+     "A chave do servidor original não é necessária e o chaveiro do destino não é alterado."
+    ],
+    "warnings": [
+     "A verificação confere o conteúdo do arquivo. Ela não inicia os aplicativos nem comprova a recuperação em uma máquina ainda não testada."
+    ]
+   }
+  },
+  "nexus-backup-restore": {
+   "en": {
+    "summary": "Open a full package, inspect destination compatibility and confirm sequential application recovery.",
+    "steps": [
+     "Use the same OS release/architecture, native Koha version and compatible application images. DSpace also requires the same release and URL.",
+     "Review which settings will be applied and which stay as private references. A different destination backup key is preserved and must be resolved before recovery.",
+     "Confirm. Native restores verify their copies and create safety backups; completed components are recorded. Target addresses and existing jobs remain unchanged."
+    ],
+    "warnings": [
+     "Recovery is not one atomic transaction across all applications. If a later member fails, use Recovery sessions to review and resume.",
+     "New recovered backup plans are disabled. Source cron commands, cloud accounts, publication identity and archived code require review and are never executed automatically."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Abre um pacote completo, mostra a compatibilidade do destino e pede confirmação para a recuperação sequencial.",
+    "steps": [
+     "Use a mesma versão/arquitetura do sistema operacional, versão nativa do Koha e imagens compatíveis. O DSpace exige também a mesma receita e URL.",
+     "Revise as configurações a aplicar e as que ficam como referências privadas. Uma chave de backup diferente no destino é preservada e precisa ser resolvida antes da recuperação.",
+     "Confirme. As rotinas nativas verificam as cópias e criam backups de segurança; os componentes concluídos são registrados. Os endereços e as agendas existentes do destino são preservados."
+    ],
+    "warnings": [
+     "A recuperação não é uma única transação atômica entre todos os sistemas. Se um componente posterior falhar, use Sessões de recuperação para revisar e retomar.",
+     "Os novos planos recuperados ficam desativados. Comandos cron, contas na nuvem, identidade de publicação e código arquivado da origem precisam de revisão e nunca são executados automaticamente."
+    ]
+   }
+  },
+  "nexus-backup-sessions": {
+   "en": {
+    "summary": "Review, resume or explicitly clean private decrypted recovery sessions.",
+    "steps": [
+     "Select a session and review its completed components and destination requirements.",
+     "Resume an interrupted recovery, import stored image IDs without installing applications, or delete an opened/completed staging area."
+    ],
+    "warnings": [
+     "Sessions contain decrypted data accessible only to root. Interrupted application recovery is preserved for review; cleanup does not remove the encrypted package or native safety backups."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Revisa, retoma ou limpa explicitamente sessões privadas de recuperação com dados descriptografados.",
+    "steps": [
+     "Selecione uma sessão e confira os componentes concluídos e os requisitos do destino.",
+     "Retome uma recuperação interrompida, importe as imagens por ID sem instalar os sistemas ou apague uma sessão aberta/concluída."
+    ],
+    "warnings": [
+     "As sessões contêm dados descriptografados acessíveis apenas ao root. Uma recuperação interrompida é preservada para revisão; a limpeza não remove o pacote criptografado nem os backups de segurança nativos."
+    ]
+   }
+  },
+  "nexus-backup-key": {
+   "en": {
+    "summary": "Configure the same shared OpenPGP backup key used by the platform backups.",
+    "steps": [
+     "Review the key setup, choose a strong recovery phrase and save the recovery kit."
+    ],
+    "warnings": [
+     "There is no separate full-backup password. Losing the recovery phrase prevents encrypted recovery."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Configura a mesma chave OpenPGP compartilhada usada pelos backups dos sistemas.",
+    "steps": [
+     "Revise a configuração da chave, escolha uma frase de recuperação forte e salve o kit."
+    ],
+    "warnings": [
+     "Não há outra senha para o backup completo. Perder a frase impede a recuperação criptografada."
+    ]
+   }
+  },
+  "nexus-backup-kit": {
+   "en": {
+    "summary": "Save the current protected recovery kit separately from the server.",
+    "steps": [
+     "Copy the kit to another device and keep its phrase separately."
+    ],
+    "warnings": [
+     "The full .nexus envelope also carries a protected key export; the human recovery phrase is never stored in either file."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Salva o kit de recuperação protegido atual em local separado do servidor.",
+    "steps": [
+     "Copie o kit para outro dispositivo e guarde a frase separadamente."
+    ],
+    "warnings": [
+     "O envelope .nexus também inclui uma exportação protegida da chave; a frase não é gravada em nenhum dos arquivos."
+    ]
+   }
+  },
   "sec-backups": {
    "en": {
     "summary": "Every backup of this server in one screen of the main menu (key b): Koha's and Tainacan's, their automatic backups and the cloud connections they share.",
@@ -23665,165 +24173,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 177,
-   "manual_total": 177,
+   "manual": 183,
+   "manual_total": 183,
    "manual_outdated": [],
-   "strings": 529,
-   "strings_total": 529
+   "strings": 541,
+   "strings_total": 541
   },
   "pt-BR": {
-   "manual": 177,
-   "manual_total": 177,
+   "manual": 183,
+   "manual_total": 183,
    "manual_outdated": [],
-   "strings": 523,
-   "strings_total": 529
+   "strings": 535,
+   "strings_total": 541
   },
   "es": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 529
+   "strings_total": 541
   },
   "fr": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 529
+   "strings_total": 541
   },
   "it": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 529
+   "strings_total": 541
   },
   "de": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 397,
-   "strings_total": 529
+   "strings_total": 541
   },
   "nl": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "sv": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "pl": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "cs": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "ru": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "uk": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "tr": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "tl": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "id": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "ar": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "fa": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "hi": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "bn": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "vi": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "zh": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "ja": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   },
   "ko": {
    "manual": 0,
-   "manual_total": 177,
+   "manual_total": 183,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 529
+   "strings_total": 541
   }
  }
 }

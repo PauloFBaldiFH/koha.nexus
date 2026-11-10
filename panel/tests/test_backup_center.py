@@ -20,7 +20,7 @@ from kei_panel.env import PanelEnv
 
 SERVERS = {"none": ("0", "0"), "koha": ("1", "0"), "tainacan": ("0", "1"), "both": ("1", "1")}
 # What the center may call while it is drawn: reads only.
-READS = {"platform-backup-status", "info", "cloud-status", "cloud-list", "set-schedule-status"}
+READS = {"platform-backup-status", "info", "cloud-status", "cloud-list", "set-schedule-status", "nexus-full"}
 KOHA_CARDS = ["backup-download", "backup-manual", "backup-marc", "restore", "backup-cloud", "backup-test"]
 SHARED = ["restore-assisted", "cloud-connections"]
 TAINACAN_CARDS = ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
@@ -212,8 +212,8 @@ def test_the_center_follows_what_is_installed_and_only_reads(server):
     vid, st, ran = asyncio.run(main())
     assert vid == "view-backups"
     koha, tainacan = server in ("koha", "both"), server in ("tainacan", "both")
-    assert st["none"] is (not koha and not tainacan)
-    assert st["buttons"] == (["koha", "tainacan", "both"] if koha and tainacan else [])
+    assert not st["none"]  # A full Nexus package can be opened before application installation.
+    assert st["buttons"] == (["koha", "tainacan", "both", "nexus"] if koha and tainacan else ["koha", "nexus"] if koha else ["tainacan", "nexus"] if tainacan else [])
     if koha:            # Koha first
         assert st["scope"] == "koha" and st["koha"] and not st["tainacan"]
         assert st["cards"] == KOHA_CARDS + SHARED
@@ -225,7 +225,7 @@ def test_the_center_follows_what_is_installed_and_only_reads(server):
         assert st["cards"] == TAINACAN_CARDS + SHARED
         assert [r[0] for r in st["rows"]] == ["Tainacan backup"]
     else:
-        assert st["scope"] == "" and st["cards"] == ["cloud-connections"] and st["rows"] == []
+        assert st["scope"] == "nexus" and set(st["cards"]) == {"cloud-connections", "nexus-backup-create", "nexus-backup-verify", "nexus-backup-restore", "nexus-backup-sessions", "nexus-backup-key", "nexus-backup-kit"} and st["rows"] == []
     assert {name for name, _a in ran} <= READS
     # The engine's state is read only where Tainacan is (the dashboard reads it too).
     assert ("platform-backup-status" in {n for n, _a in ran}) is tainacan
@@ -260,7 +260,7 @@ def test_the_platform_groups_open_the_center_already_filtered(server):
             return from_tainacan, from_koha, chosen
 
     from_tainacan, from_koha, chosen = asyncio.run(main())
-    assert from_tainacan["scope"] == "tainacan" and from_tainacan["buttons"] == ["koha", "tainacan", "both"]
+    assert from_tainacan["scope"] == "tainacan" and from_tainacan["buttons"] == ["koha", "tainacan", "both", "nexus"]
     assert from_tainacan["cards"] == TAINACAN_CARDS + SHARED
     assert from_koha["scope"] == "koha" and from_koha["cards"] == KOHA_CARDS + SHARED
     assert chosen["scope"] == "tainacan" and chosen["rows"][0][0] == "Tainacan backup"

@@ -354,6 +354,13 @@ async def restore_assisted(app) -> None:
     if picked is None:
         return
     path = str(picked)
+    if where == 'file' and app.bridge.has_task('nexus-full'):
+        from ..dspace import payload
+        identified = await app.bridge.task('nexus-full', 'identify', path)
+        if identified.ok and payload(identified).get('kind') == 'koha-nexus-recovery':
+            from .nexus_backup import restore_path
+            await restore_path(app, path)
+            return
     result = await run_task(app, t("Checking the backup"), "set-inspect", path)
     out = result.value if isinstance(result.value, TaskOutcome) else None
     if out is None or result.cancelled or not out.ok:

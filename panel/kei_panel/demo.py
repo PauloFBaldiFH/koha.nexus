@@ -923,6 +923,34 @@ def _admin_lines(name: str, args: tuple[str, ...]) -> list[str] | None:
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
                     on_result: Callable[[str, str], None] | None, env: dict[str, str],
                     ask=None) -> "TaskOutcome":
+    if name == "nexus-full":
+        import base64
+        import os
+        command = args[0] if args else "status"
+        members = [p for p, key in (("koha", "KEI_PANEL_DEMO_KOHA"), ("tainacan", "KEI_PANEL_DEMO_TAINACAN"), ("dspace", "KEI_PANEL_DEMO_DSPACE")) if os.environ.get(key, "1" if p != "dspace" else "0") == "1"]
+        data = {"file": None, "sessions": [], "compression": env.get("DEMO_NEXUS_CODEC", "gz")}
+        if command == "settings":
+            if "--compression" in args:
+                env["DEMO_NEXUS_CODEC"] = args[args.index("--compression") + 1]
+            data = {"compression": env.get("DEMO_NEXUS_CODEC", "gz")}
+        elif command == "plan":
+            data = {"applications": members, "images": [], "estimated_source_bytes": 1048576}
+        elif command == "identify":
+            data = {"kind": "koha-nexus-recovery" if args[-1].endswith(".nexus") else "unknown"}
+        elif command == "verify":
+            data = {"verified": True, "applications": members, "isolated_keyring": True}
+        elif command in ("open", "restore-plan", "restore"):
+            data = {"session": "/var/lib/koha-nexus/full-recovery/session-" + "0" * 32,
+                    "compatible": True, "phase": "complete" if command == "restore" else "opened",
+                    "applications": members, "images": 4, "completed": [], "restored": command == "restore"}
+        elif command == "create":
+            data = {"file": "/var/backups/koha-nexus/full/demo.nexus", "complete": True, "applications": members}
+        elif command == "load-images":
+            data = {"loaded": []}
+        elif command == "cleanup":
+            data = {"removed": True}
+        out.feed("@@result payload=" + base64.b64encode(json.dumps(data).encode()).decode(), reporter, on_result)
+        return out
     if name == "dspace-panel":
         import base64
         import os

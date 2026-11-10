@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.193"
+PANEL_VERSION=" 1.5.194"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -273,6 +273,54 @@ export KOHA_PANEL_LANG_FULL KOHA_PANEL_LANG SYS_LANG
 declare -A _TRANS_CACHE=()
 
 declare -A _MENU_PT=(
+    ["Restore on compatible prepared applications. Review the recovery plan before applying it; source addresses and schedules require review."]="Restaure em sistemas compatíveis já preparados. Revise o plano antes de aplicá-lo; os endereços e as agendas da origem precisam de revisão."
+    ["Full Nexus"]="Nexus completo"
+    ["Full Nexus backup"]="Backup completo do Nexus"
+    ["📦  Create full Nexus backup"]="📦  Criar backup completo do Nexus"
+    ["🧾  Verify full Nexus package"]="🧾  Verificar pacote completo do Nexus"
+    ["♻  Recover full Nexus backup"]="♻  Recuperar backup completo do Nexus"
+    ["⏯  Recovery sessions"]="⏯  Sessões de recuperação"
+    ["🔐  Shared recovery key"]="🔐  Chave compartilhada de recuperação"
+    ["🧰  Save recovery kit"]="🧰  Salvar kit de recuperação"
+    ["All installed applications, Nexus settings and immutable container images in one encrypted portable package"]="Todos os sistemas instalados, as configurações do Nexus e as imagens imutáveis dos contêineres em um pacote portátil criptografado"
+    ["Verify the recovery phrase and every archived checksum without using the original server keyring"]="Verifica a frase de recuperação e todos os arquivos sem usar o chaveiro do servidor original"
+    ["Review compatible application recovery and preserve destination addresses and publication identities"]="Mostra o plano de recuperação em sistemas compatíveis e preserva os endereços e as identidades de publicação do destino"
+    ["Review or resume interrupted recoveries; remove completed private staging explicitly"]="Revisa ou retoma recuperações interrompidas; permite remover explicitamente as sessões privadas concluídas"
+    ["Configure the existing shared OpenPGP recovery key"]="Configura a chave OpenPGP compartilhada de recuperação que o painel já usa"
+    ["Save the current protected key and recovery instructions separately"]="Salva separadamente a chave protegida atual e as instruções de recuperação"
+    ["Last full backup"]="Último backup completo"
+    ["Recovery sessions"]="Sessões de recuperação"
+    ["Encrypted portable package"]="Pacote portátil criptografado"
+    ["Private decrypted staging; review or resume explicitly"]="Arquivos privados descriptografados; revise ou retome a sessão"
+    ["Refresh or check the task log."]="Atualize ou consulte o log da tarefa."
+    ["The backup task returned no valid result. See its log before continuing."]="A tarefa de backup não retornou um resultado válido. Consulte o log antes de continuar."
+    ["Choose a full Nexus recovery package. Its contents and recovery phrase will be verified."]="Escolha um pacote de recuperação completa do Nexus. O conteúdo e a frase de recuperação serão verificados."
+    ["Enter the recovery phrase used when the backup key was created. It is not a WordPress or Koha password."]="Digite a frase de recuperação usada ao criar a chave de backup. Ela é diferente das senhas do WordPress e do Koha."
+    ["Applications:"]="Sistemas:"
+    ["Container images:"]="Imagens de contêineres:"
+    ["Apply settings:"]="Configurações a aplicar:"
+    ["Keep privately for review:"]="Manter em local privado para revisão:"
+    ["Completed components:"]="Componentes concluídos:"
+    ["Destination prerequisites:"]="Pré-requisitos do destino:"
+    ["A full Nexus backup requires the shared backup key. Configure it now?"]="O backup completo do Nexus precisa da chave compartilhada de backup. Deseja configurá-la agora?"
+    ["Choose a parent folder. The package is saved in a private nexus-full subfolder."]="Escolha uma pasta. O pacote será salvo na subpasta privada nexus-full."
+    ["Create the full recovery package now?"]="Criar o pacote completo de recuperação agora?"
+    ["Full package created. Verify it with the recovery phrase before relying on it."]="Pacote completo criado. Verifique-o com a frase de recuperação antes de depender dele."
+    ["The phrase, encryption and all archived file checksums passed using an isolated keyring. This verifies the package contents; it does not start an application recovery test."]="A frase, a criptografia e todos os arquivos passaram pela verificação usando um chaveiro isolado. Isso verifica o conteúdo do pacote; o teste não inicia uma restauração dos sistemas."
+    ["This recovery session is already complete. Its private reference files are kept here:"]="Esta sessão de recuperação já foi concluída. Seus arquivos privados de referência estão aqui:"
+    ["Keep this private session and prepare the destination"]="Manter esta sessão privada e preparar o destino"
+    ["Import the archived container images now"]="Importar agora as imagens de contêineres do pacote"
+    ["Load the archived immutable images into local Docker? No application is installed, started or restored by this step."]="Importar as imagens imutáveis do pacote no Docker local? Este passo não instala, inicia nem restaura sistemas."
+    ["Restore these applications and the listed settings now?"]="Restaurar estes sistemas e as configurações listadas agora?"
+    ["The recovery did not finish. Check the log and use Recovery sessions to review completed components and resume."]="A recuperação não terminou. Consulte o log e use Sessões de recuperação para revisar os componentes concluídos e retomar."
+    ["Application recovery finished. Review the recovered source configuration before enabling schedules or publishing addresses."]="A recuperação dos sistemas terminou. Revise as configurações recuperadas da origem antes de ativar agendas ou publicar endereços."
+    ["There are no private recovery sessions. Open a full package to prepare a recovery."]="Não há sessões privadas de recuperação. Abra um pacote completo para preparar uma recuperação."
+    ["Private sessions retain decrypted data as root-only files. Interrupted sessions can resume from the recorded components."]="As sessões privadas mantêm dados descriptografados acessíveis só ao administrador root. As sessões interrompidas podem ser retomadas a partir dos componentes registrados."
+    ["Review and continue recovery"]="Revisar e continuar a recuperação"
+    ["Delete this private staging session"]="Apagar esta sessão privada temporária"
+    ["Delete the decrypted staging and reference files of this session? The encrypted original package and application safety backups are kept."]="Apagar os arquivos temporários descriptografados e de referência desta sessão? O pacote original criptografado e os backups de segurança dos sistemas serão preservados."
+    ["One encrypted file with all installed applications, their data and secrets, Nexus settings and container images. Gzip, Bzip2, XZ or no compression. The recovery key is included protected by your recovery phrase. Keep that phrase separately. This is an application recovery package, not an operating-system disk image. Applications are captured in turn, not at the same instant."]="Um arquivo criptografado com todos os sistemas instalados, seus dados e segredos, as configurações do Nexus e as imagens dos contêineres. Gzip, Bzip2, XZ ou sem compactação. A chave de recuperação é incluída protegida pela sua frase de recuperação. Guarde essa frase separadamente. Este é um pacote de recuperação dos aplicativos, não uma imagem de disco do sistema operacional. Os sistemas são capturados em sequência, e não no mesmo instante."
+    ["Prepare compatible empty applications on the destination before restoring: the same OS release and architecture, the same Koha package, and matching container images. DSpace also requires the same release and repository address. Each application uses its existing restore checks and safety backup. Recovery is sequential; completed applications remain recorded if another one fails. Target addresses and existing jobs are preserved. Source jobs, cloud accounts and publication identities remain private references for review; new recovered backup plans are disabled."]="Prepare instalações vazias compatíveis no destino antes de restaurar: mesma versão e arquitetura do sistema operacional, mesmo pacote do Koha e imagens de contêineres correspondentes. O DSpace também exige a mesma receita e o mesmo endereço do repositório. Cada sistema usa suas verificações de restauração e sua cópia de segurança existentes. A recuperação é sequencial; componentes concluídos ficam registrados se outro falhar. Endereços e agendas existentes do destino são preservados. Agendas, contas na nuvem e identidades de publicação da origem ficam como referências privadas para revisão; os novos planos de backup recuperados ficam desativados."
     ["Restic snapshot excluded"]="Sem o snapshot restic"
     ['Compressing captured backup (${codec}); WordPress has resumed.']="Compactando o backup capturado (\${codec}); o WordPress voltou a funcionar."
     ["Backup compression failed. The captured data were kept; resume this backup."]="A compactação do backup falhou. Os dados capturados foram preservados; retome este backup."
@@ -1130,7 +1178,7 @@ panel_lock_release() {
 # --install-data-safety, which only (re)writes the data-safety settings,
 # and --rebuild-search-index (the Koha window's button).
 KEI_CLI_MODE=""
-case "${1:-}" in --status-json|--export-diagnostics|--broker-heartbeat|--opac-sitemap|--install-data-safety|--rebuild-search-index|--task) KEI_CLI_MODE="$1" ;; esac
+case "${1:-}" in --status-json|--export-diagnostics|--broker-heartbeat|--opac-sitemap|--install-data-safety|--rebuild-search-index|--nexus-recovery-driver|--task) KEI_CLI_MODE="$1" ;; esac
 
 if [ -z "$KEI_CLI_MODE" ]; then
     # A routine started by the new panel (config.sh --run, see
@@ -16273,6 +16321,189 @@ KEI_SET_KIND="koha-nexus-set"
 KEI_SET_FORMAT=1
 # The members a set may hold (anything else is refused before extracting).
 KEI_SET_MEMBERS='^(manifest\.json|SHA256SUMS|koha/|koha/[A-Za-z0-9_.-]{1,120}\.sql\.(gz|zst|xz)|koha/koha-conf\.xml\.gpg|koha/files\.tar\.gz|koha/secrets\.tar\.gpg|dspace/|dspace/knx-dspace-[0-9-]+-[0-9a-f]{8}\.tar(\.(gz|bz2|xz))?\.gpg|tainacan/|tainacan/knx-tainacan-[0-9-]{1,40}/|tainacan/knx-tainacan-[0-9-]{1,40}/(db\.sql(\.(gz|bz2|xz))?|files\.tar(\.(gz|bz2|xz))?|secrets\.tar\.gpg|manifest\.json|SHA256SUMS|journal\.jsonl|secrets/|secrets/(\.env|compose\.yml|state)))$'
+
+# Portable Nexus recovery. Its adapter is copied only after a pinned digest
+# check; a single downloaded config.sh and the offline cache both work.
+KEI_NEXUS_RECOVERY_SHA="ce411d15f07b9fd1fc9da490bed285410b2bdb21f1afcb3b644032a610bab42f"
+KEI_NEXUS_RECOVERY_HOME="${KEI_NEXUS_RECOVERY_HOME:-$KEI_OWNED_DIR/full-recovery}"
+kei_nexus_recovery() (
+    local work source expected cache rc
+    expected="$KEI_NEXUS_RECOVERY_SHA"
+    work=$(mktemp -d /tmp/nexus-recovery.XXXXXXXX) || return 1
+    trap 'rm -rf "$work"' EXIT
+    cache="${KEI_DSPACE_ADAPTER_DIR%/dspace}/nexus/$expected"
+    source="$_SCRIPT_DIR/platforms/nexus/recovery.py"
+    if [ -f "$source" ] && [ ! -L "$source" ] && [ "$(sha256sum "$source" | cut -d' ' -f1)" = "$expected" ]; then
+        cp "$source" "$work/recovery.py" || return 1
+    elif [ -f "$cache/recovery.py" ] && [ ! -L "$cache/recovery.py" ] && [ "$(sha256sum "$cache/recovery.py" | cut -d' ' -f1)" = "$expected" ]; then
+        cp "$cache/recovery.py" "$work/recovery.py" || return 1
+    else
+        curl -fsSL --retry 2 --connect-timeout 10 --max-time 60 "${UPDATE_BASE:-${UPDATE_URL%installer}}platforms/nexus/recovery.py" -o "$work/recovery.py" || return 1
+    fi
+    [ "$(sha256sum "$work/recovery.py" | cut -d' ' -f1)" = "$expected" ] || { echo 'Nexus recovery adapter checksum mismatch.' >&2; return 5; }
+    # Installing the verified cache is explicit, never a side effect of status.
+    if [ "${1:-}" = cache ]; then
+        mkdir -p "$cache" && chmod 700 "$cache" || return 1
+        install -m 400 "$work/recovery.py" "$cache/recovery.py"; return
+    fi
+    python3 "$work/recovery.py" --driver "$(readlink -f "$_SCRIPT_PATH")" --home "$KEI_NEXUS_RECOVERY_HOME" "$@"
+)
+
+kei_nexus_recovery_driver() {
+    case "${1:-}" in
+        capture)
+            local output rc
+            output=$(kei_set_backup "$2" "$3"); rc=$?
+            [ "$rc" = 0 ] || return "$rc"
+            printf '%s\n' "$output" | python3 -I -c 'import json,sys;d={};[d.update([line.rstrip().split("=",1)]) for line in sys.stdin if line.split("=",1)[0] in ("complete","recoverability","file","size")];print(json.dumps(d))'
+            ;;
+        import-key)
+            local phrase="${KEI_BACKUP_PHRASE:-}" work rc
+            unset KEI_BACKUP_PHRASE
+            local KEI_BACKUP_PHRASE="$phrase"
+            work=$(mktemp -d) && chmod 700 "$work" || return 1
+            # Repository paths/cloud copy settings of the source must not start
+            # uploading a destination's safety backups to the old institution.
+            sed '/^repo_[a-z]*=/d; /^copy_[a-z]*=/d' "$2" > "$work/kit"
+            kei_backup_kit_import "$work/kit" >&2; rc=$?
+            if [ "$rc" = 0 ]; then
+                install -m 600 "$work/kit" "$KEI_BK_DIR/recovery-kit.txt" || rc=1
+            fi
+            rm -rf "$work"
+            [ "$rc" = 0 ] || return "$rc"
+            printf '{"imported":true}\n'
+            ;;
+        unpack)
+            local output rc
+            output=$(kei_set_unpack "$2"); rc=$?
+            [ "$rc" = 0 ] || return "$rc"
+            printf '%s\n' "$output" | python3 -I -c 'import json,sys;print(json.dumps(dict(line.rstrip().split("=",1) for line in sys.stdin if "=" in line)))'
+            ;;
+        restore-part)
+            local app="${2:-}" member="${3:-}" stage="${4:-}" phrase="${KEI_BACKUP_PHRASE:-}" rc out
+            unset KEI_BACKUP_PHRASE
+            local KEI_BACKUP_PHRASE="$phrase"
+            case "$stage" in "$KEI_BK_ROOT"/.set-restore.*) ;; *) return 2 ;; esac
+            [ -d "$stage" ] && [ ! -L "$stage" ] && [ "$(readlink -f "$stage")" = "$stage" ] || return 2
+            case "$member" in "$stage/$app/"*) ;; *) return 2 ;; esac
+            [ -e "$member" ] && [ "$(readlink -f "$member")" = "$member" ] || return 2
+            case "$app" in
+                koha)
+                    # Existing database safety copy/preflight; then the file and
+                    # encryption-key restorer (never the source DB password).
+                    KEI_TASK_ANSWER=yes kei_task restore "$member" >&2 || return $?
+                    out=$(kei_set_koha_extras apply "$stage" confirm); rc=$?
+                    printf '%s\n' "$out" >&2
+                    [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -qx 'secrets=open' || return 4
+                    ;;
+                tainacan) kei_tainacan_restore "$member" >&2 || return $? ;;
+                dspace)
+                    export KEI_BACKUP_PHRASE
+                    kei_dspace_runtime backup-restore "$member" --confirm >&2; rc=$?
+                    export -n KEI_BACKUP_PHRASE
+                    [ "$rc" = 0 ] || return "$rc"
+                    ;;
+                *) return 2 ;;
+            esac
+            printf '{"restored":true}\n'
+            ;;
+        cleanup)
+            kei_set_cleanup "${2:-}" || return $?
+            printf '{"removed":true}\n'
+            ;;
+        inventory)
+            local koha=no
+            is_koha_installed && koha=yes
+            python3 -I - "$KEI_OWNED_DIR" "$KEI_TAINACAN_DIR" "$KEI_DSPACE_DIR" "$KEI_BK_DIR" "$CONF_DIR" "$KEI_PANEL_SRC" "$CLOUD_RCLONE_CONF" "${PANEL_VERSION# }" "$koha" "$(_kei_tn_image cli)" "$TRANSLATION_CONFIG" "${PANEL_LANG_ITEMS[*]}" <<'NEXUS_INV'
+import json,os,platform,subprocess,sys
+from pathlib import Path
+owned,tn,ds,bk,conf,panel,rclone,version,koha,wpcli,translation,languages=sys.argv[1:]
+applications=['koha'] if koha=='yes' else [];unknown=[];images=set();requirements={};references={};estimated=0
+local_env=dict(os.environ)
+for name in ('DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH','KEI_BACKUP_PHRASE'):local_env.pop(name,None)
+def dc(*args):
+    return subprocess.check_output(['docker','--host=unix:///var/run/docker.sock',*args],env=local_env,stderr=subprocess.DEVNULL,timeout=120)
+def size(path):
+    if Path(path).exists():
+        return int(subprocess.check_output(['du','-sb',str(path)],stderr=subprocess.DEVNULL,timeout=120).split()[0])
+    return 0
+
+def image(ref):
+    value=json.loads(dc('image','inspect',ref))[0]
+    images.add(value['Id']);references[ref]=value['Id']
+    return value.get('Size',0)
+for app,root,file in (('tainacan',Path(tn),'state'),('dspace',Path(ds),'state.json')):
+    state=root/file
+    if not state.exists():
+        if root.exists() and any(root.iterdir()):unknown.append(app)
+        continue
+    try:
+        if state.is_symlink():raise ValueError()
+        text=state.read_text()
+        data=json.loads(text) if app=='dspace' else dict(row.split('=',1) for row in text.splitlines() if '=' in row)
+        if data.get('status') in ('data-removed','uninstalled'):continue
+        if data.get('status') not in ('installed','stopped'):raise ValueError()
+        applications.append(app)
+        if app=='dspace':
+            compose=json.loads((root/'compose.json').read_text())
+            for row in compose['services'].values():estimated+=image(row['image'])
+            for volume in compose['volumes'].values():
+                obj=json.loads(dc('volume','inspect',volume['name']))[0]
+                estimated+=size(obj['Mountpoint'])
+            requirements[app]={'release_sha256':data['release_sha256'],'url':data['url'],
+                'images':{key:row['image'] for key,row in compose['services'].items()}}
+        else:
+            # Exact running/container identities, rather than tags that might move.
+            matrix={}
+            for service in ('wordpress','db'):
+                value=dc('compose','-f',str(root/'compose.yml'),'ps','-a','-q',service).decode().strip()
+                if not value:raise ValueError()
+                details=json.loads(dc('inspect',value))[0]
+                estimated+=image(details['Image']);matrix[service]=details['Image']
+                for mount in details.get('Mounts',[]):
+                    if mount.get('Type')=='volume':estimated+=size(mount['Source'])
+            estimated+=image(wpcli);matrix['cli']=references[wpcli]
+            requirements[app]={'images':matrix}
+    except (OSError,ValueError,KeyError,subprocess.SubprocessError):unknown.append(app)
+targets={'panel-settings':conf,'backup-plans':str(Path(owned)/'backup-plans'),
+    'cloud-connections':rclone,'panel-language':translation,'plan-cron-directory':'/etc/cron.d'}
+settings={}
+for role,path in (('panel-settings',conf),('panel-code',panel),('backup-plans',str(Path(owned)/'backup-plans')),('instance-registry',str(Path(owned)/'instances')),('cloud-connections',rclone),('panel-language',translation),('infrastructure-records',str(Path(owned)/'owned.tsv'))):
+    if Path(path).exists():settings[role]=path
+# Portable key exports/settings, never the GnuPG socket/cache tree.
+for name in ('config','secret-key.asc','public-key.asc','check.asc','recovery-kit.txt'):
+    path=Path(bk)/name
+    if path.exists():settings['backup-'+name.replace('.','-')]=str(path)
+for path in sorted(Path(bk).glob('restic-*.pass')):settings['restic-'+path.stem]=str(path)
+# Only Nexus-owned cron files, never a copy of unrelated jobs as executable cron.
+for path in sorted(Path('/etc/cron.d').glob('*')):
+    if path.name in ('koha_tasks','koha_zebra_queue','koha_es_watchdog','koha_broker','koha_sitemap','koha_messaging','koha_kei_opac') or path.name.startswith('koha-nexus-'):
+        settings['cron-'+path.name.replace('_','-').replace('.','-')]=str(path)
+# Private source publication settings are references, not target identities.
+for role,path in (('cloudflare-files','/etc/cloudflared'),('cloudflare-account-root','/root/.cloudflared'),('docker-settings','/etc/docker/daemon.json')):
+    if Path(path).exists():settings[role]=path
+for path in settings.values():
+    try:estimated+=size(path)
+    except (OSError,subprocess.SubprocessError):unknown.append('settings-size')
+fingerprint=''
+if (Path(bk)/'config').is_file():
+    fields=dict(line.split('=',1) for line in (Path(bk)/'config').read_text().splitlines() if '=' in line)
+    fingerprint=fields.get('fpr','')
+os_info={}
+for line in Path('/etc/os-release').read_text().splitlines():
+    if '=' in line:
+        key,value=line.split('=',1)
+        if key in ('ID','VERSION_ID'):os_info[key]=value.strip('"')
+if koha=='yes':
+    estimated+=size('/var/lib/koha/library')+size('/var/lib/mysql/koha_library')
+    try:requirements['koha']={'package_version':subprocess.check_output(['dpkg-query','-W','-f=${Version}','koha-common'],stderr=subprocess.DEVNULL,timeout=10).decode()}
+    except subprocess.SubprocessError:unknown.append('koha-package')
+print(json.dumps({'applications':applications,'unknown':unknown,'images':sorted(images),'settings':settings,'fingerprint':fingerprint,'key_file':str(Path(bk)/'secret-key.asc'),'panel_version':version,'system':dict(os_info,architecture=platform.machine()),'requirements':requirements,'targets':targets,'panel_languages':[code for code in languages.split() if __import__('re').fullmatch(r'[a-z]{2}(?:-[A-Z]{2})?',code)],'image_references':references,'estimated_source_bytes':estimated}))
+NEXUS_INV
+            ;;
+        *) return 2 ;;
+    esac
+}
 
 # kei_set_platforms: the platforms of this server a set can hold.
 kei_set_platforms() {
@@ -46430,6 +46661,12 @@ kei_task() {
         docker-install)  _kei_docker_task kei_docker_install "${1:-}" ;;
         docker-remove)   _kei_docker_task kei_docker_remove_engine "${1:-}" ;;
         docker-isolation) _kei_docker_task kei_docker_isolation_apply ;;
+        nexus-full)
+            local result rc
+            result=$(kei_nexus_recovery "$@"); rc=$?
+            [ "$rc" = 0 ] || return "$rc"
+            kei_result payload "$(printf '%s' "$result" | base64 -w0)"
+            ;;
         dspace) kei_dspace_runtime "$@" ;;
         dspace-backup-crypto)
             case "${1:-}" in
@@ -46791,6 +47028,7 @@ kei_task() {
 if [ -n "$KEI_CLI_MODE" ]; then
     trap - EXIT
     case "$KEI_CLI_MODE" in
+        --nexus-recovery-driver) kei_nexus_recovery_driver "${@:2}" ;;
         --status-json) kei_status_json ;;
         --export-diagnostics) kei_export_diagnostics "${2:-}" ;;
         --broker-heartbeat) broker_heartbeat ;;

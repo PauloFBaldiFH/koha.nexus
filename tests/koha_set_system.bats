@@ -303,3 +303,18 @@ PY
     run config.sh --task set-schedule time=off </dev/null 3>&-
     [ "$status" -eq 0 ] && [ ! -e /etc/cron.d/koha-nexus-backup-sets ]
 }
+
+
+@test "full Nexus capsule recovers real Koha and Tainacan after losing the active backup keyring" {
+    # Populate the verified standalone adapter cache for the installed config.sh.
+    run lib 'kei_nexus_recovery cache; kei_backup_kit >/dev/null'
+    [ "$status" -eq 0 ]
+    export KEI_NEXUS_TEST_PHRASE="$PHRASE"
+    run python3 "$REPO/tools/nexus_recovery_test.py" --disposable --applications koha,tainacan \
+        --driver /usr/local/bin/config.sh --output "$S/nexus-full-koha-tainacan.json"
+    echo "$output" | tail -n 10 >&3
+    [ "$status" -eq 0 ]
+    [ "$(decrypt)" = "$TOTP" ]
+    [ "$(cat "$(cat "$S/upload_path")/kn/sample.pdf")" = "scanned page" ]
+    [ "$(counts)" = "$(cat "$S/tn_counts")" ]
+}
