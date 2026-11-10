@@ -26,11 +26,12 @@ from .i18n import t
 
 KOHA, TAINACAN, BOTH = "koha", "tainacan", "both"
 DSPACE = "dspace"
+NEXUS = "nexus"
 KOHA_DSPACE, TAINACAN_DSPACE, ALL = "koha-dspace", "tainacan-dspace", "all"
 MEMBERS = {KOHA:(KOHA,), TAINACAN:(TAINACAN,), DSPACE:(DSPACE,), BOTH:(KOHA,TAINACAN),
            KOHA_DSPACE:(KOHA,DSPACE), TAINACAN_DSPACE:(TAINACAN,DSPACE), ALL:(KOHA,TAINACAN,DSPACE)}
-SCOPES = (KOHA, TAINACAN, DSPACE, BOTH, KOHA_DSPACE, TAINACAN_DSPACE, ALL)
-SCOPE_LABELS = {KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan", DSPACE: "DSpace", KOHA_DSPACE: "Koha + DSpace", TAINACAN_DSPACE: "Tainacan + DSpace", ALL: "Koha + Tainacan + DSpace"}
+SCOPES = (KOHA, TAINACAN, DSPACE, BOTH, KOHA_DSPACE, TAINACAN_DSPACE, ALL, NEXUS)
+SCOPE_LABELS = {NEXUS: "Full Nexus", KOHA: "Koha", TAINACAN: "Tainacan", BOTH: "Koha and Tainacan", DSPACE: "DSpace", KOHA_DSPACE: "Koha + DSpace", TAINACAN_DSPACE: "Tainacan + DSpace", ALL: "Koha + Tainacan + DSpace"}
 DSPACE_CODECS = {
     'gz': 'Gzip · balanced speed and size',
     'bz2': 'Bzip2 · higher CPU use',
@@ -47,7 +48,7 @@ def scopes(koha: bool, tainacan: bool, dspace: bool = False) -> list[str]:
     """The platforms the center offers: the installed ones, Koha first,
     and the two as a set when both are installed."""
     installed = {KOHA:koha, TAINACAN:tainacan, DSPACE:dspace}
-    return [scope for scope in SCOPES if all(installed[p] for p in MEMBERS[scope])]
+    return [scope for scope in SCOPES if scope in MEMBERS and all(installed[p] for p in MEMBERS[scope])]
 
 
 def pick_scope(wanted: str, offered: list[str]) -> str:

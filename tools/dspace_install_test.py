@@ -103,6 +103,23 @@ def main():
         from dspace_recovery_test import prepare, verify
         prepared, fixture = exercise(rt, output, recovery_capture=prepare)
         verify(rt, prepared, fixture)
+        from nexus_recovery_test import exercise as full_recovery
+        os.environ['KEI_NEXUS_DISPOSABLE'] = '1'
+        from dspace_browser_test import API
+        import hashlib
+        def mutate_full_fixture():
+            rt.compose('exec','-T','solr','curl','-fsS','-H','Content-Type: application/json',
+                '--data-binary','{"delete":{"id":"nexus-recovery-history"}}',
+                'http://127.0.0.1:8983/solr/statistics/update?commit=true')
+        def recovered_full_fixture():
+            admin=API(rt.state()['url']);admin.login(fixture['email'],fixture['password'])
+            assert hashlib.sha256(admin.request(fixture['content'],raw=True)).hexdigest()==fixture['sha256']
+            API(rt.state()['url']).request(fixture['content'],allowed=(401,403,404),raw=True)
+            from dspace_recovery_test import assert_history
+            assert_history(rt)
+        full_recovery(rt.driver, prepared[0].phrase, ['dspace'],
+            mutate=mutate_full_fixture, assert_restored=recovered_full_fixture,
+            output=output/'nexus-full-dspace-acceptance.json')
         # Simulate a disconnected client: its administrative container can live
         # on. Do not overlap a new install/start/stop with that still-running job.
         pending = rt.compose('run', '--rm', '--no-deps', '-d', '--entrypoint', 'sh', 'backend', '-c', 'sleep 60').strip()

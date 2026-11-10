@@ -66,11 +66,15 @@ async def _wait_for(pilot, screen_type, tries=60):
     raise AssertionError(f"{screen_type.__name__} never shown (on {type(pilot.app.screen).__name__})")
 
 
-def test_manual_backup_flow(tmp_path):
+def test_manual_backup_flow(tmp_path, monkeypatch):
     """Save screen: the folder typed is created, the backup runs, the scp
     command for the person's computer is shown (tests/test_save_backup.py
     covers the screen's own rules)."""
     from kei_panel.screens.save_backup import SaveBackupScreen
+    from kei_panel import demo
+    monkeypatch.setitem(demo._SCRIPTS, 'info', [
+        line.replace('real_home=/root', 'real_home=' + str(tmp_path))
+        for line in demo._SCRIPTS['info']])
 
     async def main():
         app = _app()

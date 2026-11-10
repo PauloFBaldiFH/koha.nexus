@@ -50,6 +50,9 @@ on:
   push:
     paths:
       - "installer"
+      - "platforms/nexus/**"
+      - "tools/nexus_recovery_test.py"
+      - "tests/test_nexus_recovery.py"
       - "uninstall.sh"
       - "tests/proxy.bats"
       - "tests/proxy_system.bats"
@@ -80,6 +83,9 @@ on:
   pull_request:
     paths:
       - "installer"
+      - "platforms/nexus/**"
+      - "tools/nexus_recovery_test.py"
+      - "tests/test_nexus_recovery.py"
       - "uninstall.sh"
       - "tests/proxy.bats"
       - "tests/proxy_system.bats"
