@@ -35,7 +35,7 @@ start)
                 mkdir -p /usr/local/share/ca-certificates && cp /ca.crt /usr/local/share/ca-certificates/test-proxy.crt
                 printf "Acquire::https::CAInfo \"/usr/local/share/ca-certificates/test-proxy.crt\";\nAcquire::https::Proxy \"%s\";\n" "$KEI_TEST_PROXY" > /etc/apt/apt.conf.d/99proxy
             fi
-            apt-get update -qq
+            bash /apt-ready.sh      # retries an unreachable mirror instead of failing later
             apt-get install -y -qq --no-install-recommends '"$packages"' >/dev/null
             if [ -n "${KEI_TEST_PROXY:-}" ]; then
                 update-ca-certificates >/dev/null 2>&1
@@ -45,7 +45,7 @@ start)
             fi'
         ca=(); [ -n "${KEI_TEST_CA:-}" ] && ca=(-v "$KEI_TEST_CA:/ca.crt:ro")
         docker rm -f "$name-build" >/dev/null 2>&1 || true
-        docker run --name "$name-build" "${ca[@]}" -e KEI_TEST_PROXY="${KEI_TEST_PROXY:-}" "$image" bash -c "$prep"
+        docker run --name "$name-build" "${ca[@]}" -v "$repo/tests/system/apt-ready.sh:/apt-ready.sh:ro" -e KEI_TEST_PROXY="${KEI_TEST_PROXY:-}" "$image" bash -c "$prep"
         docker commit "$name-build" "$tag" >/dev/null
         docker rm "$name-build" >/dev/null
     fi

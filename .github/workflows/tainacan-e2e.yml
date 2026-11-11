@@ -16,12 +16,14 @@ on:
       - "installer"
       - "tests/e2e/**"
       - "tests/system/container.sh"
+      - "tests/system/apt-ready.sh"
       - ".github/workflows/tainacan-e2e.yml"
   pull_request:
     paths:
       - "installer"
       - "tests/e2e/**"
       - "tests/system/container.sh"
+      - "tests/system/apt-ready.sh"
       - ".github/workflows/tainacan-e2e.yml"
 
 permissions:
