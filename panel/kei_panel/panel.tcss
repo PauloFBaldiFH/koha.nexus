@@ -115,6 +115,7 @@ Button.small {
     background: $boost;
 }
 .action-card .action-icon { text-style: bold; }
+.action-card:disabled { opacity: 60%; }
 .action-card .action-text { text-style: bold; color: $text; }
 .action-card .action-hint { color: $text-muted; padding-top: 1; }
 
@@ -908,6 +909,12 @@ App.-plain #picker-drop {
 /* Unified schedule editor: controls wrap on SSH-sized terminals. */
 .sc-controls { height: auto; layout: horizontal; padding-top: 1; }
 .sc-controls Switch { width: 9; }
+.bk-wait { color: $text-muted; height: 2; }
+.bk-wait.-warn { color: $warning; height: auto; }
+/* The line above the actions says it is reading: the loader takes no room,
+   so nothing moves when the read ends. */
+#view-backups #platform-loader { height: 0; }
+.bk-section-title { text-style: bold; padding-top: 1; }
 .sc-switch-label { width: auto; height: 3; content-align: left middle; margin-right: 1; }
 .sc-controls Select { width: 19; margin-right: 1; }
 .sc-controls Input { width: 12; margin-right: 1; }

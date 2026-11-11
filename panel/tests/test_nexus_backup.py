@@ -94,9 +94,6 @@ def test_full_backup_tab_only_reads_and_stays_reachable_in_small_terminal(monkey
             assert not view.query_one('#bk-plans').display
             codec=view.query_one('#bk-nexus-codec',Select)
             assert not codec.disabled and codec.value=='gz'
-            chosen=view.query_one('#scope-nexus')
-            scroll=view.query_one('#bk-scopes')
-            assert chosen.region.x>=scroll.content_region.x
-            assert chosen.region.right<=scroll.content_region.right
+            assert view.query_one('#bk-scope',Select).value=='nexus'
             assert all(args==('status',) for name,args in ran if name=='nexus-full')
     asyncio.run(exercise())

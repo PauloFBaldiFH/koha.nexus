@@ -1517,7 +1517,7 @@ Entra no U5 (tela por sistema) e no U7 (teste pelo Windows na bandeja).
 
 | PR | Muda |
 |---|---|
-| U2 | Mais o aviso “remoção do Koha ainda não disponível” na escolha de remoção |
+| U2 | Mais o aviso “remoção do Koha ainda não disponível” na escolha de remoção. Entregue: ações no topo, desenhadas desde a abertura, seletor “Mostrar”, leitura que falha mantém as ações. A chave única e as seções recolhíveis passam para o U8, junto com o texto do backup completo |
 | U5 | Árvore da 17.1 (sem juntar Aparência e IA, sem gaveta), Central de idiomas da 17.2 com o cartão do Tainacan, tela de endereços da 17.4 |
 | U7 | Teste de acesso feito pelo Windows, gravado para a tela de endereços |
 | **U11** (novo) | Remoção do Koha com backup verificado e dados guardados (17.3). Esforço G. Depende de U2 |
