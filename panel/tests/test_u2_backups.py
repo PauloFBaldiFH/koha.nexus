@@ -1,7 +1,7 @@
 """U2 acceptance: the Backup center shows its actions first.
 
 - The action cards are drawn as the center opens, right after the platform
-  choice, disabled while the state is read, and the first one is on screen
+  choice, usable while the state is read, and the first one is on screen
   without scrolling at 80x24 and 160x48.
 - Reading never moves them: the first card stays where it was.
 - A read that fails keeps every action and says what could not be read.
@@ -74,7 +74,7 @@ def test_actions_are_drawn_first_and_do_not_move_while_reading(demo, monkeypatch
             view = await open_center(app, pilot, scope)
             await pilot.pause(.3)
             cards = shown(view)
-            assert cards and all(c.disabled for c in cards)
+            assert cards and not any(c.disabled for c in cards)
             assert view.query_one('#bk-wait').display
             first = cards[0]
             top = first.region.y

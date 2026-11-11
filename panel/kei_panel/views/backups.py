@@ -35,7 +35,7 @@ from .dashboard import backup_card, human_bytes
 from .platform import ENCRYPTION_NOTE, PlatformSectionView
 
 
-READING = "Reading the backup state… The actions below become available as soon as it is read."
+READING = "Reading the backup state… The actions below can already be used; each one checks the server first."
 READ_FAILED = ("Part of the backup state could not be read (${what}). The actions stay available: each one checks "
                "the server again before doing anything. Use Refresh to read again.")
 
@@ -168,8 +168,8 @@ class BackupCenterView(PlatformSectionView):
         return platforms.Facts(status={}, koha=self.app.koha_installed, has_task=self.app.bridge.has_task)
 
     def _waiting(self, on: bool, failed: str = "") -> None:
-        for card in self.query(ActionCard):
-            card.disabled = on
+        # The cards stay usable while reading: each routine checks the server
+        # again before doing anything, so waiting here would only slow people.
         note = self.query_one("#bk-wait", Static)
         if on:
             note.update(t(READING))
