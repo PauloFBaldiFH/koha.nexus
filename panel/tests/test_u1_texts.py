@@ -26,7 +26,11 @@ SAME = {'Koha', 'online', 'offline'}
 
 
 @pytest.fixture
-def pt():
+def pt(monkeypatch, tmp_path):
+    # Only the repository cache: a downloaded copy left by another test or
+    # an older install must not decide what these tests read.
+    import kei_panel.i18n as i18n
+    monkeypatch.setattr(i18n, 'CONFIG_DIR', tmp_path)
     translator = Translator('pt', ROOT / 'installer', False)
     install(translator)
     yield translator
