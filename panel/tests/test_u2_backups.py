@@ -59,15 +59,17 @@ async def read_done(pilot, view):
 @pytest.mark.parametrize('scope', ['koha', 'dspace', 'both'])
 def test_actions_are_drawn_first_and_do_not_move_while_reading(demo, monkeypatch, size, scope):
     from kei_panel.views.backups import BackupCenterView
-    gate = asyncio.Event()
     original = BackupCenterView.read_facts
+    gates = []           # made inside the loop: Python 3.9 binds an Event to it
 
     async def slow(self):
-        await gate.wait()
+        await gates[0].wait()
         return await original(self)
     monkeypatch.setattr(BackupCenterView, 'read_facts', slow)
 
     async def run():
+        gates.append(asyncio.Event())
+        gate = gates[0]
         app = make_app()
         async with app.run_test(size=size) as pilot:
             await pilot.pause(.5)
