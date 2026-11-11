@@ -7,7 +7,8 @@
 # "Unable to locate package". Here a warning is a failure: it waits and
 # tries again, and on Ubuntu it moves to another official mirror (the
 # Azure one GitHub runners use, then kernel.org) before giving up.
-# It never installs anything; the caller does.
+# It never installs anything; the caller does. The same script serves the
+# containers and the GitHub runner itself (run it with sudo there).
 set -u
 
 APT_READY_ATTEMPTS="${APT_READY_ATTEMPTS:-5}"
@@ -26,7 +27,8 @@ ubuntu_mirror() {
     # $1: host that replaces archive.ubuntu.com and security.ubuntu.com
     grep -qi '^ID=ubuntu' "$ROOT/etc/os-release" 2>/dev/null || return 0
     local f
-    for f in "$ROOT"/etc/apt/sources.list.d/*.sources "$ROOT"/etc/apt/sources.list; do
+    # apt-mirrors.txt: the mirror list GitHub's own Ubuntu runners read.
+    for f in "$ROOT"/etc/apt/sources.list.d/*.sources "$ROOT"/etc/apt/sources.list "$ROOT"/etc/apt/apt-mirrors.txt; do
         [ -f "$f" ] || continue
         sed -i -E "s#(https?://)([a-z.]*archive\.ubuntu\.com|security\.ubuntu\.com|mirrors\.edge\.kernel\.org)/ubuntu#\1$1/ubuntu#g" "$f"
     done
