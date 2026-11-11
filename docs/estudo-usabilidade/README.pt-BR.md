@@ -48,6 +48,7 @@ Legenda de classificação usada em todo o documento:
 14. [Plano de validação](#14-plano-de-validação)
 15. [Decisões e testes que dependem de Paulo](#15-decisões-e-testes-que-dependem-de-paulo)
 16. [Aprovação e acréscimos (11/11/2026)](#16-aprovação-e-acréscimos-11112026)
+17. [Revisão do plano: navegação, idiomas, remoção do Koha e endereços](#17-revisão-do-plano-navegação-idiomas-remoção-do-koha-e-endereços)
 
 ---
 
@@ -408,6 +409,10 @@ em 80×24 com um grupo aberto por vez (os grupos já recolhem).
 
 ## 6. Árvore proposta da navegação
 
+> **Revisada na seção 17** (11/11/2026): Aparência e IA continuam separadas,
+> não há “Mais ferramentas do Koha”, Idiomas continua visível como central e a
+> remoção do Koha entra como etapa própria (U11).
+
 Uma instalação de cada sistema (recomendação da seção 9). Os nomes entre
 aspas são exemplos de nomes escolhidos pela pessoa.
 
@@ -702,6 +707,9 @@ agenda. A página “Backups e agendamentos” de cada sistema mostra a mesma
 lista filtrada (mesma fonte, `schedule_controls`).
 
 ### 7.8. Endereços e acesso
+
+> **Substituído pelo esboço da seção 17.4**: o endereço configurado, as
+> alternativas detectadas e o acesso verificado aparecem separados.
 
 ```text
 ┌ Endereços e acesso · Museu Municipal · Tainacan ───────────────────────┐
@@ -1347,3 +1355,169 @@ suporte.
 | U3 | Inclui diagnóstico inicial (lista) e final (relatório) para Tainacan e DSpace |
 | **U9** (novo) | `PortField` comum; porta editável nos três; portas efetivas no Windows em vez de lista fixa. Esforço G |
 | **U10** (novo, substitui A1) | Koha com uma ou duas portas na instalação e em Endereços e acesso. Esforço G. Depende de U9 |
+
+---
+
+## 17. Revisão do plano: navegação, idiomas, remoção do Koha e endereços
+
+Em 11/11/2026, depois do merge do U1, Paulo pediu quatro ajustes. Eles
+substituem o que as seções 5, 6, 7.8 e 9 diziam sobre esses pontos e entram
+nos PRs indicados em 17.5.
+
+### 17.1. Aparência e IA separadas; sem gaveta de ferramentas
+
+Menos itens na lateral não pode tornar uma ferramenta mais difícil de achar.
+
+- “Aparência do OPAC e STAFF” e “IA” continuam como **duas** entradas, como
+  hoje. O atalho `a` continua abrindo a IA e `o` a Aparência.
+- Não existe “Mais ferramentas do Koha”. Mensagens e interoperabilidade,
+  Motor de busca e indexação, Configurações e parâmetros e Segurança do Koha
+  continuam como entradas próprias, sob o divisor “ferramentas” do grupo Koha.
+- O que a seção 6 ganha continua: os itens-padrão de cada sistema (Acesso
+  administrativo, Endereços e acesso, Backups e agendamentos, Diagnóstico e
+  manutenção) no topo do grupo, e a lateral agrupada que recolhe. O grupo Koha
+  fica com 4 itens-padrão + 9 ferramentas, cada uma com o mesmo nome de hoje.
+
+```text
+📚 Biblioteca Central · Koha                k
+   🔐 Acesso administrativo
+   🌐 Endereços e acesso
+   💾 Backups e agendamentos
+   🩺 Diagnóstico e manutenção
+   ── ferramentas ──
+   🪄 Ferramenta Mágica de Importação       i
+   📚 Ferramentas da biblioteca             l
+   📡 Servidores Z39.50 / SRU               z
+   🤖 IA                                    a
+   🎨 Aparência do OPAC e STAFF             o
+   📨 Mensagens e interoperabilidade        m
+   🔍 Motor de busca e indexação
+   🔧 Configurações e parâmetros do Koha
+   🛡 Segurança do Koha
+```
+
+Teste de aceite (U5): cada entrada de hoje continua com o mesmo nome e
+atalho; nenhuma entrada passa a viver dentro de outra.
+
+### 17.2. Central de idiomas visível
+
+Idiomas não vai para dentro de “Diagnóstico e manutenção”. A seção “Idiomas”
+continua na lateral do servidor como **Central de idiomas**, organizada por
+painel e sistema, e cada parte usa a mesma configuração que o próprio
+aplicativo usa:
+
+```text
+┌ Central de idiomas ────────────────────────────────────────────────────┐
+│ Painel koha.nexus     Português (Brasil)              [Mudar]          │
+│ Koha (Biblioteca)     OPAC: pt-BR, en · Equipe: pt-BR  [Gerenciar]      │
+│                       baixar pacote · ativar · ver instalados          │
+│ Tainacan (Museu)      WordPress: pt_BR                [Mudar]          │
+│ DSpace (Repositório)  Interface: pt-BR, en · padrão pt-BR [Escolher]   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+- Painel: o idioma do próprio painel (hoje vem junto com “Baixar e ativar”).
+  Mudar só o painel não mexe no Koha.
+- Koha: as rotinas que já existem (`languages`, `lang-download`,
+  `lang-activate`, `lang-list`, lista completa), sobre `koha-translate` e as
+  preferências `language`/`OPACLanguages`.
+- Tainacan: `kei_tainacan_language` (já existe no instalador como
+  `tainacan-language`, ainda sem cartão no painel), que usa
+  `wp language core install --activate` e os pacotes do plugin e do tema.
+- DSpace: `dspace-languages`, que já escolhe as traduções da interface e o
+  idioma padrão.
+- Sistema ausente: a linha aparece com “não instalado”, sem botão.
+- Em cada sistema, “Diagnóstico e manutenção” pode ter um atalho “Idiomas
+  deste sistema” que abre a central já filtrada. O lugar principal é a central.
+
+Entra no U5 (navegação), com o cartão novo do Tainacan.
+
+### 17.3. Remoção do Koha como etapa explícita (U11)
+
+Hoje “Remover instância” oferece só Tainacan e DSpace, e o Koha simplesmente
+não aparece (`routines/instances.py`, função `remove`). Isso passa a ser dito
+na tela e a remoção vira uma etapa própria.
+
+**Já agora (no U2):** quando o Koha está instalado, a escolha de remoção
+mostra a linha “Koha: remoção ainda não disponível no painel” com o motivo, e
+o texto avisa que nada do Koha é tocado.
+
+**U11, remoção do Koha (esforço G):**
+
+1. Plano: o que sai (a instância `library` via `koha-remove`, o banco
+   `koha_library` e seu usuário, o site do Apache, as tarefas de cron do
+   koha.nexus ligadas ao Koha, as entradas do Koha no registro de
+   propriedade) e o que fica (pacote `koha-common`, MariaDB, Apache,
+   Elasticsearch, Tainacan, DSpace, túnel e certificados de outros sistemas,
+   backups já feitos).
+2. Backup de segurança verificado antes de qualquer remoção: SQL completo,
+   configuração da instância (`/etc/koha/sites/library`), arquivos enviados e
+   capas. Sem backup verificado, nada é removido. O instalador já faz isso ao
+   reinstalar (`install_task_remove_previous`), então a rotina reaproveita o
+   mesmo caminho.
+3. Duas escolhas, como no Tainacan e no DSpace: “remover o Koha e guardar os
+   dados para recuperar depois” (padrão; o pacote de recuperação fica na
+   pasta de backups e a Central de backups sabe restaurá-lo numa reinstalação)
+   ou “remover e apagar os dados” (exige digitar o nome).
+4. Limites claros na tela: não desinstala pacotes do sistema, não mexe em
+   portas ou firewall usados por outros sistemas, e a recuperação exige
+   reinstalar o Koha na mesma versão principal.
+5. Aceite: em máquina descartável da CI, instalar Koha + Tainacan, remover o
+   Koha guardando os dados, provar que o Tainacan seguiu igual (checksums),
+   reinstalar o Koha e restaurar o pacote.
+
+### 17.4. Endereços: configurado, alternativa e verificado
+
+Mostrar localhost, IP da rede e domínio como três endereços igualmente
+utilizáveis induz ao erro. No DSpace, a interface só renderiza no servidor
+para o nome do `baseUrl` e, por outro nome, cai para o navegador, que chama a
+API pelo endereço configurado: por isso `localhost:8100` deu erro 500 no
+Windows (registro do PR #358). No WordPress, `siteurl`/`home` redirecionam
+para o endereço configurado e os cookies de login valem só para ele. No Koha,
+`OPACBaseURL` e `staffClientBaseURL` entram em links e redirecionamentos.
+
+A tela passa a separar três coisas:
+
+```text
+┌ Endereços e acesso · Repositório Institucional · DSpace ───────────────┐
+│ Endereço configurado (use este)                                        │
+│   http://192.168.1.20:8100                                             │
+│   ✓ verificado agora a partir deste servidor                           │
+│   ? não verificado a partir do Windows        [Verificar pelo Windows] │
+│                                                                        │
+│ Alternativas detectadas (podem redirecionar ou falhar no login)        │
+│   http://localhost:8100   leva ao endereço configurado; login pode falhar│
+│                                                                        │
+│ Na internet   não publicado                          [Publicar…]       │
+│ [Mudar o endereço configurado…]   [Testar acesso]                       │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Endereço configurado**: o que o aplicativo usa para montar links e
+  redirecionar (DSpace `dspace.ui.url`/`dspace.server.url`; WordPress
+  `home`/`siteurl`; Koha `OPACBaseURL`/`staffClientBaseURL`). Só ele recebe
+  “use este”, “Abrir” e “Copiar” em destaque.
+- **Alternativas detectadas**: outros nomes que chegam ao mesmo serviço
+  (localhost, outros IPs da máquina). Aparecem em letra comum, com o efeito
+  esperado (“leva ao endereço configurado”, “login pode falhar”), sem
+  “Abrir” em destaque.
+- **Acesso verificado**: cada ✓ diz **de onde** foi testado (deste
+  servidor; pelo Windows; da internet pelo túnel) e quando. Um teste de
+  dentro do WSL não prova o acesso pelo Windows nem pela rede: no
+  Windows/WSL o indicador da bandeja faz o teste do lado do Windows e grava o
+  resultado; sem esse teste a linha fica “? não verificado a partir do
+  Windows”.
+- Nada é chamado de “funcionando” sem teste. “Mudar o endereço configurado”
+  mostra o plano (o que é reescrito em cada aplicativo e quais
+  redirecionamentos mudam) e pede confirmação.
+
+Entra no U5 (tela por sistema) e no U7 (teste pelo Windows na bandeja).
+
+### 17.5. Sequência de PRs depois desta revisão
+
+| PR | Muda |
+|---|---|
+| U2 | Mais o aviso “remoção do Koha ainda não disponível” na escolha de remoção |
+| U5 | Árvore da 17.1 (sem juntar Aparência e IA, sem gaveta), Central de idiomas da 17.2 com o cartão do Tainacan, tela de endereços da 17.4 |
+| U7 | Teste de acesso feito pelo Windows, gravado para a tela de endereços |
+| **U11** (novo) | Remoção do Koha com backup verificado e dados guardados (17.3). Esforço G. Depende de U2 |
