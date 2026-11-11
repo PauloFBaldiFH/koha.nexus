@@ -46,6 +46,25 @@ def row_text(row: schedules.Row) -> Text:
     return text
 
 
+
+def day_options(freq, current=0):
+    """Day choices for a frequency: weekday names, days of the month, or the
+    unchanged hidden value for daily and custom schedules."""
+    if freq == 'weekly':
+        return [(t(name), n) for n, name in enumerate(cron.WEEKDAYS)]
+    if freq == 'monthly':
+        return [(t("Day ${n}", n=n), n) for n in range(1, 32)]
+    return [(str(current), current)]
+
+
+def day_value(freq, current):
+    """Keep the chosen day when it fits the frequency; otherwise its first day."""
+    if freq not in ('weekly', 'monthly'):
+        return current if isinstance(current, int) else 0
+    allowed = range(0, 7) if freq == 'weekly' else range(1, 32)
+    return current if isinstance(current, int) and current in allowed else allowed[0]
+
+
 class SchedulesView(SectionView):
     def __init__(self, section):
         super().__init__(section)
@@ -269,14 +288,16 @@ class SchedulesView(SectionView):
             values = self.drafts.get((row.source, row.key), control.values())
             toolbar = Horizontal(classes="sc-controls")
             await block.mount(toolbar)
-            await toolbar.mount(Switch(values['enabled'], id=f"sc-on-{i}", disabled=not control.available),
+            await toolbar.mount(Label(t("Active"), classes="sc-switch-label"),
+                Switch(values['enabled'], id=f"sc-on-{i}", disabled=not control.available),
                 Select([(t(cron.FREQS[f]), f) for f in control.frequencies], value=values['freq'], allow_blank=False, id=f"sc-freq-{i}"),
-                Select([(str(n), n) for n in range(0,32)], value=values['day'], allow_blank=False, id=f"sc-day-{i}"),
+                Select(day_options(values['freq'], day_value(values['freq'], values['day'])), value=day_value(values['freq'], values['day']), allow_blank=False, id=f"sc-day-{i}"),
                 Input(values['time'], id=f"sc-time-{i}", placeholder="HH:MM", max_length=5),
                 Input(values['raw'], id=f"sc-raw-{i}", placeholder=t("Cron expression")),
                 Button(t("Save"), id=f"sc-save-{i}", disabled=not control.available))
             button = toolbar.query_one(f"#sc-save-{i}", Button)
             button.schedule_control = control
+            toolbar.query_one(f"#sc-day-{i}", Select).day_kind = values['freq']
             button.tooltip = t("Review and save this schedule")
             self.query_one(f"#sc-on-{i}").tooltip = t("Enabled after saving")
             self.query_one(f"#sc-freq-{i}").tooltip = t("Frequency")
@@ -300,13 +321,14 @@ class SchedulesView(SectionView):
         for key in ('sc-freq','sc-day','sc-time','sc-raw'):
             self.query_one(f"#{key}-{i}").disabled = not enabled
         day = self.query_one(f"#sc-day-{i}", Select)
-        current = day.value
-        if freq == 'weekly':
-            day.set_options([(t(name), n) for n,name in enumerate(cron.WEEKDAYS)])
-            day.value = current if isinstance(current,int) and 0 <= current <= 6 else 0
-        elif freq == 'monthly':
-            day.set_options([(t("Day ${n}", n=n), n) for n in range(1,32)])
-            day.value = current if isinstance(current,int) and 1 <= current <= 31 else 1
+        if freq in ('weekly', 'monthly') and getattr(day, 'day_kind', None) != freq:
+            target = day_value(freq, day.value)
+            day.set_options(day_options(freq))
+            day.day_kind = freq
+            # set_options already picked the first day; when that equals the
+            # target, Select keeps the old label (e.g. "1" instead of Monday).
+            day.set_reactive(Select.value, Select.BLANK)
+            day.value = target
         day.display = freq in ('weekly','monthly')
         self.query_one(f"#sc-time-{i}").display = freq != 'custom'
         self.query_one(f"#sc-raw-{i}").display = freq == 'custom'

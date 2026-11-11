@@ -33,6 +33,32 @@ def origin(value) -> str:
         return ''
 
 
+# Raw values from the DSpace runtime are protocol words. Each one is shown with
+# a sentence-case English label that has its own translation, never as is.
+STATE_LABELS = {
+    'absent': 'Not installed', 'installing': 'Installing', 'installed': 'Installed and running',
+    'starting': 'Starting', 'stopped': 'Stopped', 'degraded': 'Some services stopped',
+    'unavailable': 'Docker unavailable', 'failed': 'Installation failed', 'data-kept': 'Removed, data kept',
+}
+PHASE_LABELS = {
+    'images': 'Preparing images', 'network': 'Preparing the network', 'dependencies': 'Starting database and search',
+    'migration': 'Preparing the database', 'application': 'Starting DSpace', 'proxy': 'Publishing the address',
+    'ready': 'Installation complete',
+}
+SERVICE_LABELS = {
+    'running': 'Running', 'exited': 'Stopped', 'created': 'Created, not started', 'restarting': 'Restarting',
+    'paused': 'Paused', 'dead': 'Failed', 'removing': 'Being removed', 'missing': 'Not found',
+}
+BUILD_NOTE = 'Images built on this server from a pinned, verified recipe; amd64 processor'
+
+
+def label(table: dict[str, str], value) -> str:
+    """Translated label for a runtime value; unknown values say so plainly."""
+    if value in (None, ''):
+        return t('Unknown')
+    return t(table[value]) if isinstance(value, str) and value in table else t('Unknown') + ' (' + str(value) + ')'
+
+
 class DSpaceSummary(Grid):
     def __init__(self, **kwargs):
         super().__init__(classes='status-grid', **kwargs)
@@ -54,15 +80,15 @@ class DSpaceSummary(Grid):
     def show(self, data: dict) -> None:
         url = origin(data.get('url'))
         external = data.get('proxy_status') == 'external-configuration-required'
-        note = t('External proxy: verify both routes; the public address has not been checked.') if external else t('Experimental DSpace')
+        note = t('External proxy: verify both routes; the public address has not been checked.') if external else ''
         for key, link in (('site', url), ('login', url + '/login' if url else '')):
             self.query_one('#ds-' + key, LinkCard).set_url(link, note, 'warn' if external else '')
         self.query_one('#ds-state', StatusCard).set(
-            t(str(data.get('status', 'Unknown'))), t('Process state; health is checked only by Diagnosis'), '')
-        self.query_one('#ds-phase', StatusCard).set(str(data.get('phase', '-')), t('Data are preserved after an interrupted operation'), '')
-        self.query_one('#ds-version', StatusCard).set('DSpace 10.1', t('Experimental; amd64 only'), 'warn')
+            label(STATE_LABELS, data.get('status')), t('Process state; health is checked only by Diagnosis'), '')
+        self.query_one('#ds-phase', StatusCard).set(label(PHASE_LABELS, data.get('phase')), t('Data are preserved after an interrupted operation'), '')
+        self.query_one('#ds-version', StatusCard).set('DSpace 10.1', t(BUILD_NOTE), '')
         services = data.get('services') if isinstance(data.get('services'), dict) else {}
         for name in ('postgres', 'solr', 'backend', 'ui'):
             state = services.get(name, 'unknown')
-            self.query_one('#ds-' + name, StatusCard).set(t(str(state)), t('Local container state'),
+            self.query_one('#ds-' + name, StatusCard).set(label(SERVICE_LABELS, state), t('Local container state'),
                                                                         'ok' if state == 'running' else 'warn')

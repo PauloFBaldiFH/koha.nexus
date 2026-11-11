@@ -5,7 +5,7 @@ Four facts are kept apart for every platform, never folded into one
 "operational" flag:
 
   supported  this version of the panel can install and administer it
-             (Koha, Tainacan and experimental DSpace; AtoM is planned)
+             (Koha, Tainacan and DSpace; AtoM is planned)
   detected   an installation was found (Koha: its koha-conf.xml exists,
              the installer's is_koha_installed); None = not looked for
   services   its system services: active, partial, inactive, unknown, or
@@ -145,11 +145,11 @@ def dspace_mode(facts) -> str:
 def dspace_problem(facts) -> str:
     mode = dspace_mode(facts)
     return t({
-        "absent": "DSpace is experimental. Installation needs a reviewed image catalog, Docker and a web proxy; each change has its own plan and confirmation.",
+        "absent": "DSpace is not installed. Installation builds its images on this server from a pinned, verified recipe (amd64 processor) and needs Docker and a web proxy; each change has its own plan and confirmation.",
         "incomplete": "DSpace installation is incomplete. Read the diagnosis before resuming; data and the migration journal are preserved.",
         "failing": "DSpace is stopped or unavailable. Diagnose first, then start its services; this does not require restoring a backup.",
         "unknown": "DSpace state could not be read. Retry Refresh or use Diagnosis and Logs below.",
-        "installed": "Experimental DSpace: encrypted individual backups are in the Backup center. Explicit schedules and cloud copies are in the same center; address/HTTPS and reviewed updates remain in the DSpace menu. State and addresses are in the DSpace dashboard tab.",
+        "installed": "DSpace installed: encrypted individual backups are in the Backup center. Explicit schedules and cloud copies are in the same center; address/HTTPS and reviewed updates remain in the DSpace menu. State and addresses are in the DSpace dashboard tab.",
     }[mode])
 
 

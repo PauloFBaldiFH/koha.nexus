@@ -47,6 +47,7 @@ Legenda de classificação usada em todo o documento:
 13. [Sequência de PRs](#13-sequência-de-prs)
 14. [Plano de validação](#14-plano-de-validação)
 15. [Decisões e testes que dependem de Paulo](#15-decisões-e-testes-que-dependem-de-paulo)
+16. [Aprovação e acréscimos (11/11/2026)](#16-aprovação-e-acréscimos-11112026)
 
 ---
 
@@ -1136,7 +1137,7 @@ Trilha 1 (usabilidade, sem mudança de arquitetura) primeiro; trilha 2
 | **U6** | Nome visível: adoção no registro, nome em lateral, abas, backups, agendas, confirmações | U5 | M | Renomear não muda recursos; nome aparece nos 6 lugares |
 | **U7** | Indicador do Windows: `summary` no status, tray e `nexus_core` | U6 (nomes; funciona sem) | M | Matriz da seção 11 com status simulado + Windows CI `windows-tools` |
 | **U8** | Backup completo: explicação e verificação do que volta (texto + tabela da 7.6) | U2 | P | Revisão de texto |
-| **A1** | Koha: equipe por nome com domínio (opcional) | decisão de Paulo | G | Apache configtest/rollback; acesso por IP preservado |
+| **A1** | Substituído por U10 (seção 16.1) | — | — | — |
 | **A2…** | Várias instâncias (Tainacan → DSpace → Koha) | decisão de Paulo | GG | Duas instâncias reais do mesmo tipo |
 
 U1 e U2 podem ir em paralelo. U3 e U4 são do DSpace e reaproveitam para os
@@ -1221,3 +1222,128 @@ python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -r panel/requirements.txt
    aparecer (compara com a medição simulada).
 4. Se A1 for adiante: testar `http://admin.localhost` num navegador do Windows
    apontando para o WSL (10.5).
+
+---
+
+## 16. Aprovação e acréscimos (11/11/2026)
+
+Paulo aprovou o plano em 11/11/2026, com as recomendações da seção 15
+(uma instalação de cada sistema com nome visível; árvore da seção 6; sem caixa
+“Usar Docker”; ordem U1–U8), e pediu três acréscimos. Texto aprovado para o
+lugar de “experimental” em Requisitos e limitações: “Imagens compiladas neste
+servidor a partir de uma receita fixada e verificada; processador amd64”.
+
+### 16.1. Koha: uma porta ou duas, escolhido na instalação
+
+A escolha aparece na instalação do Koha e depois em Endereços e acesso:
+
+```text
+┌ Instalar Koha · Acesso ────────────────────────────────────────────────┐
+│ Como as pessoas vão abrir o catálogo e a área da equipe?               │
+│                                                                        │
+│ (•) Duas portas (recomendado)                                          │
+│     Catálogo  http://192.168.1.20        Equipe  http://192.168.1.20:8080│
+│     Funciona pelo IP, sem configurar nomes na rede.                    │
+│                                                                        │
+│ ( ) Uma porta, com nomes                                               │
+│     Domínio da instituição: [biblioteca.org.br              ]          │
+│     Catálogo  http://biblioteca.org.br                                 │
+│     Equipe    http://admin.biblioteca.org.br                           │
+│     Os dois nomes precisam apontar para este servidor (DNS ou túnel).  │
+│     Pelo IP abre só o catálogo.                                        │
+│                                         [Continuar]  [Voltar]          │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Regras:
+
+- “Uma porta” só pode ser confirmada com um domínio preenchido. O painel
+  resolve os dois nomes e avisa (sem bloquear) se ainda não apontam para cá.
+- Implementação: vhost da equipe por nome na porta 80 (`ServerName
+  admin.<domínio>`), mantendo o vhost da 8080 ativo **somente em
+  127.0.0.1** como acesso de recuperação. Nunca `INTRAPORT=""` (seção 10.2).
+- O firewall da equipe (hoje regra UFW na 8080) passa a ser `Require ip` no
+  vhost por nome; os dois modos mostram a mesma lista de redes permitidas.
+- Instalações existentes continuam em duas portas. Trocar para uma porta é
+  uma ação com plano, `apache2ctl configtest`, rollback e registro em
+  `owned.tsv`, como as demais mudanças de Apache.
+- Túnel e endereço gratuito não mudam: já usam nomes na 443.
+- `admin.localhost` para uso só no próprio computador continua 🖥 (teste em
+  Windows/WSL antes de oferecer).
+
+### 16.2. Porta padrão conferida e editável em cada instalação
+
+Mesmo componente nos três instaladores (`PortField`):
+
+```text
+Porta do site: [8100]  ✓ livre
+Porta do site: [8090]  ✗ em uso por Museu Municipal (Tainacan) · sugestão 8091 [Usar]
+Porta do site: [  80]  ✗ em uso por outro programa (nginx) · sugestão 8081 [Usar]
+```
+
+| Sistema | Hoje | Padrão proposto |
+|---|---|---|
+| Koha | 80/8080 fixos; `define_koha_sites_conf` regrava a cada execução | 80 e 8080, editáveis |
+| Tainacan | escolhe sozinho a primeira livre de 8090–8099 | 8090, mostrada e editável |
+| DSpace | pede o endereço inteiro | 8100, editável; endereço montado a partir dela |
+
+Conferência (somente leitura): escutas reais (`ss -lnt`, já usado em
+`port_in_use`), `Listen` do Apache, portas publicadas pelo Docker, portas
+internas reservadas (18090+, 18100–18102) e o registro de propriedade. O dono
+é mostrado só quando conhecido; senão “outro programa”. A porta é conferida de
+novo imediatamente antes de aplicar.
+
+Porta livre ≠ acessível: a tela diz “Outros computadores também dependem do
+firewall e do roteador”. No Windows, as portas liberadas hoje são só
+`WebPorts = 80, 8080, 8100` (`KohaEasy.Core.psm1`): **a porta do Tainacan
+(8090+) não está nessa lista**. Hipótese a confirmar no Windows: o Tainacan
+não abre por outros computadores da rede quando o Debian roda no WSL. A
+correção é ler as portas efetivas dos sistemas instalados em vez de uma lista
+fixa, o que também é necessário para a porta editável.
+
+Efeitos de mudar a porta do Koha que o PR precisa cobrir: `ports.conf`, vhost
+da instância, firewall da equipe, ingress do túnel (`localhost:8080`),
+portas do Windows, credenciais e textos que citam `:8080`, e os testes
+`kei_http_code` do status.
+
+### 16.3. Tainacan e DSpace no mesmo nível do Koha
+
+Os três passam pelo mesmo roteiro (seção 8):
+
+```text
+1 Apresentação ─► 2 Diagnóstico inicial ─► 3 Nome, acesso e porta
+  ─► 4 Resumo ─► 5 Progresso em etapas ─► 6 Diagnóstico final ─► 7 Conclusão
+```
+
+Diagnóstico inicial (só leitura, antes de pedir qualquer confirmação):
+
+```text
+┌ Antes de instalar o DSpace ────────────────────────────────────────────┐
+│ ✓ Processador amd64            ✓ Debian 12                              │
+│ ✓ Memória livre 6,1 GB (4 GB)  ✓ Disco livre 41 GB (8 GB)               │
+│ ✓ Docker 27.3 ativo            ✓ Porta 8100 livre                       │
+│ ▲ Apache não instalado: será instalado com sua confirmação             │
+│ Nada foi alterado até aqui.                    [Continuar]  [Cancelar] │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Fontes que já existem: `runtime.plan()` e `dspace-prerequisites plan`
+(DSpace); `tainacan-plan` com `KEI_TAINACAN_MIN_RAM_MB` (768) e
+`KEI_TAINACAN_MIN_DISK_MB` (3072); pré-validação do Koha. Hoje cada
+verificação que falha vira um `Refused` com uma frase; passa a ser uma lista
+com todos os itens e o motivo de cada um.
+
+Diagnóstico final: o mesmo relatório que o Koha mostra (`v_fail`/`v_warn`),
+alimentado pelo que os motores já verificam: DSpace (`dependencies`,
+`health`, `web_checks`, `public_health`), Tainacan (`kei_tainacan_health`),
+Koha (validação atual). Resultado com “Ver relatório” e exportação para
+suporte.
+
+### 16.4. Sequência de PRs atualizada
+
+| PR | Muda em relação à seção 13 |
+|---|---|
+| U1 | Inclui o texto aprovado de requisitos e limitações |
+| U3 | Inclui diagnóstico inicial (lista) e final (relatório) para Tainacan e DSpace |
+| **U9** (novo) | `PortField` comum; porta editável nos três; portas efetivas no Windows em vez de lista fixa. Esforço G |
+| **U10** (novo, substitui A1) | Koha com uma ou duas portas na instalação e em Endereços e acesso. Esforço G. Depende de U9 |
