@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.194"
+PANEL_VERSION=" 1.5.195"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12774,7 +12774,7 @@ kei_dspace_resource() {
             read -r scheme host port < <(kei_tainacan_parse_url "$1")
             [ -f "$KEI_DSPACE_DIR/state.json" ] || kei_dspace_address_check "$1" || return 4
             if [ "$mode" = none ]; then
-                echo 'Apache must be installed and reviewed first (shared infrastructure); no package is installed by this experimental task.' >&2
+                echo 'Apache must be installed and reviewed first (shared infrastructure); no package is installed by this task.' >&2
                 return 3
             fi
             if [ "$mode" != external ] && [ "$scheme" = https ]; then

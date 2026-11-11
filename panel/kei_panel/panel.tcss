@@ -908,6 +908,7 @@ App.-plain #picker-drop {
 /* Unified schedule editor: controls wrap on SSH-sized terminals. */
 .sc-controls { height: auto; layout: horizontal; padding-top: 1; }
 .sc-controls Switch { width: 9; }
+.sc-switch-label { width: auto; height: 3; content-align: left middle; margin-right: 1; }
 .sc-controls Select { width: 19; margin-right: 1; }
 .sc-controls Input { width: 12; margin-right: 1; }
 .sc-controls Button { min-width: 9; width: 9; }

@@ -62,7 +62,7 @@ async def install(app):
                 return
     if available.get('prepare_required'):
         if not await app.push_screen_wait(ConfirmScreen(TITLE, t(
-                'Prepare the experimental DSpace images on this server? This downloads the pinned sources and builds backend, interface and Solr. It can take 30–90 minutes or longer, uses additional disk and memory, and installs Git if missing. Existing Koha/Tainacan data are preserved. You can retry if preparation fails.'))):
+                'Prepare the DSpace images on this server? They are built here from a pinned, verified recipe (amd64 processor). This downloads the pinned sources and builds backend, interface and Solr. It can take 30–90 minutes or longer, uses additional disk and memory, and installs Git if missing. Existing Koha/Tainacan data are preserved. You can retry if preparation fails.'))):
             return
         if await call(app, 'prepare-images', '--confirm', cancellable=False) is None:
             return
