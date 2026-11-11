@@ -5,8 +5,11 @@
 # apt-get update only warns ("W: Failed to fetch ... Could not resolve")
 # when a mirror is unreachable, and the failure surfaces later as
 # "Unable to locate package". Here a warning is a failure: it waits and
-# tries again, and on Ubuntu it moves to another official mirror (the
-# Azure one GitHub runners use, then kernel.org) before giving up.
+# tries again, and on Ubuntu it moves to another official mirror (kernel.org
+# right after the first failure, then the Azure one GitHub runners use)
+# before giving up. On a GitHub runner one failed round costs about six
+# minutes of DNS timeouts, so the move comes early and apt does not repeat
+# each download itself (Acquire::Retries=1); this loop does the retrying.
 # It never installs anything; the caller does. The same script serves the
 # containers and the GitHub runner itself (run it with sudo there).
 set -u
@@ -17,7 +20,7 @@ ROOT="${APT_READY_ROOT:-}"      # tests only: a fake /etc
 log="$(mktemp)"
 
 update() {
-    apt-get update -qq -o Acquire::Retries=3 >"$log" 2>&1
+    apt-get update -qq -o Acquire::Retries=1 >"$log" 2>&1
     local rc=$?
     cat "$log" >&2
     [ "$rc" -eq 0 ] && ! grep -qE '^(W|E): (Failed to fetch|Some index files failed)' "$log"
@@ -41,8 +44,8 @@ for attempt in $(seq 1 "$APT_READY_ATTEMPTS"); do
         exit 0
     fi
     case "$attempt" in
-        2) ubuntu_mirror azure.archive.ubuntu.com ;;
-        4) ubuntu_mirror mirrors.edge.kernel.org ;;
+        1) ubuntu_mirror mirrors.edge.kernel.org ;;
+        3) ubuntu_mirror azure.archive.ubuntu.com ;;
     esac
     [ "$attempt" -lt "$APT_READY_ATTEMPTS" ] && sleep $((attempt * APT_READY_SLEEP))
 done
