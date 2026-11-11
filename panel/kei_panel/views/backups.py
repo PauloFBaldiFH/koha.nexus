@@ -21,9 +21,9 @@ from __future__ import annotations
 import time
 
 from textual.app import ComposeResult
-from textual.containers import Grid, Horizontal, HorizontalScroll, Vertical
+from textual.containers import Grid, Horizontal, Vertical
 from rich.text import Text
-from textual.widgets import Button, Label, Select, Static
+from textual.widgets import Label, Select, Static
 
 from .. import backup_center, cloud, cron, platforms
 from ..backup_center import DSPACE_CODECS, TAINACAN_CODECS
@@ -34,6 +34,10 @@ from .base import ZONE_ORDER, zone_id
 from .dashboard import backup_card, human_bytes
 from .platform import ENCRYPTION_NOTE, PlatformSectionView
 
+
+READING = "Reading the backup state… The actions below can already be used; each one checks the server first."
+READ_FAILED = ("Part of the backup state could not be read (${what}). The actions stay available: each one checks "
+               "the server again before doing anything. Use Refresh to read again.")
 
 MARKS = {"ok": ("✅", "green"), "warn": ("⚠", "yellow"), "bad": ("⚠", "red"), "": ("·", "")}
 
@@ -63,14 +67,31 @@ class BackupCenterView(PlatformSectionView):
         self.plans: list[backup_center.PlanRow] = []
 
     # --- layout ---------------------------------------------------------------
+    def compose(self) -> ComposeResult:
+        # The actions come right after the platform choice (study 2.1): the
+        # state, settings and automatic backups follow them, so reading them
+        # never pushes a button down.
+        yield from self.heading()
+        yield from self.cards()
+        yield from self.details()
+
     def heading(self) -> ComposeResult:
         yield from super().heading()
-        with HorizontalScroll(id="bk-scopes", classes="sb-card-buttons"):
-            yield Label(t("Platform:"), classes="form-label")
-            for scope in backup_center.SCOPES:
-                yield Button(t(backup_center.SCOPE_LABELS[scope]), id=f"scope-{scope}", classes="small")
+        # One compact choice instead of a button per combination (study 7.5).
+        with Horizontal(id="bk-scopes", classes="form-row"):
+            yield Label(t("Show:"), classes="form-label")
+            offered = self.offered() or list(backup_center.SCOPES)
+            first = backup_center.pick_scope(self.scope or getattr(self.app, "backup_scope", ""), offered)
+            select = Select([(t(backup_center.SCOPE_LABELS[s]), s) for s in offered],
+                            value=first if first in offered else offered[0], allow_blank=False, id="bk-scope")
+            select.offered = offered
+            yield select
         yield Static(t("No platform is installed yet: install Koha, Tainacan or DSpace to back it up. Cloud connections "
                        "can already be added."), id="bk-none", classes="view-prompt", markup=False)
+        yield Static(t(READING), id="bk-wait", classes="view-prompt bk-wait", markup=False)
+
+    def details(self) -> ComposeResult:
+        yield Label(t("State and settings"), classes="view-prompt bk-section-title", id="bk-details-title")
         with Vertical(id="bk-koha"):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Last backup"), id="bk-age")
@@ -138,12 +159,33 @@ class BackupCenterView(PlatformSectionView):
         self.query_one("#bk-tn-codec-box").border_title = t("Backup compression type")
         self.query_one("#bk-ds-codec-box").border_title = t("Backup compression type")
         super().on_mount()        # hides the cards and titles, then refresh_data()
+        # Drawn at once from what is already known; usable when the read ends.
+        self.show(self.facts or self.known_facts())
+        self._waiting(True)
+
+    def known_facts(self) -> platforms.Facts:
+        """What the panel knows before reading: installed platforms and tasks."""
+        return platforms.Facts(status={}, koha=self.app.koha_installed, has_task=self.app.bridge.has_task)
+
+    def _waiting(self, on: bool, failed: str = "") -> None:
+        # The cards stay usable while reading: each routine checks the server
+        # again before doing anything, so waiting here would only slow people.
+        note = self.query_one("#bk-wait", Static)
+        if on:
+            note.update(t(READING))
+        elif failed:
+            note.update(t(READ_FAILED, what=failed))
+        else:
+            note.update(t("State read at ${time}.", time=time.strftime("%H:%M")))
+        note.set_class(bool(failed) and not on, "-warn")
 
     def refresh_data(self) -> None:
         # What is installed may have changed since (a platform installed or
         # removed while the panel is open): the platform shown is chosen again.
         self.scope = backup_center.pick_scope(self.scope or getattr(self.app, "backup_scope", ""), self.offered())
         self._show_scope()
+        if self.query("#bk-wait"):
+            self._waiting(True)
         super().refresh_data()
 
     # --- the platform shown -------------------------------------------------------
@@ -167,12 +209,14 @@ class BackupCenterView(PlatformSectionView):
 
     def _show_scope(self) -> None:
         offered = self.offered()
-        for scope in backup_center.SCOPES:
-            button = self.query_one(f"#scope-{scope}", Button)
-            button.display = scope in offered and len(offered) > 1
-            button.variant = "primary" if scope == self.scope else "default"
-            if scope == self.scope and button.display:
-                self.call_after_refresh(button.scroll_visible, animate=False)
+        select = self.query_one("#bk-scope", Select)
+        if offered and getattr(select, "offered", None) != offered:
+            select.offered = offered
+            with select.prevent(Select.Changed):
+                select.set_options([(t(backup_center.SCOPE_LABELS[s]), s) for s in offered])
+        if self.scope in offered and select.value != self.scope:
+            with select.prevent(Select.Changed):
+                select.value = self.scope
         self.query_one("#bk-scopes").display = len(offered) > 1
         self.query_one("#bk-none").display = not offered
         self.query_one("#bk-koha").display = self.scope == backup_center.KOHA
@@ -180,19 +224,14 @@ class BackupCenterView(PlatformSectionView):
         self.query_one("#bk-dspace").display = self.scope == backup_center.DSPACE
         self.query_one("#bk-nexus").display = self.scope == backup_center.NEXUS
         self.query_one("#bk-both").display = len(backup_center.MEMBERS.get(self.scope, ())) > 1
+        self.query_one("#bk-details-title").display = bool(self.scope)
         self.query_one("#bk-plans-title").display = bool(self.scope) and self.scope != backup_center.NEXUS
         self.query_one("#bk-plans").display = bool(self.scope) and self.scope != backup_center.NEXUS
-        if self.facts is not None:
-            self.show(self.facts)
+        self.show(self.facts or self.known_facts())
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        bid = event.button.id or ""
-        if bid.startswith("scope-"):
-            event.stop()
-            self.app.backup_scope = bid.removeprefix("scope-")
-            self.set_scope(self.app.backup_scope)
-            return
-        super().on_button_pressed(event)
+    def choose_scope(self, scope: str) -> None:
+        self.app.backup_scope = scope
+        self.set_scope(scope)
 
     def needs_backups(self) -> bool:
         return self.scope in (backup_center.TAINACAN, backup_center.BOTH)
@@ -241,26 +280,46 @@ class BackupCenterView(PlatformSectionView):
     # --- loading ------------------------------------------------------------------
     async def _load(self) -> None:
         rows: list[backup_center.PlanRow] = []
+        failed: list[str] = []
+        facts = None
+
+        async def part(name, read):
+            try:
+                return await read()
+            except Exception:  # noqa: BLE001 - one read failing never hides the actions
+                failed.append(t(name))
+                return None
+
         try:
-            facts = await self.read_facts()
-            if self.scope == backup_center.KOHA:
-                rows = await self._load_koha()
-            elif self.scope == backup_center.TAINACAN:
-                rows = await self._load_tainacan(facts)
-            elif self.scope == backup_center.BOTH:
-                rows = await self._load_koha() + await self._load_tainacan(facts) + await self._load_set()
+            facts = await part("server state", self.read_facts)
+            if facts is not None:
+                if self.scope == backup_center.KOHA:
+                    rows = await part("Koha backups", self._load_koha) or []
+                elif self.scope == backup_center.TAINACAN:
+                    rows = await part("Tainacan backups", lambda: self._load_tainacan(facts)) or []
+                elif self.scope == backup_center.BOTH:
+                    for name, read in (("Koha backups", self._load_koha),
+                                       ("Tainacan backups", lambda: self._load_tainacan(facts)),
+                                       ("joint backup", self._load_set)):
+                        rows += await part(name, read) or []
             if self.scope == backup_center.DSPACE:
-                await self._load_dspace()
+                await part("DSpace backups", self._load_dspace)
             if self.scope == backup_center.NEXUS:
-                await self._load_nexus()
+                await part("full backup", self._load_nexus)
             if 'dspace' in backup_center.MEMBERS.get(self.scope, ()) and self.app.bridge.has_task('dspace-panel'):
                 from ..dspace import payload
-                rows += backup_center.operation_plans(payload(await self.app.bridge.task('dspace-panel','operations','plans')),self.scope)
+
+                async def dspace_plans():
+                    out = await self.app.bridge.task('dspace-panel', 'operations', 'plans')
+                    return backup_center.operation_plans(payload(out), self.scope)
+                rows += await part("DSpace backup plans", dspace_plans) or []
         finally:
             self.query_one("#platform-loader").display = False
-        self.facts = facts
-        self.show(facts)
-        self._draw_plans(rows)
+            facts = facts or self.facts or self.known_facts()
+            self.facts = facts
+            self.show(facts)
+            self._waiting(False, ", ".join(failed))
+            self._draw_plans(rows)
 
     async def _cloud(self) -> tuple[dict, list[cloud.Plan], list[cloud.History], list[cloud.Remote]]:
         status: dict = {}
@@ -367,8 +426,12 @@ class BackupCenterView(PlatformSectionView):
             self.query_one('#bk-ds-codec', Select).disabled = True
 
     def _draw_plans(self, rows: list[backup_center.PlanRow]) -> None:
-        self.plans = rows
+        title = t("Automatic backups") + (f" ({len(rows)})" if rows else "")
+        self.query_one("#bk-plans-title", Label).update(title)
         box = self.query_one("#bk-plans", Vertical)
+        if rows == self.plans and box.children:
+            return                    # nothing changed: nothing is rebuilt
+        self.plans = rows
         box.remove_children()
         if not rows:
             box.mount(Static(t("No automatic backup is set up yet."), classes="bk-plan", markup=False))
@@ -377,6 +440,11 @@ class BackupCenterView(PlatformSectionView):
 
     # --- Koha: the compression of new backups ------------------------------------
     def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == 'bk-scope':
+            event.stop()
+            if isinstance(event.value, str) and event.value != self.scope and event.value in self.offered():
+                self.choose_scope(event.value)
+            return
         if event.select.id == 'bk-nexus-codec':
             event.stop()
             value = event.value if isinstance(event.value, str) else ''

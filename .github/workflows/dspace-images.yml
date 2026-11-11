@@ -308,7 +308,7 @@ jobs:
           for archive in "$RUNNER_TEMP"/dspace-runtime/*.tar.gz; do docker load -i "$archive"; done
       - name: Prepare disposable resource infrastructure
         run: |
-          sudo apt-get update -qq
+          sudo bash tests/system/apt-ready.sh
           sudo apt-get install -y -qq apache2 iptables iproute2 curl python3 gnupg restic rclone
           sudo systemctl start apache2
       - name: Resolve the canonical disposable repository address
@@ -348,7 +348,7 @@ jobs:
           for archive in "$RUNNER_TEMP"/dspace-runtime/*.tar.gz; do docker load -i "$archive"; done
       - name: Existing resource infrastructure on a disposable runner
         run: |
-          sudo apt-get update -qq
+          sudo bash tests/system/apt-ready.sh
           sudo apt-get install -y -qq apache2 iptables iproute2 curl python3 python3-venv gnupg restic rclone cron openssl
           sudo systemctl start apache2
       - name: Prepare real browser acceptance

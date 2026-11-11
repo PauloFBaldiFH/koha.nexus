@@ -190,7 +190,9 @@ def state(view):
     # Each row is drawn as its own block, with every field.
     blocks = [str(w.render()) for w in view.query("#bk-plans Static")]
     assert all(r[0] in b and r[1] in b and r[5] in b for r, b in zip(rows, blocks))
-    buttons = [s for s in backup_center.SCOPES if view.query_one(f"#scope-{s}").display]
+    from textual.widgets import Select
+    select = view.query_one("#bk-scope", Select)
+    buttons = [value for _label, value in select._options]
     return {"scope": view.scope, "buttons": buttons if view.query_one("#bk-scopes").display else [],
             "none": bool(view.query_one("#bk-none").display), "koha": bool(view.query_one("#bk-koha").display),
             "tainacan": bool(view.query_one("#bk-tainacan").display), "cards": shown_cards(view), "rows": rows}
@@ -253,7 +255,8 @@ def test_the_platform_groups_open_the_center_already_filtered(server):
             app.screen.query_one("#sidebar").blur()
             from_tainacan = await open_from(app, pilot, "g", "tainacan")
             from_koha = await open_from(app, pilot, "k", "koha")
-            await pilot.click("#scope-tainacan")          # the choice on the center itself
+            from textual.widgets import Select
+            current_view(app).query_one("#bk-scope", Select).value = "tainacan"   # the choice on the center itself
             await pilot.pause(0.3)
             await until(pilot, loaded(app))
             chosen = state(current_view(app))

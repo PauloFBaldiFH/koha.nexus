@@ -16,12 +16,14 @@ on:
       - "installer"
       - "tests/e2e/**"
       - "tests/system/container.sh"
+      - "tests/system/apt-ready.sh"
       - ".github/workflows/tainacan-e2e.yml"
   pull_request:
     paths:
       - "installer"
       - "tests/e2e/**"
       - "tests/system/container.sh"
+      - "tests/system/apt-ready.sh"
       - ".github/workflows/tainacan-e2e.yml"
 
 permissions:
@@ -46,6 +48,7 @@ jobs:
           python-version: "3.12"
       - name: Playwright and Chromium
         run: |
+          sudo bash tests/system/apt-ready.sh
           python -m pip install playwright==1.48.0
           python -m playwright install --with-deps chromium
       - name: Install, use and recover Tainacan through the browser

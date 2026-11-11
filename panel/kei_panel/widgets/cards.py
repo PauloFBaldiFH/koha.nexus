@@ -110,4 +110,6 @@ class ActionCard(Static, can_focus=True):
         self.action_choose()
 
     def action_choose(self) -> None:
+        if self.disabled:        # drawn while its screen still reads the state
+            return
         self.post_message(self.Chosen(self.entry))

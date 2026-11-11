@@ -131,7 +131,7 @@ jobs:
           docker run --rm -v "$PWD":/src:ro -e KEI_DESTRUCTIVE_TESTS=1 -e DEBIAN_FRONTEND=noninteractive \
             "${{ matrix.image }}" bash -c '
               set -e
-              apt-get update -qq
+              bash /src/tests/system/apt-ready.sh
               apt-get install -y -qq apache2 bats curl openssl python3 iproute2 gnupg restic rclone >/dev/null
               restic version
               cd /src

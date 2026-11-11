@@ -316,11 +316,11 @@ def test_all_three_platforms_remain_reachable_in_the_shared_backup_selector(monk
                     await pilot.pause(.1)
                 raise AssertionError('Backup selector did not reach the expected state')
             await ready(lambda: view.facts is not None and not view.query_one('#platform-loader').display)
-            button=view.query_one('#scope-all')
-            button.focus()
-            await pilot.pause()
-            assert button.region.intersection(view.region).width==button.region.width
-            await pilot.click('#scope-all')
+            from textual.widgets import Select
+            select=view.query_one('#bk-scope',Select)
+            assert 'all' in [value for _label,value in select._options]
+            assert select.region.intersection(view.region).width==select.region.width
+            select.value='all'
             await ready(lambda: view.scope=='all' and app.backup_scope=='all')
     asyncio.run(exercise())
 
