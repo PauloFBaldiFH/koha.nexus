@@ -1804,3 +1804,56 @@ Testes em `panel/tests/test_u6_names.py`:
 - As remoções do Tainacan e do DSpace pedem o nome digitado para apagar
   dados.
 - Todos os textos novos têm tradução.
+
+## 24. U7, primeira parte: o indicador do Windows para todos os sistemas
+
+O ícone da bandeja deixou de olhar só para o Koha (problema 2.7). Agora ele
+segue a matriz da seção 11:
+
+| Cor | Quando |
+|---|---|
+| Verde | Todo sistema instalado e que deve estar ligado responde |
+| Amarelo | Algo precisa de atenção (instalando, backup atrasado ou com falha, ainda não verificado), a última consulta tem mais de 10 minutos, o estado não pôde ser lido, ou os sistemas estão iniciando |
+| Vermelho | Falta uma parte de que um sistema precisa (banco, aplicação, servidor web, Docker), ou o Debian parou sem a pessoa pedir |
+| Cinza | Nenhum sistema instalado, ou parado pela pessoa |
+
+A dica do ícone (até 63 caracteres) mostra o pior caso com o nome visível do
+U6. Exemplo: “Museu Municipal: não responde · outros funcionando”. O menu
+ganhou uma linha por sistema, como “Biblioteca Central (Koha): funcionando”.
+Um sistema parado de propósito (o DSpace parado pelo painel) não conta
+enquanto outros funcionam. “Iniciar Koha” e “Parar Koha” passaram a se
+chamar “Iniciar sistemas” e “Parar sistemas”, porque valem para o Debian
+inteiro. Um servidor só com Tainacan ou só com DSpace não aparece mais como
+“Koha não está instalado”.
+
+**De onde vem.** O `--status-json` ganhou o bloco `summary` no fim:
+
+```json
+"summary": {"state": "critical", "checked_at": 1794390000,
+  "systems": [{"id": "koha", "name": "Biblioteca Central", "state": "ok", "reason": ""},
+              {"id": "tainacan", "name": "Museu Municipal", "state": "critical",
+               "reason": "not_responding"}]}
+```
+
+- O bloco é calculado uma vez, no Linux (`kei_panel/status_summary.py`), a
+  partir do que o status já lê. Nenhuma sondagem nova foi criada.
+- O bloco sai como `null` quando não pode ser calculado. Assim o JSON
+  continua válido e a bandeja volta ao comportamento anterior.
+- A bandeja (`Resolve-KohaIndicator`, em `KohaEasy.Core.psm1`) e o
+  `nexus_core/indicator.py` só leem o bloco. Os dois seguem a mesma tabela de
+  motivos, e um teste confere isso.
+- Um instalador antigo, sem `summary`, mantém a bandeja como antes.
+
+Testes:
+
+- `panel/tests/test_u7_summary.py`: estados de cada sistema e motivos,
+  sistema parado que não conta, pior caso, nomes, o comando sempre imprime
+  JSON, ligação no instalador e traduções da bandeja.
+- `nexus_core/tests/test_indicator.py`: a matriz 11.1 inteira, a bandeja
+  antiga, a dica de 63 caracteres e os mesmos motivos na versão PowerShell.
+- `tests/windows_checks.ps1`, na CI `windows-tools`, roda no Windows
+  PowerShell 5.1 a mesma matriz contra `Resolve-KohaIndicator`.
+
+A segunda parte do U7 é o teste de acesso feito pelo próprio Windows, gravado
+para a tela “Endereços e acesso”, que hoje mostra “? não verificado a partir
+do Windows”.

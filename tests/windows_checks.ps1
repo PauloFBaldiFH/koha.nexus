@@ -144,6 +144,44 @@ Check 'status: final complete response after preamble' ((ConvertFrom-KohaStatusO
 $sample = '{"schema":1,"platforms":[' + "`n" + '{"id":"dspace"}'
 Check 'status: truncated outer object refused' ($null -eq (ConvertFrom-KohaStatusOutput -Output $sample))
 Check 'status: inline trailing text refused' ($null -eq (ConvertFrom-KohaStatusOutput -Output '{"schema":1} trailing'))
+
+# U7, study 11: the indicator of every system, from "summary" (the same
+# matrix as nexus_core/tests/test_indicator.py).
+$now = [int64]1800000000
+function New-SummaryStatus {
+    param([string]$Rows, [string]$State = 'ok', [string]$Koha = 'ok', [int64]$At = 1799999970)
+    return ConvertFrom-KohaStatusOutput -Output ('{"schema":1,"state":"' + $Koha + '","summary":{"state":"' + $State + '","checked_at":' + $At + ',"systems":[' + $Rows + ']}}')
+}
+$kohaOk = '{"id":"koha","name":"Biblioteca Central","state":"ok","reason":""}'
+$museuDown = '{"id":"tainacan","name":"Museu Municipal","state":"critical","reason":"not_responding"}'
+$i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus $kohaOk) -Now $now
+Check 'indicator: one system ok is green with its name' ($i.Colour -eq 'green' -and $i.Text -eq 'Biblioteca Central is running' -and $i.Lines[0] -eq 'Biblioteca Central (Koha): running') ($i.Colour + ' ' + $i.Text)
+$i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus ($kohaOk + ',' + $museuDown) 'critical') -Now $now
+Check 'indicator: one down says which, others running' ($i.Colour -eq 'red' -and $i.Text -eq ('Museu Municipal: not responding ' + [char]0x00B7 + ' others running') -and @($i.Lines).Count -eq 2) ($i.Colour + ' ' + $i.Text)
+$noKoha = New-SummaryStatus '{"id":"tainacan","name":"Museu Municipal","state":"ok","reason":""}' 'ok' 'not_installed'
+$word = Resolve-KohaState -Installed $true -Running $true -Linux $noKoha -State @{} -Now $now
+Check 'indicator: Tainacan without Koha is not "not installed" (2.7)' ($word -eq 'running' -and (Resolve-KohaIndicator -State $word -Linux $noKoha -Now $now).Text -eq 'Museu Municipal is running') $word
+$none = New-SummaryStatus '' 'none' 'not_installed'
+$word = Resolve-KohaState -Installed $true -Running $true -Linux $none -State @{} -Now $now
+$i = Resolve-KohaIndicator -State $word -Linux $none -Now $now
+Check 'indicator: no system is gray' ($word -eq 'not_installed' -and $i.Colour -eq 'gray' -and $i.Text -eq 'No system installed. Open the panel to install.') ($word + ' ' + $i.Text)
+$i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus '{"id":"dspace","name":"Repositorio","state":"stopped","reason":"stopped"}' 'stopped') -Now $now
+Check 'indicator: only stopped systems are gray' ($i.Colour -eq 'gray' -and $i.Text -eq 'Systems stopped') $i.Text
+$i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus ($kohaOk + ',{"id":"dspace","name":"Repositorio","state":"stopped","reason":"stopped"}')) -Now $now
+Check 'indicator: a stopped system does not count while others run' ($i.Colour -eq 'green') $i.Text
+$i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus $kohaOk 'ok' 'ok' ($now - 780)) -Now $now
+Check 'indicator: a check older than 10 min is yellow' ($i.Colour -eq 'yellow' -and $i.Text -eq 'Could not check the state (13 min ago)') $i.Text
+Check 'indicator: unreadable state is yellow' ((Resolve-KohaIndicator -State 'not_responding' -Linux $null -Now $now).Colour -eq 'yellow')
+Check 'indicator: Debian stopped by the person is gray, otherwise red' ((Resolve-KohaIndicator -State 'stopped_by_user' -Linux $null -Now $now).Colour -eq 'gray' -and (Resolve-KohaIndicator -State 'stopped' -Linux $null -Now $now).Colour -eq 'red')
+$old = ConvertFrom-KohaStatusOutput -Output '{"schema":1,"state":"ok"}'
+$i = Resolve-KohaIndicator -State 'running' -Linux $old -Now $now
+Check 'indicator: an older installer keeps the old tray' ($i.Colour -eq 'green' -and $i.Text -eq 'Koha is running') $i.Text
+$long = '{"id":"tainacan","name":"' + ('M' * 90) + '","state":"critical","reason":"not_responding"}'
+$i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus ($kohaOk + ',' + $long) 'critical') -Now $now
+Check 'indicator: the tooltip fits 63 characters' ($i.Tooltip.Length -le 63 -and $i.Text.Length -gt 63) ([string]$i.Tooltip.Length)
+$trayText = Get-Content -Raw -LiteralPath (Join-Path $repo 'windows\KohaEasy.Tray.ps1')
+Check 'tray: icon, header and tooltip from Resolve-KohaIndicator' ($trayText -match 'Resolve-KohaIndicator -State \$s -Linux \$Status\.Linux' -and $trayText -match '\$tray\.Text = \$ind\.Tooltip' -and $trayText -match "T 'Start the systems'") ''
+
 $wsl = 'C:\Windows\System32\wsl.exe'
 
 # Console defaults (Paulo, 2026-10-29): later PowerShell windows open in

@@ -75,6 +75,10 @@ def resolve_state(*, installed: bool, running: bool, linux: Optional[LinuxStatus
     if linux is not None and linux.state == "ok":
         return RUNNING
     if linux is not None and linux.state == "not_installed":
+        # Koha is optional (U7): with Tainacan or DSpace there, the
+        # distro is up and the indicator reads the summary.
+        if linux.summary is not None and linux.summary.systems:
+            return RUNNING
         return NOT_INSTALLED
     if recent:
         return STARTING

@@ -522,7 +522,12 @@ function Resolve-KohaState {
     }
     $recent = $grace -or (($State.startedAt -gt 0) -and (($Now - [int64]$State.startedAt) -lt $script:Cfg.StartWaitS))
     if ($null -ne $Linux -and $Linux.state -eq 'ok') { return 'running' }
-    if ($null -ne $Linux -and $Linux.state -eq 'not_installed') { return 'not_installed' }
+    if ($null -ne $Linux -and $Linux.state -eq 'not_installed') {
+        # Koha is optional (U7): with Tainacan or DSpace there, Debian is
+        # up and the indicator reads the summary.
+        if (@(Get-KohaSummarySystems $Linux).Count -gt 0) { return 'running' }
+        return 'not_installed'
+    }
     if ($recent) { return 'starting' }
     return 'not_responding'
 }
@@ -565,6 +570,125 @@ function Get-KohaStateText {
         'stopped'         { return (T 'Koha is stopped') }
         default           { return (T 'Koha is not installed') }
     }
+}
+
+# ----------------------------------------------------------------------
+# The indicator of every system (study 11, U7)
+# ----------------------------------------------------------------------
+# The Linux side computes "summary" once (kei_panel/status_summary.py);
+# this only reads it. Ported from nexus_core/indicator.py, which tests the
+# matrix of the study's section 11 (the same reasons and texts):
+#   green   every installed system that should run is answering
+#   yellow  attention, a check older than 10 minutes, an unreadable state,
+#           starting
+#   red     a needed part is down, or Debian stopped without being asked
+#   gray    no system installed, or stopped by the person
+# Without "summary" (an older installer) the tray behaves as before.
+$script:KohaReasons = @{
+    stopped = 'stopped'
+    database_stopped = 'database stopped'
+    web_server_stopped = 'web server stopped'
+    not_responding = 'not responding'
+    services_partial = 'some services stopped'
+    backup_failed = 'last backup failed'
+    backup_late = 'backup late'
+    installing = 'installing'
+    install_failed = 'installation failed'
+    docker_stopped = 'Docker stopped'
+    not_running = 'not running'
+    not_checked = 'not checked yet'
+    unknown = 'state unknown'
+}
+$script:KohaWords = @{ ok = 'running'; attention = 'needs attention'; critical = 'not working'; stopped = 'stopped' }
+$script:KohaSystemNames = @{ koha = 'Koha'; tainacan = 'Tainacan'; dspace = 'DSpace' }
+
+# A member of a JSON object, $null when it is not there (StrictMode 2.0
+# throws on a missing property: an older installer has no "summary").
+function Get-KohaMember {
+    param($Object, [string]$Name)
+    if ($null -eq $Object) { return $null }
+    if ($Object -is [System.Collections.IDictionary]) { return $Object[$Name] }
+    $p = $Object.PSObject.Properties[$Name]
+    if ($p) { return $p.Value }
+    return $null
+}
+
+# The valid rows of $Linux.summary.systems (none for an older installer).
+function Get-KohaSummarySystems {
+    param($Linux)
+    $summary = Get-KohaMember $Linux 'summary'
+    if ($null -eq $summary) { return @() }
+    $rows = @()
+    foreach ($r in @(Get-KohaMember $summary 'systems')) {
+        if ($null -eq $r) { continue }
+        $id = [string](Get-KohaMember $r 'id')
+        $state = [string](Get-KohaMember $r 'state')
+        $name = ([string](Get-KohaMember $r 'name')).Trim()
+        if ($script:KohaSystemNames.ContainsKey($id) -and $script:KohaWords.ContainsKey($state) -and $name) {
+            if ($name.Length -gt 120) { $name = $name.Substring(0, 120) }
+            $rows += [pscustomobject]@{ Id = $id; Name = $name; State = $state; Reason = [string](Get-KohaMember $r 'reason') }
+        }
+    }
+    return $rows
+}
+
+function Get-KohaSystemLine {
+    param($System)
+    $what = (T $script:KohaWords[$System.State])
+    if ($System.State -ne 'ok' -and $script:KohaReasons.ContainsKey($System.Reason)) { $what = (T $script:KohaReasons[$System.Reason]) }
+    $sys = $script:KohaSystemNames[$System.Id]
+    $who = $System.Name
+    if ($who -ne $sys) { $who = '{0} ({1})' -f $System.Name, $sys }
+    return ('{0}: {1}' -f $who, $what)
+}
+
+function New-KohaIndicator {
+    param([string]$Colour, [string]$Text, $Lines = @())
+    $tip = $Text
+    if ($tip.Length -gt 63) { $tip = $tip.Substring(0, 62) + [char]0x2026 }
+    return [pscustomobject]@{ Colour = $Colour; Text = $Text; Tooltip = $tip; Lines = @($Lines) }
+}
+
+# Pure: the state word (Resolve-KohaState), what --status-json said ($null
+# when it could not be read) and the time.
+function Resolve-KohaIndicator {
+    param([string]$State, $Linux, [int64]$Now = (Get-UnixTime))
+    if ($State -eq 'stopped_by_user') { return (New-KohaIndicator 'gray' (T 'Systems stopped (you stopped them)')) }
+    if ($State -eq 'stopped') { return (New-KohaIndicator 'red' (T 'Systems are stopped')) }
+    if ($State -eq 'starting') { return (New-KohaIndicator 'yellow' (T 'Systems are starting...')) }
+    $summary = Get-KohaMember $Linux 'summary'
+    if ($null -ne $summary -and @('ok', 'attention', 'critical', 'stopped', 'none') -notcontains [string](Get-KohaMember $summary 'state')) { $summary = $null }
+    if ($State -eq 'not_installed' -and $null -eq $summary) { return (New-KohaIndicator 'gray' (Get-KohaStateText 'not_installed')) }
+    if ($null -eq $Linux) { return (New-KohaIndicator 'yellow' (T 'Could not check the state')) }
+    if ($null -eq $summary) {
+        $c = 'red'
+        if ($State -eq 'running') { $c = 'green' }
+        return (New-KohaIndicator $c (Get-KohaStateText $State))
+    }
+    $systems = @(Get-KohaSummarySystems $Linux)
+    $lines = @($systems | ForEach-Object { Get-KohaSystemLine $_ })
+    $checked = [int64]0
+    try { $checked = [int64](Get-KohaMember $summary 'checked_at') } catch { }
+    if ($checked -gt 0 -and ($Now - $checked) -gt 600) {
+        return (New-KohaIndicator 'yellow' ((T 'Could not check the state (${n} min ago)') -replace '\$\{n\}', [string][int64][Math]::Floor(($Now - $checked) / 60)) $lines)
+    }
+    if ([string](Get-KohaMember $summary 'state') -eq 'none' -or $systems.Count -eq 0) { return (New-KohaIndicator 'gray' (T 'No system installed. Open the panel to install.')) }
+    $counted = @($systems | Where-Object { $_.State -ne 'stopped' })
+    if ($counted.Count -eq 0) { return (New-KohaIndicator 'gray' (T 'Systems stopped') $lines) }
+    $order = @{ ok = 0; attention = 1; critical = 2 }
+    $worst = $counted[0]
+    foreach ($s in $counted) { if ($order[$s.State] -gt $order[$worst.State]) { $worst = $s } }
+    if ($worst.State -eq 'ok') {
+        if ($systems.Count -eq 1) { return (New-KohaIndicator 'green' ((T '${name} is running').Replace('${name}', $worst.Name)) $lines) }
+        return (New-KohaIndicator 'green' (T 'All systems running') $lines)
+    }
+    $why = $script:KohaWords[$worst.State]
+    if ($script:KohaReasons.ContainsKey($worst.Reason)) { $why = $script:KohaReasons[$worst.Reason] }
+    $text = '{0}: {1}' -f $worst.Name, (T $why)
+    if (@($systems | Where-Object { $_.State -eq 'ok' }).Count -gt 0) { $text += ' ' + [char]0x00B7 + ' ' + (T 'others running') }
+    $colour = 'yellow'
+    if ($worst.State -eq 'critical') { $colour = 'red' }
+    return (New-KohaIndicator $colour $text $lines)
 }
 
 # ----------------------------------------------------------------------

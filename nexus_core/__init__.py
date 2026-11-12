@@ -7,6 +7,8 @@ What a desktop client (a future Python tray on any platform) needs to know about
                 the panel's dashboard and notify.py;
   * state.py    turns it into one word (running, starting, not_responding,
                 stopped_by_user, stopped, not_installed) and its text;
+  * indicator.py  the tray's colour, tooltip and one line per system,
+                from the "summary" of --status-json (study 11);
   * alerts.py   decides which notifications to show after a check and what
                 to remember so each is shown once;
   * ports.py    the small interfaces a platform implements (Runner,
@@ -27,4 +29,4 @@ ctypes.windll, pywin32, Textual): the same files run on Debian, Ubuntu and
 Windows. The panel and the Linux install never import it.
 """
 
-__all__ = ["alerts", "health", "langcache", "monitor", "ports", "state", "status"]
+__all__ = ["alerts", "health", "indicator", "langcache", "monitor", "ports", "state", "status"]
