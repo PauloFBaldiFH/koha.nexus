@@ -3128,15 +3128,15 @@
    "summary": "Runs an explicit plan immediately. The entire output is encrypted, cloud upload is checked and partial captures or failed uploads do not prune good backups."
   },
   "sec-instances": {
-   "summary": "Installations",
+   "summary": "Add system",
    "overview": [
-    "Use Add instance to choose an application that is not installed, or Remove instance to review an existing container installation. Additional copies of the same application are not enabled by these shortcuts."
+    "Lists Koha, Tainacan and DSpace. An installed system opens its page; a missing one shows what it is, what happens when installing and its requirements, before **Install…**. Each system is installed once per server; existing data are never installed over. **Remove instance** reviews an existing container installation."
    ]
   },
   "instance-add": {
-   "summary": "Add instance",
+   "summary": "Add system",
    "overview": [
-    "Choose Koha, Tainacan or DSpace and follow its existing driver. Installed applications are excluded to preserve existing data."
+    "Choose Koha, Tainacan or DSpace. An installed one opens its page instead of a second installation, preserving its data."
    ]
   },
   "instance-remove": {
@@ -3234,6 +3234,27 @@
    "warnings": [
     "The full .nexus envelope also carries a protected key export; the human recovery phrase is never stored in either file."
    ]
+  },
+  "sec-koha-admin": {
+   "summary": "Koha's administrative access in one place: the superlibrarians, the first-access credentials and creating a superlibrarian. The same cards stay on Koha's home."
+  },
+  "sec-koha-addresses": {
+   "summary": "How Koha is reached: the Cloudflare Tunnel, the free SSL certificate and the staff firewall. The same cards stay in the Security & access hub and in Koha security."
+  },
+  "sec-koha-backups": {
+   "summary": "Opens the Backup center already showing Koha's backups."
+  },
+  "sec-tainacan-admin": {
+   "summary": "Tainacan's administrative access: your own password for the initial account, other administrators and the WordPress administrator."
+  },
+  "sec-tainacan-backups": {
+   "summary": "Opens the Backup center already showing Tainacan's backups."
+  },
+  "sec-dspace-addresses": {
+   "summary": "The repository address and HTTPS, and the repair of web access without reinstalling."
+  },
+  "sec-dspace-backups": {
+   "summary": "Opens the Backup center already showing DSpace's backups."
   }
  }
 }

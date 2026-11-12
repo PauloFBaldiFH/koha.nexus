@@ -198,6 +198,9 @@ def test_with_koha_the_sidebar_has_its_group_then_the_server():
 
     # Tainacan's screens only come with Tainacan installed (not in this demo).
     koha = [s.id for s in menus.children("koha")]
+    # U5: the "tools" divider before Koha's own tools (study 17.1).
+    first_tool = next(i for i, s in enumerate(menus.children("koha")) if s.tool)
+    koha.insert(first_tool, "sidebar-tools-koha")
     server = [s.id for s in menus.SECTIONS if s.sidebar and not s.group and s.id not in ("dashboard", "instances")]
     assert asyncio.run(main()) == ["dashboard", "instances", "koha", *koha, "tainacan", "dspace", "sidebar-server", *server]
     assert "platforms" not in server and "infra" in server

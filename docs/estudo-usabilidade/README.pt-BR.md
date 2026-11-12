@@ -1605,3 +1605,43 @@ depois” só fecha, criação direta, lista ilegível nunca diz pronto, revisõ
 resultados sem JSON na frente, JSON intacto nos detalhes, tela em 80×24 e
 160×48, traduções). Nenhum motor mudou: `runtime.py` e o instalador só
 mudaram a versão do painel.
+
+## 20. U5, primeira parte: árvore de navegação e “Adicionar sistema”
+
+O U5 tem três partes de tamanho bem diferente. Para cada uma ter revisão
+própria, ele sai em três PRs: esta (árvore da 17.1 e “Adicionar sistema” da
+7.2), depois a Central de idiomas (17.2, com o cartão do Tainacan) e por fim
+a tela de endereços (17.4).
+
+1. **Mesmos itens-padrão em todo sistema, na mesma ordem.** Logo abaixo do
+   nome do sistema: Acesso administrativo, Endereços e acesso, Backups e
+   agendamentos, Diagnóstico e manutenção. Depois, o divisor “ferramentas” e
+   as ferramentas próprias, com o nome e o atalho de antes (no Koha: Ferramenta
+   Mágica de Importação, Ferramentas da biblioteca, Servidores Z39.50 / SRU,
+   IA, Aparência do OPAC e STAFF, Mensagens, Motor de busca, Configurações,
+   Segurança do Koha; no Tainacan: Eventos). Aparência e IA continuam
+   separadas e não há gaveta “Mais ferramentas”.
+2. **Os itens-padrão só reúnem o que já existia.** Acesso administrativo do
+   Koha: acesso administrativo, credenciais do primeiro acesso, criar
+   superbibliotecário. Endereços e acesso: Cloudflare Tunnel, certificado
+   SSL e firewall da equipe (Koha); endereço do Tainacan; endereço e HTTPS e
+   reparo do acesso web (DSpace). Cada cartão continua também onde estava.
+   A tela de endereços com configurado, alternativas e verificado (17.4)
+   substitui esse conteúdo na terceira parte.
+3. **Backups e agendamentos** abre a Central de backups já filtrada pelo
+   sistema, e a linha do sistema fica marcada na lateral.
+4. **Adicionar sistema** (antes “Adicionar ou remover instância”) lista os
+   três. Um sistema instalado aparece como “Instalado · abrir” e leva à
+   página dele, nunca a uma segunda instalação. Um ausente mostra o que é, o
+   que acontece ao instalar e os requisitos, com “Instalar…” e Voltar; nada
+   muda até a própria instalação fazer suas verificações e perguntas.
+
+| Lateral do Koha | Backups e agendamentos (Tainacan) | Adicionar sistema | Conhecer o DSpace |
+|---|---|---|---|
+| ![](capturas/u5/u5-1-lateral-koha-160x48.png) | ![](capturas/u5/u5-2-tainacan-backups-160x48.png) | ![](capturas/u5/u5-3-adicionar-sistema-80x24.png) | ![](capturas/u5/u5-4-conhecer-dspace-80x24.png) |
+
+Testes: `panel/tests/test_u5_navigation.py` (ordem dos itens-padrão nos três
+grupos, ferramentas do Koha com nomes e atalhos de antes, todos os atalhos
+mantidos, divisor não selecionável, filtro da Central, abrir as telas novas
+sem rodar nada que altere o servidor, “Adicionar sistema” com os três,
+traduções) e `tests/test_instance_navigation.py` atualizado.

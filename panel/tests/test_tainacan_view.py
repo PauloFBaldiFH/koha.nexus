@@ -100,9 +100,14 @@ def choose(view, action) -> None:
 # ----------------------------------------------------------------------
 # Four servers: the sidebar, the dashboard's tabs, the platform homes
 # ----------------------------------------------------------------------
-KOHA_SCREENS = ["import", "library", "z3950", "ai", "opac", "hub", "search", "settings",
-                "diagnostics", "koha-security"]
-TAINACAN_SCREENS = ["tainacan-maintenance", "tainacan-events"]
+# U5 (study 17.1): the standard items first, then the "tools" divider and the tools.
+KOHA_SCREENS = ["koha-admin", "koha-addresses", "koha-backups", "diagnostics", "sidebar-tools-koha",
+                "import", "library", "z3950", "ai", "opac", "hub", "search", "settings", "koha-security"]
+TAINACAN_SCREENS = ["tainacan-admin", "tainacan-addresses", "tainacan-backups", "tainacan-maintenance",
+                    "sidebar-tools-tainacan", "tainacan-events"]
+# The cards of each home did not change with U5.
+KOHA_CARDS = ["import", "library", "z3950", "ai", "opac", "hub", "search", "settings", "diagnostics", "koha-security"]
+TAINACAN_CARDS = ["tainacan-maintenance", "tainacan-events"]
 # The Backup center and the Schedules center are shared (main menu, Paulo
 # 2026-11-06): a platform home has a card that opens them already filtered.
 SERVER_SCREENS = ["backups", "schedules", "security", "infra", "server-diagnostics", "languages", "update", "tools", "about",
@@ -160,15 +165,15 @@ def test_each_platform_home_follows_its_state(server):
     assert kid == "view-koha"
     if koha:
         # The Schedules center's card sits where the editor was, after indexing.
-        cards = KOHA_SCREENS[:KOHA_SCREENS.index("search") + 1] + ["schedules"] + \
-            KOHA_SCREENS[KOHA_SCREENS.index("search") + 1:]
+        cards = KOHA_CARDS[:KOHA_CARDS.index("search") + 1] + ["schedules"] + \
+            KOHA_CARDS[KOHA_CARDS.index("search") + 1:]
         assert kcards == ["credentials", "admin-koha", "backups"] + cards and kproblem == "" and kdash
     else:
         assert kcards == ["install"] and "not installed" in kproblem and not kdash
     tid, tcards, tproblem, tdash = homes["g"]
     assert tid == "view-tainacan"
     if tainacan:
-        assert tcards == ["admin-tainacan", "tainacan-address"] + TAINACAN_SCREENS + ["backups", "tainacan-uninstall"] \
+        assert tcards == ["admin-tainacan", "tainacan-address"] + TAINACAN_CARDS + ["backups", "tainacan-uninstall"] \
             and tproblem == "" and tdash
     else:
         assert tcards == ["tainacan-install"] and "not installed" in tproblem and not tdash
@@ -312,7 +317,7 @@ def test_the_tainacan_screens_have_their_tools_and_no_second_summary(server):
         async with app.run_test(size=(160, 48)) as pilot:
             await pilot.pause(0.3)
             out = {}
-            for sec in TAINACAN_SCREENS + ["tainacan"]:
+            for sec in TAINACAN_CARDS + ["tainacan"]:
                 app.screen.action_show(sec)
                 await pilot.pause(2.0)
                 view = current_view(app)

@@ -12,19 +12,24 @@ def test_add_routes_only_to_a_missing_application_driver(monkeypatch, applicatio
     calls=[]
     async def run(app): calls.append(application)
     monkeypatch.setitem(ROUTINES, {'koha':'install','tainacan':'tainacan-install','dspace':'dspace-install'}[application],run)
+    shown=[]
     async def choose(screen):
-        assert isinstance(screen,ChoiceScreen)
-        return application
+        shown.append(type(screen).__name__)
+        # U5: the list, then what the system is and needs, then Install…
+        return application if isinstance(screen,ChoiceScreen) else True
     app=SimpleNamespace(platform_ready=lambda p:p!=application,push_screen_wait=choose)
     asyncio.run(instances.add(app))
-    assert calls==[application]
+    assert calls==[application] and shown==['ChoiceScreen','PlanSummaryScreen']
 
 
 def test_add_never_reinstalls_an_existing_application(monkeypatch):
     async def forbidden(app): raise AssertionError('existing data must not be reinstalled')
     for action in ('install','tainacan-install','dspace-install'):monkeypatch.setitem(ROUTINES,action,forbidden)
-    async def choose(screen):return 'koha' # stale/invalid answer must not select an installed target
-    asyncio.run(instances.add(SimpleNamespace(platform_ready=lambda p:p=='koha',push_screen_wait=choose)))
+    async def choose(screen):return 'koha' # an installed one opens its page, never a second installation
+    opened=[]
+    screen=SimpleNamespace(action_show=opened.append)
+    asyncio.run(instances.add(SimpleNamespace(platform_ready=lambda p:p=='koha',push_screen_wait=choose,screen=screen)))
+    assert opened==['koha']
 
 
 def test_cancel_remove_does_not_call_a_driver(monkeypatch):

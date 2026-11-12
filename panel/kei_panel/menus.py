@@ -68,6 +68,14 @@ class Section:
     # drawn under that group's row, only while the group is expanded. The
     # group's own row is the section whose id is the group (its home).
     group: str = ""
+    # A tool of its platform group (study 17.1): drawn under the group's
+    # "tools" divider, after the standard items every group has in the same
+    # order (Administrative access, Addresses and access, Backups and
+    # schedules, Diagnosis and maintenance).
+    tool: bool = False
+    # A sidebar row that opens another section, already filtered by its
+    # group ("Backups and schedules" = the Backup center for this system).
+    opens: str = ""
 
 
 # The platform groups of the sidebar, in order: the id of the platform's
@@ -81,7 +89,7 @@ SECTIONS: tuple[Section, ...] = (
     # live here only, in tabs (views/dashboard.py).
     Section("dashboard", "Control Dashboard", view="dashboard", key="d", icon="📊"),
 
-    Section("instances", "➕  Add or remove instance", "Instances", entries=(
+    Section("instances", "➕  Add system", "Instances", entries=(
         Entry("➕  Add instance", "instance-add", kind="native"),
         Entry("🗑  Remove instance", "instance-remove", kind="native", zone="removal"),
     )),
@@ -112,6 +120,28 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🩺  Koha diagnostics & maintenance", "diagnostics", kind="view"),
         Entry("🛡  Koha security", "koha-security", kind="view"),
     ), view="platform-home", key="k", group="koha"),
+    # The standard items of every platform group (study 17.1), first and in
+    # the same order; each one gathers cards that also stay where they were.
+    Section("koha-admin", "🔐  Administrative access", "🔐  Administrative access", entries=(
+        Entry("🔐  Administrative access", "admin-koha", kind="native"),
+        Entry("🔑  View first-access credentials", "credentials", kind="native"),
+        Entry("👑  Create super librarian", "superlibrarian", kind="native"),
+    ), requires="koha", group="koha"),
+    Section("koha-addresses", "🌐  Addresses and access", "🌐  Addresses and access", entries=(
+        Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native"),
+        Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native"),
+        Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
+    ), requires="koha", group="koha"),
+    Section("koha-backups", "💾  Backups and schedules", requires="koha", group="koha", opens="backups"),
+    # Koha's diagnosis and maintenance (the server's own: Server diagnostics).
+    Section("diagnostics", "🩺  Koha diagnostics & maintenance", "🩺  Koha diagnostics & maintenance",
+            "Choose a tool:", (
+        Entry("🏥  Full system health check", "health", kind="native"),
+        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native"),
+        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
+        Entry("📑  Database tables", "database", kind="view"),
+        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
+    ), requires="koha", group="koha"),
     Section("credentials", "🔑  View first-access credentials", requires="koha", entries=(
         Entry("🔑  View first-access credentials", "credentials", kind="native"),), sidebar=False, parent="koha",
         group="koha"),
@@ -120,7 +150,7 @@ SECTIONS: tuple[Section, ...] = (
             prompt="Imports bibliographic records, authority records and patron (reader) data from other systems: "
                    "MARC, ISIS, CSV and spreadsheets, and old-system backups.", entries=(
         Entry("🪄  Magic Import Tool (drop anything here)", "magic-import", kind="native"),), key="i", requires="koha",
-        group="koha"),
+        group="koha", tool=True),
     # Enrichment jobs (views/enrich.py), opened from Library tools (or its key).
     # The batch "Enrich bibliographic catalog" screen is retired (Paulo, 1.5.94):
     # "Enrich from world catalogues" (on-demand enrichment) replaces it. Its view and installer tasks stay in the
@@ -151,12 +181,12 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🧩  Koha plugins (turn on or off)", "plugins", kind="native"),
         Entry("📂  Staff access to server files", "access-files", kind="native"),
         Entry("🧮  Cutter Calculator", "cutter", kind="native", hidden=True),
-    ), key="l", requires="koha", group="koha"),
+    ), key="l", requires="koha", group="koha", tool=True),
     # New screen: this Koha's Z39.50/SRU server (on/off), the koha.nexus
     # Catalog Network, and public catalogues for copy cataloguing (Z39.50 and
     # SRU), scanned and ranked, added to Koha's z3950servers (no bash menu).
     Section("z3950", "📡  Z39.50 / SRU servers", "📡  Z39.50 / SRU servers", view="z3950", key="z", requires="koha",
-            group="koha"),
+            group="koha", tool=True),
     # New screen: both AI tools on one page (views/ai.py). AI cataloguing
     # (Module 1: MARC Replace, which opens the routine below) and the AI
     # assistant (Module 2: the chat on the Koha staff home page) share the
@@ -164,11 +194,11 @@ SECTIONS: tuple[Section, ...] = (
     Section("ai", "🤖  AI", "🤖  AI", entries=(
         Entry("🔀  Replace a MARC record (staff tool)", "marc-replace", kind="native"),
         Entry("💬  AI assistant on the staff home page", "ai-assistant", kind="native"),
-    ), view="ai", key="a", requires="koha", group="koha"),
+    ), view="ai", key="a", requires="koha", group="koha", tool=True),
     # New screen: the look of the public catalogue and the staff interface (textures, wallpaper, dark mode,
     # New arrivals carousel), written into OpacUserCSS / OpacUserJS (no bash menu).
     Section("opac", "🎨  OPAC and Staff Appearance", "🎨  OPAC and Staff Appearance", view="opac", key="o",
-            requires="koha", group="koha"),
+            requires="koha", group="koha", tool=True),
     # Messaging & interoperability: e-mail, WhatsApp/Telegram, SMS, SIP2 and
     # Z39.50 on one screen (views/hub.py); its buttons run these routines.
     # This Koha's Z39.50/SRU server is turned on and off on the z3950 screen:
@@ -177,11 +207,11 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📧  Configure email and circulation notices", "email", kind="native"),
         Entry("💬  Messaging: WhatsApp and Telegram", "messaging", kind="native"),
         Entry("🔌  Enable interoperability (SIP2 and Z39.50)", "interoperability", kind="native", hidden=True),
-    ), view="hub", key="m", requires="koha", group="koha"),
+    ), view="hub", key="m", requires="koha", group="koha", tool=True),
     Section("search", "🔍  Search engine & indexing", "🔍 Search Engine & Indexing", "Choose an action:", (
         Entry("🔃  Toggle search engine (Zebra ⇄ Elasticsearch)", "search-toggle", kind="native"),
         Entry("🔨  Repair / rebuild indexing", "search-repair", kind="native"),
-    ), requires="koha", group="koha"),
+    ), requires="koha", group="koha", tool=True),
     # The visual cron manager of koha_tasks (views/crons.py); the entry is the
     # classic routine. Reached from the Schedules center (Paulo, 2026-11-06).
     Section("crons", "⏰  Schedules & cron tasks", entries=(
@@ -191,16 +221,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("settings", "🔧  Koha settings & parameters", "🔧 Koha Settings & Parameters", "Choose a parameter:", (
         Entry("📏  Server sizing (memory / workers)", "sizing", kind="native"),
         Entry("👑  Create super librarian", "superlibrarian", kind="native"),
-    ), requires="koha", group="koha"),
-    # Koha's diagnosis and maintenance (the server's own: Server diagnostics).
-    Section("diagnostics", "🩺  Koha diagnostics & maintenance", "🩺  Koha diagnostics & maintenance",
-            "Choose a tool:", (
-        Entry("🏥  Full system health check", "health", kind="native"),
-        Entry("📜  Real-time Apache log auditing", "apache-log", kind="native"),
-        Entry("🧹  Deep database optimization & log cleanup", "db-maintenance", kind="native"),
-        Entry("📑  Database tables", "database", kind="view"),
-        Entry("🔁  Restart / repair Koha services (Memcached, Plack)", "repair-services", kind="native"),
-    ), requires="koha", group="koha"),
+    ), requires="koha", group="koha", tool=True),
     # New screen: Koha's tables at a glance (no bash menu of its own), opened
     # from Koha diagnostics & maintenance (Paulo, 2026-10-15: not on the sidebar;
     # maintenance and the reports pack have their own cards elsewhere).
@@ -211,7 +232,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
         Entry("🔐  Rotate database password", "rotate-db-password", kind="native"),
         Entry("🔎  Google Search Console Assistant", "search-console", kind="native"),
-    ), requires="koha", group="koha"),
+    ), requires="koha", group="koha", tool=True),
 
     # ---------------- Tainacan (collections and museums) ----------------
     # Its home: installing while it is absent (Docker is prepared on the
@@ -234,6 +255,14 @@ SECTIONS: tuple[Section, ...] = (
         Entry("💾  Tainacan backups", "backups", kind="view", scope="tainacan"),
         Entry("🗑  Uninstall Tainacan", "tainacan-uninstall", kind="native", zone="removal", requires="tainacan"),
     ), view="platform-home", key="g", group="tainacan"),
+    Section("tainacan-admin", "🔐  Administrative access", "🔐  Administrative access", entries=(
+        Entry("🔐  Administrative access", "admin-tainacan", kind="native"),
+        Entry("👤  WordPress administrator", "tainacan-credentials", kind="native"),
+    ), view="platform-section", requires="tainacan", group="tainacan"),
+    Section("tainacan-addresses", "🌐  Addresses and access", "🌐  Addresses and access", entries=(
+        Entry("🌐  Tainacan address", "tainacan-address", kind="native"),
+    ), view="platform-section", requires="tainacan", group="tainacan"),
+    Section("tainacan-backups", "💾  Backups and schedules", requires="tainacan", group="tainacan", opens="backups"),
     Section("tainacan-maintenance", "🩺  Tainacan diagnosis & maintenance", "🩺  Tainacan diagnosis & maintenance",
             "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown "
             "in the Control Dashboard, Tainacan tab.", (
@@ -249,7 +278,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🎟  Turn events on", "events-on", kind="native"),
         Entry("⏸  Turn events off", "events-off", kind="native"),
         Entry("📋  Events state", "events-status", kind="native"),
-    ), view="platform-section", requires="tainacan", group="tainacan"),
+    ), view="platform-section", requires="tainacan", group="tainacan", tool=True),
     Section("dspace", "🏛  DSpace (repository)", "🏛  DSpace (repository)", entries=(
         Entry("📦  Install or resume DSpace", "dspace-install", kind="native", zone="setup"),
         Entry("▶  Start DSpace", "dspace-start", kind="native", zone="recovery", requires="dspace"),
@@ -264,6 +293,14 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📖  DSpace first steps", "dspace-help", kind="native", requires="dspace"),
         Entry("🗑  Remove DSpace", "dspace-remove", kind="native", zone="removal", requires="dspace"),
     ), view="platform-home", key="j", group="dspace"),
+    Section("dspace-admin-access", "🔐  Administrative access", "🔐  Administrative access", entries=(
+        Entry("🔐  Administrative access", "dspace-admin", kind="native"),
+    ), view="platform-section", requires="dspace", group="dspace"),
+    Section("dspace-addresses", "🌐  Addresses and access", "🌐  Addresses and access", entries=(
+        Entry("🌐  DSpace address and HTTPS", "dspace-address", kind="native"),
+        Entry("🔧  Repair DSpace web access", "dspace-repair-web", kind="native"),
+    ), view="platform-section", requires="dspace", group="dspace"),
+    Section("dspace-backups", "💾  Backups and schedules", requires="dspace", group="dspace", opens="backups"),
     Section("dspace-maintenance", "🩺  DSpace diagnosis & maintenance", "🩺  DSpace diagnosis & maintenance", entries=(
         Entry("🩺  DSpace diagnosis", "dspace-diagnose", kind="native"),
         Entry("📜  DSpace logs", "dspace-logs", kind="native"),
