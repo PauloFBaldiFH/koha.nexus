@@ -439,7 +439,7 @@ async def _restore_parts(app, title: str, path: str, found: Inspected) -> None:
         if 'dspace' in chosen:
             from . import dspace
             ds_path = out.results.get('dspace')
-            if not ds_path or not await dspace.restore_path(app,ds_path):
+            if not ds_path or not await dspace.restore_path(app,ds_path,show=False):
                 return  # no other platform is changed after a refused/cancelled DSpace recovery
         for pid in chosen:
             if pid == 'dspace': continue

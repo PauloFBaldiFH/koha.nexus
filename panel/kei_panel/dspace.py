@@ -176,3 +176,96 @@ def diagnosis_rows(data: dict) -> list[tuple[str, str, str]]:
     else:
         rows.append(('warn', 'Address verified from this server', t('not checked')))
     return rows
+
+
+# ----------------------------------------------------------------------
+# Completion and operations (U4): results summed up in plain lines. The
+# runtime's JSON stays whole behind "Technical details", never in front.
+# ----------------------------------------------------------------------
+def size_text(n) -> str:
+    if not isinstance(n, (int, float)) or isinstance(n, bool) or n < 0:
+        return t('Unknown')
+    for unit in ('B', 'KB', 'MB', 'GB'):
+        if n < 1024 or unit == 'GB':
+            return f'{n:.0f} {unit}' if unit == 'B' else f'{n:.1f} {unit}'
+        n /= 1024
+    return f'{n:.1f} GB'
+
+
+def yes_no(value) -> str:
+    return t('Yes') if value is True else t('No') if value is False else t('Unknown')
+
+
+def codec(value) -> str:
+    from .backup_center import DSPACE_CODECS
+    return t(DSPACE_CODECS[value]) if value in DSPACE_CODECS else label({}, value)
+
+
+def admin_emails(data: dict | None) -> list[str]:
+    import re
+    email = re.compile(r'[^@\s|=]+@[^@\s|=]+\.[^@\s|=]+')
+    return [v for v in (data or {}).get('admins', []) if isinstance(v, str) and len(v) <= 254 and email.fullmatch(v)]
+
+
+def admin_fact(data: dict | None) -> tuple[str, str, str]:
+    """The administrator line of the completion: pending until one exists."""
+    if data is None:
+        return ('warn', t('Administrator account'), t('could not be read; see Administrative access'))
+    emails = admin_emails(data)
+    if not emails:
+        return ('warn', t('Administrator account'), t('not created yet'))
+    return ('ok', t('Administrator account'), ', '.join(emails))
+
+
+def backup_rows(data: dict) -> list[tuple[str, str]]:
+    package = str(data.get('package') or '')
+    return [(t('File'), package.rsplit('/', 1)[-1] or t('Unknown')),
+            (t('Folder'), package.rsplit('/', 1)[0] if '/' in package else t('Unknown')),
+            (t('Size'), size_text(data.get('bytes'))),
+            (t('Compression'), codec(data.get('compression'))),
+            (t('Encrypted'), yes_no(data.get('encrypted'))),
+            (t('Repository paused for'), t('${n} s', n=data['window_seconds'])
+             if isinstance(data.get('window_seconds'), (int, float)) else t('Unknown'))]
+
+
+def restore_plan_rows(plan: dict, package: str = '') -> list[tuple[str, str]]:
+    rows = []
+    if package:
+        rows.append((t('Backup'), package.rsplit('/', 1)[-1]))
+    rows += [(t('Made from'), origin(plan.get('source_url')) or t('Unknown')),
+             (t('Restored into'), origin(plan.get('destination_url')) or t('Unknown')),
+             (t('Files'), str(plan['files']) if isinstance(plan.get('files'), int) else t('Unknown')),
+             (t('Size'), size_text(plan.get('uncompressed_bytes'))),
+             (t('Compression'), codec(plan.get('compression'))),
+             (t('Safety backup first'), yes_no(plan.get('safety_backup_required'))),
+             (t('Current data kept'), t('Yes, in the old volumes') if plan.get('old_volumes_preserved') else t('No')),
+             (t('Repository pauses'), yes_no(plan.get('repository_will_pause')))]
+    return rows
+
+
+def test_rows(result: dict) -> list[tuple[str, str]]:
+    return [(t('Recovery verified'), yes_no(result.get('verified'))),
+            (t('Database'), t('all records read') if result.get('database') else t('Unknown')),
+            (t('Files'), t('all checksums match') if result.get('files') else t('Unknown')),
+            (t('Search (Solr)'), t('all cores read') if result.get('solr') else t('Unknown')),
+            (t('Network used'), t('none; nothing was published') if result.get('public_ports') is False else t('Unknown')),
+            (t('Active repository'), t('not changed'))]
+
+
+def restore_rows(result: dict) -> list[tuple[str, str]]:
+    safety = str(result.get('safety_backup') or '')
+    return [(t('Restored'), yes_no(result.get('restored'))),
+            (t('Safety backup'), safety.rsplit('/', 1)[-1] or t('Unknown')),
+            (t('Previous data'), t('kept in the old volumes') if result.get('old_volumes_preserved') else t('Unknown'))]
+
+
+def repair_rows(plan: dict) -> list[tuple[str, str]]:
+    url = origin(plan.get('url')) or str(plan.get('url') or '')
+    rows = [(t('New address'), f"{url} ({t(where(url))})" if url else t('Unknown')),
+            (t('Current address'), origin(plan.get('previous_url')) or t('Unknown')),
+            (t('Changes'), t('DSpace address and its Apache site; a copy is kept to undo')),
+            (t('Repository data'), t('kept') if plan.get('data_volumes_preserved') else t('Unknown')),
+            (t('Database migration'), t('none') if plan.get('database_migration') is False else t('Unknown'))]
+    if isinstance(plan.get('note'), str) and plan['note']:
+        rows.append((t('Note'), t(plan['note'])))
+    return rows

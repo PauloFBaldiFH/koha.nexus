@@ -152,19 +152,42 @@ async def tainacan_initial_diagnosis(app, title: str) -> bool:
     return bool(await app.push_screen_wait(CheckReportScreen(t("Before installing Tainacan"), rows)))
 
 
-async def tainacan_final_diagnosis(app) -> None:
-    from ..screens.install_flow import CheckReportScreen
+async def tainacan_completion(app, result) -> None:
+    """The end of the installation (study 8.3), in the same layout as
+    DSpace: the checks summed up, the addresses, the administrator."""
+    from .admin_access import Admins, change_password
+    from ..screens.install_flow import CompletionScreen
 
     out = await app.bridge.task("tainacan-status")
-    if out.results:
-        await app.push_screen_wait(CheckReportScreen(
-            t("Tainacan diagnosis after the installation"), tainacan_status_rows(out.results), final=True))
+    checks = tainacan_status_rows(out.results) if out.results else [
+        ("fail", "Collections API checked", t("The diagnosis could not be read."))]
+    url = out.results.get("url", "") if out.results else ""
+    links = [(t("Public site"), url), (t("Sign in"), url.rstrip("/") + "/wp-admin")] if url else []
+    admins = Admins(await app.bridge.task("admin-status", "tainacan"))
+    if admins.state == "initial" and admins.initial:
+        fact = ("warn", t("Administrator account"),
+                t("${name}, with a generated password", name=admins.initial))
+    elif admins.admins:
+        fact = ("ok", t("Administrator account"), ", ".join(admins.admins))
+    else:
+        fact = ("warn", t("Administrator account"), t("could not be read; see Administrative access"))
+    pending = admins.state == "initial" and bool(admins.initial)
+    done = result.value if isinstance(result.value, TaskOutcome) else None
+    last = done.last("info") if done is not None else None
+    choice = await app.push_screen_wait(CompletionScreen(
+        "Tainacan", checks, links, facts=[fact], note=last[2] if last else "",
+        next_step=t("Set your own password to sign in to WordPress; the generated one is not shown.") if pending else "",
+        action=t("Set my password now") if pending else "",
+        reminder=t("Administrative access, the address and backups are always in the Tainacan menu."),
+        report_title=t("Tainacan diagnosis after the installation")))
+    if choice == "action":
+        await change_password(app, "tainacan", admins.initial)
 
 
 async def tainacan_install(app) -> None:
     """The initial diagnosis, an address, the summary, the stages, the
     final diagnosis."""
-    from .common import run_task, show_done
+    from .common import run_task, show_failure
     from ..screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
     from ..screens.install_flow import PlanSummaryScreen
 
@@ -226,16 +249,16 @@ async def tainacan_install(app) -> None:
         return
     args = ["confirm"] + ([plan.get("address")] if plan.get("address") else [])
     result = await run_task(app, title, "tainacan-install", *args)
-    if _done(result):
-        await tainacan_final_diagnosis(app)
-    await show_done(app, title, result, t("Tainacan is installed."))
-    if _done(result):
-        # The address chosen before: the local network on purpose is the
-        # step done; the free address is made now, by its wizard.
-        if mode in ("local", "domain"):
-            await _setup_done(app, "tainacan", "public")
-        elif mode == "free":
-            await tainacan_free(app, True)
+    if not _done(result):
+        await show_failure(app, title, result)
+        return
+    await tainacan_completion(app, result)
+    # The address chosen before: the local network on purpose is the step
+    # done; the free address is made now, by its wizard.
+    if mode in ("local", "domain"):
+        await _setup_done(app, "tainacan", "public")
+    elif mode == "free":
+        await tainacan_free(app, True)
 
 
 async def tainacan_backup(app) -> None:

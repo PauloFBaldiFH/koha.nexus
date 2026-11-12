@@ -14,7 +14,7 @@ from kei_panel.dspace import origin, payload
 from kei_panel.env import PanelEnv
 from kei_panel.routines import dspace
 from kei_panel.screens.dialogs import InputScreen, MessageScreen
-from kei_panel.screens.install_flow import CheckReportScreen, PlanSummaryScreen
+from kei_panel.screens.install_flow import CheckReportScreen, CompletionScreen, PlanSummaryScreen
 from kei_panel.tasks import TaskResult
 from kei_panel.widgets.cards import ActionCard
 
@@ -77,6 +77,7 @@ class App:
         self.screens.append(screen)
         if isinstance(screen,MessageScreen):return None
         if isinstance(screen,CheckReportScreen) and screen._final:return True   # a report, not a question
+        if isinstance(screen,CompletionScreen):return None    # U4: "Do it later" (test_u4_completion covers the action)
         assert self.answers,'Unexpected question'
         return self.answers.pop(0)
 
@@ -187,7 +188,7 @@ def test_external_proxy_instructions_are_shown_before_setup(monkeypatch):
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
-    assert any(note in getattr(s,'_body','') for s in app.screens if isinstance(s,MessageScreen))
+    assert any(note==s._note for s in app.screens if isinstance(s,CompletionScreen))   # U4: in the completion
 
 
 def test_failed_worker_never_continues_even_with_partial_success_payload(monkeypatch):

@@ -304,7 +304,7 @@ ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPicke
 TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen,
 ServerHelperScreen, SaveBackupScreen, WebTransferScreen, ProfileScreen, OAuthScreen,
 CloudBackupScreen, RemoteFormScreen, PlanFormScreen, CloudflareScreen,
-DiagnosticsScreen, LogTailScreen, CheckReportScreen {
+DiagnosticsScreen, LogTailScreen, CheckReportScreen, PlanSummaryScreen, CompletionScreen {
     align: center middle;
     background: $background 70%;
 }
@@ -943,3 +943,8 @@ App.-plain #picker-drop {
 .check-row.-fail .check-mark { color: $error; }
 .check-label { width: 40; }
 .check-detail { width: 1fr; color: $text-muted; }
+/* Completion (U4): the next step stands apart; a pending fact in its colour. */
+.completion-next { margin-top: 1; text-style: bold; }
+.completion-row.-warn .detail-value { color: $warning; }
+.completion-row.-fail .detail-value { color: $error; }
+.completion-reminder { margin-top: 1; }

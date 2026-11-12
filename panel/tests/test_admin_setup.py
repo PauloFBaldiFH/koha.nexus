@@ -63,8 +63,8 @@ class FakeApp:
 
     async def push_screen_wait(self, screen):
         self.screens.append(screen)
-        if isinstance(screen, MessageScreen):
-            return None
+        if isinstance(screen, MessageScreen) or type(screen).__name__ == "CompletionScreen":
+            return None                     # U4: the end of an installation, "Do it later"
         assert self.script, f"unexpected screen {type(screen).__name__}"
         return self.script.pop(0)(screen)
 

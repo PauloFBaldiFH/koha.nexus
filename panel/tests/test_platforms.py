@@ -521,7 +521,7 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
             preview = isinstance(app.screen, PlanSummaryScreen) and "wordpress.org" in str(app.screen._rows)
             await pilot.click(f"#{answer}")
             await pilot.pause(2.0)
-            report = isinstance(app.screen, CheckReportScreen) and app.screen._final
+            report = type(app.screen).__name__ == "CompletionScreen"     # U4: the common completion
             return shown, (checked, asked, preview, report), [r for r in ran if r[0].startswith("tainacan-")]
 
     shown, seen, ran = asyncio.run(main("back"))
@@ -529,7 +529,7 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
     assert (shown, seen) == (["tainacan-install"], (True, ["local", "domain", "free", "later"], True, False))
     assert ran == [("tainacan-preflight", ()), ("tainacan-free-status", ()), ("tainacan-plan", ())]   # Back: nothing installed
     _shown_, seen, ran = asyncio.run(main("install"))
-    assert seen[-1] is True                                  # the final diagnosis after it
+    assert seen[-1] is True                                  # the completion, with the final diagnosis
     assert ran == [("tainacan-preflight", ()), ("tainacan-free-status", ()), ("tainacan-plan", ()),
                    ("tainacan-install", ("confirm", "http://192.168.0.10:8090")), ("tainacan-status", ())]
 
