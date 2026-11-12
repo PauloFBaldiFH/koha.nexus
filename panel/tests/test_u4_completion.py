@@ -329,9 +329,11 @@ def test_completion_fits_and_opens_the_report(size, pt):
 
 
 def test_titles_by_state():
-    ready = CompletionScreen('DSpace', OK_CHECKS, [])
-    pending = CompletionScreen('DSpace', OK_CHECKS, [], facts=[('warn', 'Administrator account', 'not created yet')])
-    failed = CompletionScreen('DSpace', OK_CHECKS + [('fail', 'Public interface', 'Stopped')], [])
+    async def build():      # a Screen needs a running loop on Python 3.9
+        return (CompletionScreen('DSpace', OK_CHECKS, []),
+                CompletionScreen('DSpace', OK_CHECKS, [], facts=[('warn', 'Administrator account', 'not created yet')]),
+                CompletionScreen('DSpace', OK_CHECKS + [('fail', 'Public interface', 'Stopped')], []))
+    ready, pending, failed = asyncio.run(build())
     assert (ready.pending, pending.pending, failed.pending) == (False, True, True)
 
 
