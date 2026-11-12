@@ -55,6 +55,11 @@ class AddressesView(SectionView):
             yield Button(t("Test access"), id="addr-test", classes="small")
         yield from self.cards()
 
+    def on_mount(self) -> None:
+        # Read as soon as it exists too: a Show event can be missed when the
+        # view is mounted and made current in one step on a busy machine.
+        self.refresh_data()
+
     def on_show(self) -> None:
         self.refresh_data()
 
