@@ -1991,15 +1991,15 @@
    "_en": "217301606f"
   },
   "sec-languages": {
-   "summary": "Os pacotes de idioma do Koha e o idioma do painel, divididos em quatro ações claras: só baixar, baixar e ativar, ativar um idioma já instalado e listar.",
+   "summary": "A Central de idiomas: o idioma deste painel e de cada sistema (Koha, Tainacan, DSpace) numa só tela, cada um com o seu botão.",
    "overview": [
-    "A interface do Koha (OPAC e intranet) pode aparecer em vários idiomas, cada um instalado como um *pacote de idioma*. O próprio painel tem os seus 23 idiomas. Desde a versão 1.5.42 as quatro ações são separadas, para você nunca mudar o idioma ativo sem querer quando só queria baixar um pacote.",
-    "Num servidor onde o Koha ainda não está instalado, escolher um idioma muda o idioma do painel, e a instalação instala o pacote correspondente depois."
+    "Cada linha mostra o idioma em uso agora, lido de onde o próprio aplicativo o guarda: a configuração do painel, as preferências do OPAC e da equipe do Koha, o idioma do WordPress do Tainacan e os idiomas da interface do DSpace. Abrir a central não muda nada.",
+    "Um sistema que não está instalado aparece como *Não instalado*, sem botão. Os cartões abaixo das linhas são as mesmas ações: as quatro do Koha (só baixar, baixar e ativar, ativar um idioma já instalado, listar) e uma para o painel, o Tainacan e o DSpace."
    ],
    "tips": [
-    "Instale primeiro os pacotes de que você precisa, depois decida qual fica ativo: navegadores de leitores que pedem outro idioma habilitado recebem aquele."
+    "Mudar o idioma do painel não muda o Koha. *Baixar e ativar* muda os dois quando o painel tem esse idioma."
    ],
-   "_en": "bf8eb9af75"
+   "_en": "0c19a5d979"
   },
   "languages": {
    "summary": "Baixa um pacote de idioma do Koha e o torna o idioma do OPAC, da intranet e deste painel de uma vez.",
@@ -2816,6 +2816,28 @@
   },
   "sec-dspace-backups": {
    "summary": "Abre a Central de backups já mostrando os backups do DSpace."
+  },
+  "panel-language": {
+   "summary": "Muda só o idioma deste painel. O Koha, o Tainacan e o DSpace mantêm os seus.",
+   "steps": [
+    "Abra **Idiomas** e aperte **Mudar** na linha do painel (ou o cartão *Idioma só do painel*).",
+    "Escolha o idioma e confirme: o painel fecha e abre de novo nesse idioma."
+   ],
+   "overview": [
+    "A escolha é gravada na mesma configuração que a primeira tela do painel usa (translation.conf). Nada é baixado e nenhum sistema muda."
+   ],
+   "_en": "2865fbdb46"
+  },
+  "tainacan-language": {
+   "summary": "O idioma do WordPress e do plugin Tainacan, para visitantes e administradores.",
+   "steps": [
+    "Abra **Idiomas** e aperte **Mudar** na linha do Tainacan (ou o cartão *Idioma do Tainacan*).",
+    "Escolha o idioma e confirme: o WordPress baixa a tradução dele e a do plugin e a deixa como idioma ativo."
+   ],
+   "overview": [
+    "Acervos, itens e contas não mudam. Se a tradução não puder ser baixada, o WordPress fica no idioma que tinha e a mensagem avisa."
+   ],
+   "_en": "d521ede8ba"
   }
  }
 }

@@ -70,6 +70,7 @@ ROUTINES: dict[str, Routine] = {
     "clock": settings.clock,
     "languages": tools.languages,
     "lang-activate": tools.language_activate,
+    "panel-language": tools.panel_language,
     "update-panel": tools.update_panel,
     "monitor": tools.monitor,
     "mc": tools.mc,
@@ -99,6 +100,7 @@ ROUTINES: dict[str, Routine] = {
     "pbackup-verify": platforms.backup_verify,
     "pbackup-incomplete": platforms.backup_incomplete,
     "tainacan-address": platforms.tainacan_address,
+    "tainacan-language": platforms.tainacan_language,
     # Administrative access and the steps after a new installation.
     "admin-koha": admin_access.koha_admin,
     "admin-tainacan": admin_access.tainacan_admin,

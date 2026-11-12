@@ -567,6 +567,10 @@ _SCRIPTS: dict[str, list[str]] = {
                               "(ok 3 128 117)"],
     "tainacan-restore": ["@@msg ok OK\tRestored knx-tainacan-20261105-020000. The state before is in the safety "
                          "backup knx-tainacan-20261105-143500. (ok 3 128 117)"],
+    # The Language center (views/languages.py).
+    "koha-languages": ["@@result koha=installed", "@@result installed=en", "@@result installed=pt-BR",
+                       "@@result installed=es-ES", "@@result opac=pt-BR,en", "@@result staff=pt-BR"],
+    "tainacan-language": ["@@msg ok OK\tLanguage set: es_ES."],
     "tainacan-credentials": ["@@msg ok OK\tTainacan administrator\nAddress: http://192.168.0.10:8090/wp-admin/\n"
                              "User: knadmin\nPassword: demo-password-123"],
     # The common backup engine of the platforms (views/platforms.py, "Platform backups").
@@ -1039,6 +1043,10 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         elif command == "backup-restore":
             data = {"restored": True, "safety_backup": "/var/backups/koha-nexus/dspace/knx-dspace-20261112-143500.tar.gz.gpg",
                     "old_volumes_preserved": True}
+        elif command == "operations" and args[1:2] == ("languages",):
+            data = {"available": [{"code": "en", "label": "English"}, {"code": "pt-BR", "label": "Português do Brasil"},
+                                  {"code": "es", "label": "Español"}],
+                    "active": ["pt-BR", "en"], "fallback": "pt-BR", "suggested": "pt-BR", "accounts": ["en", "pt-BR"]}
         elif command == "operations" and args[1:2] == ("repair-web",):
             data = {"url": "http://localhost:8100", "previous_url": "http://192.168.1.20:8100", "local_only": True,
                     "changes": "DSpace UI/API address and owned Apache site; private configuration rollback copy",
@@ -1071,7 +1079,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         return out
     pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
                             "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
-                            "docker-plan", "dspace-prerequisites", "tainacan-plan", "tainacan-preflight", "tainacan-status", "tainacan-backups",
+                            "docker-plan", "dspace-prerequisites", "koha-languages", "tainacan-plan", "tainacan-preflight", "tainacan-status", "tainacan-backups",
                             "tainacan-restore-notes",
                             "platform-backup-status", "platform-backup-compression", "platform-backup-plan", "platform-backup-incomplete",
                             "set-inspect", "set-cleanup", "set-schedule-status", "admin-status", "setup-status", "setup-mark",

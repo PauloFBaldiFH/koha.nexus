@@ -2334,19 +2334,22 @@
    ]
   },
   "sec-languages": {
-   "summary": "Koha's language packs and the panel's language, split into four clear actions: download only, download and activate, set an installed language as active, and list.",
+   "summary": "The Language center: the language of this panel and of each system (Koha, Tainacan, DSpace) on one screen, each with its own button.",
    "related": [
+    "panel-language",
     "languages",
     "lang-download",
     "lang-activate",
-    "lang-list"
+    "lang-list",
+    "tainacan-language",
+    "dspace-languages"
    ],
    "overview": [
-    "Koha's interface (OPAC and staff) can be shown in many languages, each installed as a *language pack*. The panel itself has its own 23 languages. Since 1.5.42 the four actions are separate, so you never change the active language by accident when you only meant to download a pack.",
-    "On a server where Koha is not installed yet, choosing a language changes the panel's language and the installation installs the matching pack later."
+    "Each row shows the language in use now, read from where the application itself keeps it: the panel's setting, Koha's OPAC and staff preferences, the WordPress language of Tainacan and the interface languages of DSpace. Opening the center changes nothing.",
+    "A system that is not installed shows *Not installed* and no button. The cards below the rows are the same actions: Koha's four (download only, download and activate, set an installed language as active, list) and one each for the panel, Tainacan and DSpace."
    ],
    "tips": [
-    "Install the packs you need first, then decide which one is active: readers' browsers asking for another enabled language get that one."
+    "Changing the panel's language does not change Koha. *Download & activate* changes both when the panel has that language."
    ]
   },
   "languages": {
@@ -3255,6 +3258,33 @@
   },
   "sec-dspace-backups": {
    "summary": "Opens the Backup center already showing DSpace's backups."
+  },
+  "panel-language": {
+   "summary": "Changes only the language of this panel. Koha, Tainacan and DSpace keep theirs.",
+   "related": [
+    "languages",
+    "sec-languages"
+   ],
+   "steps": [
+    "Open **Languages** and press **Change** on the panel row (or the *Panel language only* card).",
+    "Choose the language and confirm: the panel closes and opens again in it."
+   ],
+   "overview": [
+    "The choice is written to the same setting the panel's first screen uses (translation.conf). Nothing is downloaded and no system changes."
+   ]
+  },
+  "tainacan-language": {
+   "summary": "The language of WordPress and of the Tainacan plugin, for visitors and administrators.",
+   "related": [
+    "sec-languages"
+   ],
+   "steps": [
+    "Open **Languages** and press **Change** on the Tainacan row (or the *Tainacan language* card).",
+    "Choose the language and confirm: WordPress downloads its translation and the plugin's, and makes it the active language."
+   ],
+   "overview": [
+    "Collections, items and accounts do not change. If the translation cannot be downloaded, WordPress stays in the language it had and the message says so."
+   ]
   }
  }
 }

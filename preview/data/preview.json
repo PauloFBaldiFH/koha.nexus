@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.199",
+ "panel_version": "1.5.200",
  "languages": [
   {
    "code": "en",
@@ -1083,19 +1083,21 @@
    "id": "languages",
    "item": "sec-languages",
    "label": "🌍  Languages",
-   "title": "🌍 Panel & application languages",
-   "prompt": "Choose an action:",
+   "title": "🌍 Language center",
+   "prompt": "The language of this panel and of each system:",
    "icon": "",
    "key": "",
-   "view": "section",
+   "view": "languages",
    "sidebar": true,
    "parent": "",
    "entries": [
-    "dspace-languages",
+    "panel-language",
     "languages",
     "lang-download",
     "lang-activate",
-    "lang-list"
+    "lang-list",
+    "tainacan-language",
+    "dspace-languages"
    ],
    "features": [],
    "media": [],
@@ -2594,12 +2596,12 @@
    "status": "available",
    "media": []
   },
-  "dspace-languages": {
-   "id": "dspace-languages",
+  "panel-language": {
+   "id": "panel-language",
    "type": "entry",
    "section": "languages",
-   "label": "🏛  DSpace interface languages",
-   "description": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
+   "label": "🖥  Panel language only",
+   "description": "Changes only this panel's language; Koha and the other systems stay as they are",
    "kind": "native",
    "status": "available",
    "media": []
@@ -2644,13 +2646,33 @@
    "status": "available",
    "media": []
   },
+  "tainacan-language": {
+   "id": "tainacan-language",
+   "type": "entry",
+   "section": "languages",
+   "label": "🏺  Tainacan language",
+   "description": "The language of WordPress and Tainacan: downloads it and makes it the active one",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "dspace-languages": {
+   "id": "dspace-languages",
+   "type": "entry",
+   "section": "languages",
+   "label": "🏛  DSpace interface languages",
+   "description": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
   "sec-languages": {
    "id": "sec-languages",
    "type": "section",
    "section": "languages",
    "label": "🌍  Languages",
-   "description": "Choose an action:",
-   "kind": "menu",
+   "description": "The language of this panel and of each system:",
+   "kind": "view",
    "status": "available",
    "media": []
   },
@@ -10972,9 +10994,9 @@
    "ja": null,
    "ko": null
   },
-  "🌍 Panel & application languages": {
-   "en": "🌍 Panel & application languages",
-   "pt-BR": "🌍 Idiomas do painel e dos sistemas",
+  "🌍 Language center": {
+   "en": "🌍 Language center",
+   "pt-BR": "🌍 Central de idiomas",
    "es": null,
    "fr": null,
    "it": null,
@@ -10997,9 +11019,9 @@
    "ja": null,
    "ko": null
   },
-  "🏛  DSpace interface languages": {
-   "en": "🏛  DSpace interface languages",
-   "pt-BR": "🏛  Idiomas da interface do DSpace",
+  "The language of this panel and of each system:": {
+   "en": "The language of this panel and of each system:",
+   "pt-BR": "O idioma deste painel e de cada sistema:",
    "es": null,
    "fr": null,
    "it": null,
@@ -11022,9 +11044,34 @@
    "ja": null,
    "ko": null
   },
-  "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.": {
-   "en": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
-   "pt-BR": "Seleciona as traduções incluídas na interface e o idioma alternativo. As preferências da conta, do navegador e do painel continuam independentes.",
+  "🖥  Panel language only": {
+   "en": "🖥  Panel language only",
+   "pt-BR": "🖥  Idioma só do painel",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Changes only this panel's language; Koha and the other systems stay as they are": {
+   "en": "Changes only this panel's language; Koha and the other systems stay as they are",
+   "pt-BR": "Muda só o idioma deste painel; o Koha e os outros sistemas ficam como estão",
    "es": null,
    "fr": null,
    "it": null,
@@ -11246,6 +11293,106 @@
    "zh": "列出已安装和已激活的语言",
    "ja": "インストール済み言語と有効な言語を一覧表示します",
    "ko": "설치된 언어와 활성 언어를 표시합니다"
+  },
+  "🏺  Tainacan language": {
+   "en": "🏺  Tainacan language",
+   "pt-BR": "🏺  Idioma do Tainacan",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "The language of WordPress and Tainacan: downloads it and makes it the active one": {
+   "en": "The language of WordPress and Tainacan: downloads it and makes it the active one",
+   "pt-BR": "O idioma do WordPress e do Tainacan: baixa e deixa como ativo",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🏛  DSpace interface languages": {
+   "en": "🏛  DSpace interface languages",
+   "pt-BR": "🏛  Idiomas da interface do DSpace",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.": {
+   "en": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
+   "pt-BR": "Seleciona as traduções incluídas na interface e o idioma alternativo. As preferências da conta, do navegador e do painel continuam independentes.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "🔄  Update center": {
    "en": "🔄  Update center",
@@ -22015,32 +22162,29 @@
     ]
    }
   },
-  "dspace-languages": {
+  "panel-language": {
    "en": {
-    "summary": "Select the DSpace interface languages already bundled in the installed image and the fallback for visitors without a matching preference.",
-    "steps": [
-     "Select the languages available to visitors, then choose an active fallback. The panel language supplies the first suggestion.",
-     "Review and confirm before restarting only the interface. Existing accounts, data, domains and schedules are preserved."
+    "summary": "Changes only the language of this panel. Koha, Tainacan and DSpace keep theirs.",
+    "overview": [
+     "The choice is written to the same setting the panel's first screen uses (translation.conf). Nothing is downloaded and no system changes."
     ],
-    "tips": [
-     "Visitors keep saved account, cookie or browser preferences when supported. Translation completeness varies.",
-     "Image recipes 3 and 4 offer 35 interface languages and three account languages. Recipe 5 offers 37 interface/account languages; an image update is separate from a panel update."
+    "steps": [
+     "Open **Languages** and press **Change** on the panel row (or the *Panel language only* card).",
+     "Choose the language and confirm: the panel closes and opens again in it."
     ],
     "related": [
-     "dspace-admin",
-     "dspace-upgrade",
-     "languages"
+     "languages",
+     "sec-languages"
     ]
    },
    "pt-BR": {
-    "summary": "Selecione os idiomas da interface do DSpace já incluídos na imagem instalada e o idioma alternativo para visitantes sem preferência compatível.",
-    "steps": [
-     "Escolha os idiomas dos visitantes e, depois, um idioma alternativo ativo. O idioma do painel fornece a primeira sugestão.",
-     "Confira e confirme antes de reiniciar apenas a interface. Contas existentes, dados, domínios e agendamentos são preservados."
+    "summary": "Muda só o idioma deste painel. O Koha, o Tainacan e o DSpace mantêm os seus.",
+    "overview": [
+     "A escolha é gravada na mesma configuração que a primeira tela do painel usa (translation.conf). Nada é baixado e nenhum sistema muda."
     ],
-    "tips": [
-     "Os visitantes mantêm as preferências compatíveis da conta, dos cookies ou do navegador. A cobertura das traduções varia.",
-     "As receitas 3 e 4 oferecem 35 idiomas da interface e três de conta. A receita 5 oferece 37 idiomas de interface/conta; atualizar as imagens é uma etapa separada de atualizar o painel."
+    "steps": [
+     "Abra **Idiomas** e aperte **Mudar** na linha do painel (ou o cartão *Idioma só do painel*).",
+     "Escolha o idioma e confirme: o painel fecha e abre de novo nesse idioma."
     ]
    }
   },
@@ -22161,31 +22305,88 @@
     ]
    }
   },
-  "sec-languages": {
+  "tainacan-language": {
    "en": {
-    "summary": "Koha's language packs and the panel's language, split into four clear actions: download only, download and activate, set an installed language as active, and list.",
+    "summary": "The language of WordPress and of the Tainacan plugin, for visitors and administrators.",
     "overview": [
-     "Koha's interface (OPAC and staff) can be shown in many languages, each installed as a *language pack*. The panel itself has its own 23 languages. Since 1.5.42 the four actions are separate, so you never change the active language by accident when you only meant to download a pack.",
-     "On a server where Koha is not installed yet, choosing a language changes the panel's language and the installation installs the matching pack later."
+     "Collections, items and accounts do not change. If the translation cannot be downloaded, WordPress stays in the language it had and the message says so."
     ],
-    "tips": [
-     "Install the packs you need first, then decide which one is active: readers' browsers asking for another enabled language get that one."
+    "steps": [
+     "Open **Languages** and press **Change** on the Tainacan row (or the *Tainacan language* card).",
+     "Choose the language and confirm: WordPress downloads its translation and the plugin's, and makes it the active language."
     ],
     "related": [
-     "languages",
-     "lang-download",
-     "lang-activate",
-     "lang-list"
+     "sec-languages"
     ]
    },
    "pt-BR": {
-    "summary": "Os pacotes de idioma do Koha e o idioma do painel, divididos em quatro ações claras: só baixar, baixar e ativar, ativar um idioma já instalado e listar.",
+    "summary": "O idioma do WordPress e do plugin Tainacan, para visitantes e administradores.",
     "overview": [
-     "A interface do Koha (OPAC e intranet) pode aparecer em vários idiomas, cada um instalado como um *pacote de idioma*. O próprio painel tem os seus 23 idiomas. Desde a versão 1.5.42 as quatro ações são separadas, para você nunca mudar o idioma ativo sem querer quando só queria baixar um pacote.",
-     "Num servidor onde o Koha ainda não está instalado, escolher um idioma muda o idioma do painel, e a instalação instala o pacote correspondente depois."
+     "Acervos, itens e contas não mudam. Se a tradução não puder ser baixada, o WordPress fica no idioma que tinha e a mensagem avisa."
+    ],
+    "steps": [
+     "Abra **Idiomas** e aperte **Mudar** na linha do Tainacan (ou o cartão *Idioma do Tainacan*).",
+     "Escolha o idioma e confirme: o WordPress baixa a tradução dele e a do plugin e a deixa como idioma ativo."
+    ]
+   }
+  },
+  "dspace-languages": {
+   "en": {
+    "summary": "Select the DSpace interface languages already bundled in the installed image and the fallback for visitors without a matching preference.",
+    "steps": [
+     "Select the languages available to visitors, then choose an active fallback. The panel language supplies the first suggestion.",
+     "Review and confirm before restarting only the interface. Existing accounts, data, domains and schedules are preserved."
     ],
     "tips": [
-     "Instale primeiro os pacotes de que você precisa, depois decida qual fica ativo: navegadores de leitores que pedem outro idioma habilitado recebem aquele."
+     "Visitors keep saved account, cookie or browser preferences when supported. Translation completeness varies.",
+     "Image recipes 3 and 4 offer 35 interface languages and three account languages. Recipe 5 offers 37 interface/account languages; an image update is separate from a panel update."
+    ],
+    "related": [
+     "dspace-admin",
+     "dspace-upgrade",
+     "languages"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Selecione os idiomas da interface do DSpace já incluídos na imagem instalada e o idioma alternativo para visitantes sem preferência compatível.",
+    "steps": [
+     "Escolha os idiomas dos visitantes e, depois, um idioma alternativo ativo. O idioma do painel fornece a primeira sugestão.",
+     "Confira e confirme antes de reiniciar apenas a interface. Contas existentes, dados, domínios e agendamentos são preservados."
+    ],
+    "tips": [
+     "Os visitantes mantêm as preferências compatíveis da conta, dos cookies ou do navegador. A cobertura das traduções varia.",
+     "As receitas 3 e 4 oferecem 35 idiomas da interface e três de conta. A receita 5 oferece 37 idiomas de interface/conta; atualizar as imagens é uma etapa separada de atualizar o painel."
+    ]
+   }
+  },
+  "sec-languages": {
+   "en": {
+    "summary": "The Language center: the language of this panel and of each system (Koha, Tainacan, DSpace) on one screen, each with its own button.",
+    "overview": [
+     "Each row shows the language in use now, read from where the application itself keeps it: the panel's setting, Koha's OPAC and staff preferences, the WordPress language of Tainacan and the interface languages of DSpace. Opening the center changes nothing.",
+     "A system that is not installed shows *Not installed* and no button. The cards below the rows are the same actions: Koha's four (download only, download and activate, set an installed language as active, list) and one each for the panel, Tainacan and DSpace."
+    ],
+    "tips": [
+     "Changing the panel's language does not change Koha. *Download & activate* changes both when the panel has that language."
+    ],
+    "related": [
+     "panel-language",
+     "languages",
+     "lang-download",
+     "lang-activate",
+     "lang-list",
+     "tainacan-language",
+     "dspace-languages"
+    ]
+   },
+   "pt-BR": {
+    "summary": "A Central de idiomas: o idioma deste painel e de cada sistema (Koha, Tainacan, DSpace) numa só tela, cada um com o seu botão.",
+    "overview": [
+     "Cada linha mostra o idioma em uso agora, lido de onde o próprio aplicativo o guarda: a configuração do painel, as preferências do OPAC e da equipe do Koha, o idioma do WordPress do Tainacan e os idiomas da interface do DSpace. Abrir a central não muda nada.",
+     "Um sistema que não está instalado aparece como *Não instalado*, sem botão. Os cartões abaixo das linhas são as mesmas ações: as quatro do Koha (só baixar, baixar e ativar, ativar um idioma já instalado, listar) e uma para o painel, o Tainacan e o DSpace."
+    ],
+    "tips": [
+     "Mudar o idioma do painel não muda o Koha. *Baixar e ativar* muda os dois quando o painel tem esse idioma."
     ]
    }
   },
@@ -24518,165 +24719,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 190,
-   "manual_total": 190,
+   "manual": 192,
+   "manual_total": 192,
    "manual_outdated": [],
-   "strings": 543,
-   "strings_total": 543
+   "strings": 548,
+   "strings_total": 548
   },
   "pt-BR": {
-   "manual": 190,
-   "manual_total": 190,
+   "manual": 192,
+   "manual_total": 192,
    "manual_outdated": [],
-   "strings": 537,
-   "strings_total": 543
+   "strings": 542,
+   "strings_total": 548
   },
   "es": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 543
+   "strings_total": 548
   },
   "fr": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 543
+   "strings_total": 548
   },
   "it": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 543
+   "strings_total": 548
   },
   "de": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 397,
-   "strings_total": 543
+   "strings_total": 548
   },
   "nl": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "sv": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "pl": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "cs": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "ru": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "uk": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "tr": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "tl": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "id": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "ar": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "fa": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "hi": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "bn": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "vi": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "zh": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "ja": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   },
   "ko": {
    "manual": 0,
-   "manual_total": 190,
+   "manual_total": 192,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 543
+   "strings_total": 548
   }
  }
 }

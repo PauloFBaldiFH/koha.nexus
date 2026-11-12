@@ -8,6 +8,7 @@ from .dashboard import DashboardView
 from .enrich import AuthEnrichView, EnrichView
 from .database import DatabaseView
 from .hub import HubView
+from .languages import LanguagesView
 from .ondemand import OnDemandView
 from .opac import OpacView
 from .schedules import SchedulesView
@@ -27,6 +28,7 @@ VIEWS = {
     "ondemand": OnDemandView,
     "opac": OpacView,
     "hub": HubView,
+    "languages": LanguagesView,
     "crons": CronView,
     "schedules": SchedulesView,
     "vpn": VpnView,
@@ -35,4 +37,4 @@ VIEWS = {
 }
 
 __all__ = ["VIEWS", "SectionView", "DashboardView", "BackupCenterView", "DatabaseView", "AIView", "Z3950View", "EnrichView", "OnDemandView", "OpacView",
-           "HubView", "CronView", "SchedulesView", "VpnView", "PlatformHomeView", "PlatformSectionView", "UnavailableView"]
+           "HubView", "LanguagesView", "CronView", "SchedulesView", "VpnView", "PlatformHomeView", "PlatformSectionView", "UnavailableView"]
