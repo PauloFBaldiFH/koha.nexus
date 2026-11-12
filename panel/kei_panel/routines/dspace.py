@@ -5,10 +5,11 @@ import json
 import re
 
 from ..bridge import TaskOutcome
-from ..dspace import diagnosis_rows, origin, payload, plan_rows, preflight_rows
+from ..dspace import (admin_emails, admin_fact, backup_rows, diagnosis_rows, origin, payload, plan_rows,
+                      preflight_rows, repair_rows, restore_plan_rows, restore_rows, test_rows)
 from ..i18n import t
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
-from ..screens.install_flow import CheckReportScreen, PlanSummaryScreen
+from ..screens.install_flow import CheckReportScreen, CompletionScreen, PlanSummaryScreen
 from .admin_access import ask_password
 from .common import run_task, show_failure
 
@@ -51,12 +52,32 @@ async def initial_diagnosis(app):
 
 
 async def final_diagnosis(app):
-    """The installation's own checks, read again and shown as a report."""
-    data = await call(app, 'diagnose')
-    if data is not None:
-        await app.push_screen_wait(CheckReportScreen(
-            t('DSpace diagnosis after the installation'), diagnosis_rows(data), final=True,
-            details=json.dumps(data, ensure_ascii=False, indent=2)))
+    """The installation's own checks, read again (study 16.3). Returns the
+    runtime's answer, or None when it could not be read."""
+    return await call(app, 'diagnose')
+
+
+async def completion(app, result, url):
+    """The end of the installation (study 8.3): ready, or installed with the
+    administrator still to create. Creating it is offered here, once."""
+    data = await final_diagnosis(app)
+    checks = diagnosis_rows(data) if data is not None else [
+        ('fail', 'API, interface and login page checked', t('The diagnosis could not be read.'))]
+    admins = await call(app, 'admin-status', cancellable=False)
+    fact = admin_fact(admins)
+    site = origin(result.get('url', url)) or origin(url)
+    note = t(result['note']) if isinstance(result.get('note'), str) and result['note'] else ''
+    pending = fact[0] != 'ok'
+    choice = await app.push_screen_wait(CompletionScreen(
+        'DSpace', checks, [(t('Public site'), site), (t('Sign in'), site + '/login')] if site else [],
+        facts=[fact], note=note,
+        next_step=t('Create the administrator account to sign in to DSpace.') if pending else '',
+        action=t('Create administrator now') if pending and admins is not None else '',
+        reminder=t('Administrative access, addresses and backups are always in the DSpace menu.'),
+        report_title=t('DSpace diagnosis after the installation'),
+        details=json.dumps(data, ensure_ascii=False, indent=2) if data is not None else ''))
+    if choice == 'action':
+        await admin(app, create=True)
 
 
 async def install(app):
@@ -137,10 +158,7 @@ async def install(app):
     result = await call(app, 'install', '--url', url, '--language', language, '--confirm', *retry)
     if result is not None:
         app.check_platforms()
-        await final_diagnosis(app)
-        if isinstance(result.get('note'), str) and result['note']:
-            await app.push_screen_wait(MessageScreen(TITLE, t(result['note'])))
-        await app.push_screen_wait(MessageScreen(TITLE, t("DSpace is installed. Administrative access, addresses and backups are available in the menus.") + '\n\n' + origin(result.get('url', url)) + '/login'))
+        await completion(app, result, url)
 
 
 async def control(app, start):
@@ -206,8 +224,10 @@ async def repair_web(app):
     plan = await call(app, 'operations', 'repair-web', env=env)
     if plan is None:
         return
-    if not await app.push_screen_wait(ConfirmScreen(TITLE,
-            t('Review web repair. Configuration is saved for rollback; database, files, images and schedules are preserved.') + '\n\n' + json.dumps(plan, ensure_ascii=False, indent=2))):
+    if not await app.push_screen_wait(PlanSummaryScreen(
+            t('Repair web access · Review'), repair_rows(plan),
+            body=t('Review web repair. Configuration is saved for rollback; database, files, images and schedules are preserved.'),
+            details=json.dumps(plan, ensure_ascii=False, indent=2), action=t('Repair'))):
         return
     result = await call(app, 'operations', 'repair-web', '--confirm', env=env, cancellable=False)
     if result is not None:
@@ -215,17 +235,22 @@ async def repair_web(app):
         await app.push_screen_wait(MessageScreen(TITLE, t('Web access repaired. Open the address shown in the dashboard.') + '\n\n' + origin(result.get('url', plan.get('url', ''))) + '/login'))
 
 
-async def admin(app):
+async def admin(app, create=False):
+    """Create an administrator or change one's password. create=True comes
+    from the completion screen: the choice was already made there."""
     data = await call(app, 'admin-status', cancellable=False)
     if data is None:
         return
-    emails = [v for v in data.get('admins', []) if isinstance(v, str) and len(v) <= 254 and EMAIL.fullmatch(v)]
-    choices = [('create', t('Create an administrator'))]
-    if emails:
-        choices.append(('password', t('Change the password of an administrator')))
-    choice = await app.push_screen_wait(ChoiceScreen(TITLE, t('DSpace accounts are separate from Koha and WordPress. Existing accounts are never promoted or overwritten when creating an administrator.') + '\n\n' + ', '.join(emails), choices))
-    if choice is None:
-        return
+    emails = admin_emails(data)
+    if create:
+        choice = 'create'
+    else:
+        choices = [('create', t('Create an administrator'))]
+        if emails:
+            choices.append(('password', t('Change the password of an administrator')))
+        choice = await app.push_screen_wait(ChoiceScreen(TITLE, t('DSpace accounts are separate from Koha and WordPress. Existing accounts are never promoted or overwritten when creating an administrator.') + '\n\n' + ', '.join(emails), choices))
+        if choice is None:
+            return
     request = {}
     if choice == 'create':
         for key, label in (('email', 'E-mail:'), ('first', 'First name:'), ('last', 'Last name:')):
@@ -308,7 +333,7 @@ async def backup_create(app):
         return
     data = await call(app, 'backup-create', '--compression', compression, '--confirm', cancellable=False)
     if data is not None:
-        await app.push_screen_wait(MessageScreen(TITLE, str(data.get('package', ''))))
+        await app.push_screen_wait(MessageScreen(TITLE, t('Encrypted DSpace backup created.'), details=backup_rows(data)))
 
 
 async def _recovery(app, restore):
@@ -324,13 +349,29 @@ async def _recovery(app, restore):
     if not phrase: return
     plan = await call(app, 'backup-plan', path, env={'KEI_BACKUP_PHRASE':phrase}) if restore else {}
     if plan is None: return
-    question = ('Restore DSpace? A safety backup is made first. Recovery is verified in independent volumes before replacing the active data. Old volumes are kept.' if restore else 'Test DSpace recovery in new volumes on an internal network without public ports? The active repository data are kept.')
-    if not await app.push_screen_wait(ConfirmScreen(TITLE, t(question) + ('\n\n' + json.dumps(plan,ensure_ascii=False,indent=2) if restore else ''), danger=restore)): return
+    if restore:
+        if not await confirm_restore(app, plan, path): return
+    elif not await app.push_screen_wait(ConfirmScreen(TITLE, t('Test DSpace recovery in new volumes on an internal network without public ports? The active repository data are kept.'))): return
     result = await call(app, 'backup-restore' if restore else 'backup-test', path, '--confirm',
                         env={'KEI_BACKUP_PHRASE':phrase}, cancellable=False)
     phrase = ''
     if result is not None:
-        await app.push_screen_wait(MessageScreen(TITLE, json.dumps(result, ensure_ascii=False, indent=2)))
+        await show_recovery(app, result, restore)
+
+
+async def confirm_restore(app, plan, path):
+    """Restoring replaces the active data: a plain summary, Back focused."""
+    return await app.push_screen_wait(PlanSummaryScreen(
+        t('Restore DSpace · Review'), restore_plan_rows(plan, path),
+        body=t('Restore DSpace? A safety backup is made first. Recovery is verified in independent volumes before replacing the active data. Old volumes are kept.'),
+        details=json.dumps(plan, ensure_ascii=False, indent=2), action=t('Restore'), danger=True))
+
+
+async def show_recovery(app, result, restore):
+    await app.push_screen_wait(MessageScreen(
+        TITLE, t('DSpace restored. Check the repository before sharing its address.') if restore
+        else t('Recovery test passed. The backup can be restored.'),
+        details=restore_rows(result) if restore else test_rows(result)))
 
 
 async def backup_test(app):
@@ -522,11 +563,15 @@ async def remove(app):
     await operation(app,'remove',request,True)
 
 
-async def restore_path(app,path):
+async def restore_path(app,path,show=True):
+    """show=False inside a whole-set restore, which reports at its end."""
     phrase=await app.push_screen_wait(InputScreen(TITLE,t('DSpace always requires the recovery phrase; it cannot recover encrypted data without it.'),t('Recovery phrase:'),password=True))
     if not phrase:return False
     env={'KEI_BACKUP_PHRASE':phrase}
     plan=await call(app,'backup-plan',path,env=env)
     if plan is None:return False
-    if not await app.push_screen_wait(ConfirmScreen(TITLE,json.dumps(plan,ensure_ascii=False,indent=2),danger=True)):return False
-    return await call(app,'backup-restore',path,'--confirm',env=env,cancellable=False) is not None
+    if not await confirm_restore(app,plan,path):return False
+    result=await call(app,'backup-restore',path,'--confirm',env=env,cancellable=False)
+    if result is None:return False
+    if show:await show_recovery(app,result,True)
+    return True

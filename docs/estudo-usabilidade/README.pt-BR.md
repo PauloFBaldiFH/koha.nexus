@@ -1562,3 +1562,46 @@ Testes: `panel/tests/test_u3_install.py` (fluxos, barra por etapa, Continuar
 desligado com ✖ em 80×24 e 160×48, traduções), `tests/test_dspace_runtime.py`
 (ordem das etapas, linhas sem saída de comandos, `preflight` sem gravar) e
 `tests/tainacan.bats` (lista e etapas do Tainacan).
+
+## 19. U4 entregue: conclusão comum e administrador do DSpace
+
+1. **Uma tela de conclusão para todos** (`CompletionScreen`). Título pelo
+   estado real: “está pronto” (✔), “está instalado; falta um passo” (⚠) ou
+   “está instalado, com verificações para rever” (✖). Linhas: verificações
+   resumidas (“6 de 6 aprovadas”, relatório completo em “Ver o relatório”),
+   site público e login com Abrir e Copiar, a conta de administrador, o
+   próximo passo e o lembrete de onde tudo fica no menu.
+2. **DSpace sem administrador nunca aparece como pronto.** A conclusão lê o
+   diagnóstico e o `admin-status`; sem conta, oferece “Criar administrador
+   agora” (vai direto ao formulário de criação, sem a pergunta “criar ou
+   trocar senha?”) ou “Fazer depois”, que só fecha. Se a lista de
+   administradores não puder ser lida, o estado fica pendente e o painel diz
+   para ver em Acesso administrativo. A criação continua sendo a mesma
+   rotina do menu: nenhuma senha é inventada, mostrada ou registrada.
+3. **Tainacan no mesmo formato.** Com a senha gerada na instalação, a conta
+   aparece como pendente e o botão é “Definir minha senha agora” (a senha
+   gerada nunca é mostrada). O endereço gratuito, quando escolhido, segue
+   depois, como antes. Uma falha na instalação continua na tela de falha.
+4. **Koha mantém a tela de credenciais.** A instalação do Koha já termina com
+   as credenciais do primeiro acesso; ela não foi trocada neste PR.
+5. **Resultados do DSpace em linhas simples.** Backup criado (arquivo, pasta,
+   tamanho, compressão, criptografia, tempo de pausa), teste de recuperação,
+   restauração (revisão com Voltar em foco, botão vermelho “Restaurar”;
+   resultado com o backup de segurança) e reparo do acesso web (endereço novo
+   e atual, o que muda, dados mantidos, sem migração). O JSON do motor fica
+   inteiro em “Detalhes técnicos”. Na restauração de um conjunto completo, o
+   DSpace não abre caixa própria: o conjunto informa no fim.
+
+| Falta o administrador | Relatório | Pronto | Tainacan |
+|---|---|---|---|
+| ![](capturas/u4/u4-dspace-1-conclusao-falta-admin-80x24.png) | ![](capturas/u4/u4-dspace-2-relatorio-80x24.png) | ![](capturas/u4/u4-dspace-4-conclusao-pronto-80x24.png) | ![](capturas/u4/u4-tainacan-1-conclusao-80x24.png) |
+
+| Criar administrador | Restaurar (revisão) | Restaurado |
+|---|---|---|
+| ![](capturas/u4/u4-dspace-3-criar-admin-80x24.png) | ![](capturas/u4/u4-dspace-5-restaurar-resumo-80x24.png) | ![](capturas/u4/u4-dspace-6-restaurado-80x24.png) |
+
+Testes: `panel/tests/test_u4_completion.py` (pendente × pronto, “Fazer
+depois” só fecha, criação direta, lista ilegível nunca diz pronto, revisões e
+resultados sem JSON na frente, JSON intacto nos detalhes, tela em 80×24 e
+160×48, traduções). Nenhum motor mudou: `runtime.py` e o instalador só
+mudaram a versão do painel.

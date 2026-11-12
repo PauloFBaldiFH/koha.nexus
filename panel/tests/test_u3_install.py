@@ -24,7 +24,7 @@ from kei_panel.bridge import TaskOutcome, stage_parts
 from kei_panel.i18n import Translator, install
 from kei_panel.routines import dspace, platforms as tn
 from kei_panel.screens.dialogs import MessageScreen, TextScreen
-from kei_panel.screens.install_flow import CheckReportScreen, PlanSummaryScreen
+from kei_panel.screens.install_flow import CheckReportScreen, CompletionScreen, PlanSummaryScreen
 from kei_panel.tasks import TaskResult
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -108,6 +108,8 @@ class App:
             return None
         if isinstance(screen, CheckReportScreen) and screen._final:
             return True
+        if isinstance(screen, CompletionScreen):
+            return None                       # U4: the end of the flow, "Do it later"
         return self.answers.pop(0)
 
 
@@ -115,7 +117,8 @@ def run_dspace(monkeypatch, answers, checks=CHECKS):
     calls = []
     table = {'availability': {'available': True}, 'dspace-prerequisites': {'proxy_mode': 'apache-nexus'},
              'preflight': checks, 'status': {'url': 'http://192.168.1.20:8100'}, 'plan': PLAN,
-             'install': {'status': 'installed', 'url': 'http://192.168.1.20:8100'}, 'diagnose': DIAGNOSIS}
+             'install': {'status': 'installed', 'url': 'http://192.168.1.20:8100'}, 'diagnose': DIAGNOSIS,
+             'admin-status': {'state': 'own', 'admins': []}}
 
     async def run(app, title, name, *args, **kwargs):
         calls.append((name, args))
@@ -130,7 +133,7 @@ def run_dspace(monkeypatch, answers, checks=CHECKS):
 def test_dspace_installs_through_diagnosis_summary_stages_and_report(monkeypatch):
     app, commands = run_dspace(monkeypatch, [True, True])
     kinds = [type(s) for s in app.screens]
-    assert kinds[:3] == [CheckReportScreen, PlanSummaryScreen, CheckReportScreen]
+    assert kinds[:3] == [CheckReportScreen, PlanSummaryScreen, CompletionScreen]   # U4: the report sits in the completion
     assert commands.index('preflight') < commands.index('plan') < commands.index('install') < commands.index('diagnose')
     summary = app.screens[1]
     shown = ' '.join(f'{a} {b}' for a, b in summary._rows)
@@ -138,7 +141,7 @@ def test_dspace_installs_through_diagnosis_summary_stages_and_report(monkeypatch
     assert json.loads(summary._details) == PLAN                      # the plan itself, unchanged, behind a button
     assert 'http://192.168.1.20:8100' in shown
     final = app.screens[2]
-    assert final._final and all(state == 'ok' for state, _l, _d in final._rows)
+    assert all(state == 'ok' for state, _l, _d in final._checks)
 
 
 @pytest.mark.parametrize('answer', [False, None])
@@ -259,7 +262,7 @@ class TApp:
 
     async def push_screen_wait(self, screen):
         self.screens.append(screen)
-        if isinstance(screen, MessageScreen) or (isinstance(screen, CheckReportScreen) and screen._final):
+        if isinstance(screen, (MessageScreen, CompletionScreen)) or (isinstance(screen, CheckReportScreen) and screen._final):
             return None
         return self.answers.pop(0)
 
@@ -293,8 +296,8 @@ def test_tainacan_installs_through_diagnosis_summary_and_report(monkeypatch):
     assert kinds[0] == 'CheckReportScreen' and 'PlanSummaryScreen' in kinds
     assert ran == ['tainacan-install']
     assert app.tasks.index('tainacan-preflight') < app.tasks.index('tainacan-plan') < app.tasks.index('tainacan-status')
-    final = [s for s in app.screens if isinstance(s, CheckReportScreen) and s._final][0]
-    assert all(state == 'ok' for state, _l, _d in final._rows)
+    final = [s for s in app.screens if isinstance(s, CompletionScreen)][0]
+    assert all(state == 'ok' for state, _l, _d in final._checks)
     summary = [s for s in app.screens if isinstance(s, PlanSummaryScreen)][0]
     assert ('Address', 'http://192.168.0.10:8090') in summary._rows
 

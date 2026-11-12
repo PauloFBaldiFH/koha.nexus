@@ -548,8 +548,8 @@ _SCRIPTS: dict[str, list[str]] = {
                          "@@stage [4/6] Setting up WordPress and Tainacan\tThe site, the plugin, the language and the home page.",
                          "@@stage [5/6] Checking the isolation and the collection\tThe containers' rules and the API of the collections.",
                          "@@stage [6/6] Publishing the address\tThe Apache site, the firewall port and the tunnel, when there is one.",
-                         "@@msg ok OK\tTainacan is installed at http://192.168.0.10:8090. Administrator: knadmin "
-                         "(password: Platforms, Tainacan, Administrator)."],
+                         "@@msg ok OK\tTainacan is installed at http://192.168.0.10:8090. Administrator: kn_7f3a, with a "
+                         "generated password: set your own in the panel (Tainacan, Administrative access)."],
     "tainacan-status": ["@@result status=installed", "@@result url=http://192.168.0.10:8090", "@@result apache_site=yes",
                         "@@result db=running", "@@result wordpress=running", "@@result health=healthy",
                         "@@result collections=3", "@@result items=128", "@@result attachments=117",
@@ -886,6 +886,8 @@ def _set_conflicts() -> list[str]:
 # KEI_PANEL_DEMO_SETUP=1 (then both platforms have every step to do). Kept
 # for the session, as the installer keeps its file.
 _DEMO_SETUP: dict[str, dict[str, str]] = {}
+_DEMO_DSPACE_ADMIN: list[bool] = []     # the U4 flow: set once the administrator is created
+
 _DEMO_ADMINS = {"koha": ["admin", "bibliotecaria"], "tainacan": ["kn_7f3a"]}
 
 
@@ -1010,11 +1012,40 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         elif command == "setup-status":
             data = {"setup": "none"}
         elif command == "admin-status":
-            data = {"state": "own", "admins": ["admin@example.org"]}
+            # The U4 flow starts without an administrator, as a new install does.
+            data = {"state": "own", "admins": [] if flow and not _DEMO_DSPACE_ADMIN else ["admin@example.org"]}
         elif command == "logs":
             data = {"logs": "Demo: no real logs."}
         elif command in ("admin-create", "admin-password"):
+            if command == "admin-create":
+                _DEMO_DSPACE_ADMIN.append(True)
             data = {"changed": True}
+        elif command == "backup-settings":
+            data = {"compression": "gz"}
+        elif command == "backup-list":
+            data = {"packages": ["/var/backups/koha-nexus/dspace/knx-dspace-20261112-020000.tar.gz.gpg"]}
+        elif command == "backup-create":
+            data = {"package": "/var/backups/koha-nexus/dspace/knx-dspace-20261112-143000.tar.gz.gpg",
+                    "encrypted": True, "compression": "gz", "bytes": 734003200, "window_seconds": 42}
+        elif command == "backup-plan":
+            data = {"platform": "dspace", "release_sha256": "4" * 64, "compression": "gz",
+                    "source_url": "http://192.168.1.20:8100", "destination_url": "http://192.168.1.20:8100",
+                    "files": 1284, "uncompressed_bytes": 2147483648, "safety_backup_required": True,
+                    "destination_database_must_be_readable": True, "old_volumes_preserved": True,
+                    "repository_will_pause": True, "isolated_verification_network": "none; shared loopback only"}
+        elif command == "backup-test":
+            data = {"verified": True, "database": "all logical records", "files": "all checksums",
+                    "solr": "all cold cores", "network": "none; shared loopback only", "public_ports": False}
+        elif command == "backup-restore":
+            data = {"restored": True, "safety_backup": "/var/backups/koha-nexus/dspace/knx-dspace-20261112-143500.tar.gz.gpg",
+                    "old_volumes_preserved": True}
+        elif command == "operations" and args[1:2] == ("repair-web",):
+            data = {"url": "http://localhost:8100", "previous_url": "http://192.168.1.20:8100", "local_only": True,
+                    "changes": "DSpace UI/API address and owned Apache site; private configuration rollback copy",
+                    "data_volumes_preserved": True, "database_migration": False,
+                    "note": "localhost works only on this computer. Other computers require the network/address assistant."}
+            if "--confirm" in args:
+                data["repaired"] = True
         out.feed("@@result payload=" + base64.b64encode(json.dumps(data).encode()).decode(), reporter, on_result)
         return out
     if name == "run":

@@ -18,7 +18,7 @@ The progress in stages is the loader's (bridge.stage_parts reads the
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Optional
 
 from textual import on
 from textual.app import ComposeResult
@@ -107,13 +107,13 @@ class PlanSummaryScreen(FitsScreen, ModalScreen[bool]):
     BINDINGS = [Binding("escape", "back", t("Back"))]
 
     def __init__(self, title: str, rows: list[tuple[str, str]], body: str = "", details: str = "",
-                 note: str = "", action: str = ""):
+                 note: str = "", action: str = "", danger: bool = False):
         super().__init__()
         self._title, self._rows, self._body, self._details = title, rows, body, details
-        self._note, self._action = note, action or t("Install")
+        self._note, self._action, self._danger = note, action or t("Install"), danger
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="dialog -wide", id="plan-summary"):
+        with Vertical(classes="dialog -wide -error" if self._danger else "dialog -wide", id="plan-summary"):
             yield Label(self._title, classes="dialog-title", markup=False)
             if self._body:
                 yield Static(self._body, classes="dialog-body", markup=False)
@@ -127,12 +127,13 @@ class PlanSummaryScreen(FitsScreen, ModalScreen[bool]):
             with Horizontal(classes="dialog-buttons"):
                 if self._details:
                     yield Button(t("Technical details"), id="details")
-                yield Button(self._action, id="install", variant="primary")
+                yield Button(self._action, id="install", variant="error" if self._danger else "primary")
                 yield Button(t("Back"), id="back")
 
     def on_mount(self) -> None:
         super().on_mount()
-        _focus_first(self, "#install")
+        # A step that replaces data starts on Back, like ConfirmScreen's No.
+        _focus_first(self, "#back" if self._danger else "#install")
 
     @on(Button.Pressed, "#details")
     def _show_details(self) -> None:
@@ -145,3 +146,97 @@ class PlanSummaryScreen(FitsScreen, ModalScreen[bool]):
     @on(Button.Pressed, "#back")
     def action_back(self) -> None:
         self.dismiss(False)
+
+
+class CompletionScreen(FitsScreen, ModalScreen[Optional[str]]):
+    """The end of an installation, the same for every system (study 8.3).
+
+    A system that still needs a step (DSpace without an administrator) is
+    "installed, one step left" in yellow, never "ready". The checks come
+    from the final diagnosis, summed up, with the report one button away.
+    Returns "action" when its next step was chosen, else None: "Do it
+    later" only closes; nothing else opens from here."""
+
+    BINDINGS = [Binding("escape", "later", t("Do it later"))]
+
+    def __init__(self, name: str, checks: list[Check], links: list[tuple[str, str]],
+                 facts: list[Check] | None = None, next_step: str = "", action: str = "",
+                 note: str = "", reminder: str = "", report_title: str = "", details: str = ""):
+        super().__init__()
+        self._system, self._checks, self._links = name, checks, links
+        self._facts, self._next, self._action = facts or [], next_step, action
+        self._note, self._reminder = note, reminder
+        self._report_title, self._details = report_title, details
+
+    @property
+    def pending(self) -> bool:
+        return worst(list(self._checks) + list(self._facts)) != OK
+
+    def compose(self) -> ComposeResult:
+        failed = worst(self._checks) == FAIL
+        title = (t("${name} is installed, with checks to review", name=self._system) if failed
+                 else t("${name} is installed; one step is left", name=self._system) if self.pending
+                 else t("${name} is ready", name=self._system))
+        kind = "-error" if failed else "-info" if self.pending else "-ok"
+        mark = MARKS[FAIL] if failed else MARKS[WARN] if self.pending else MARKS[OK]
+        with Vertical(classes=f"dialog -wide {kind}", id="completion"):
+            yield Label(f"{mark} {title}", classes="dialog-title", markup=False, id="completion-title")
+            with VerticalScroll(classes="dialog-scroll"):
+                if self._checks:
+                    passed = sum(1 for state, _l, _d in self._checks if state == OK)
+                    with Horizontal(classes="dialog-detail completion-row"):
+                        yield Label(t("Checks"), classes="detail-label", markup=False)
+                        yield Static(f"{MARKS[worst(self._checks)]} " + t("${n} of ${total} passed", n=passed,
+                                                                           total=len(self._checks)),
+                                     classes="detail-value", markup=False, id="completion-checks")
+                        yield Button(t("See the report"), id="report", classes="detail-copy")
+                for i, (label, url) in enumerate(self._links):
+                    with Horizontal(classes="dialog-detail completion-row"):
+                        yield Label(label, classes="detail-label", markup=False)
+                        yield Static(url, classes="detail-value", markup=False)
+                        yield Button(t("Open"), id=f"open-{i}", classes="detail-copy")
+                        yield Button(t("Copy"), id=f"copy-{i}", classes="detail-copy")
+                for state, label, value in self._facts:
+                    with Horizontal(classes=f"dialog-detail completion-row check-row -{state}"):
+                        yield Label(label, classes="detail-label", markup=False)
+                        yield Static(f"{MARKS.get(state, '?')} {value}", classes="detail-value check-detail-strong",
+                                     markup=False)
+                if self._note:
+                    yield Static(self._note, classes="dialog-body", markup=False, id="completion-note")
+                if self._next:
+                    yield Static(self._next, classes="dialog-body completion-next", markup=False,
+                                 id="completion-next")
+            if self._reminder:
+                yield Static(self._reminder, classes="dialog-note completion-reminder", markup=False)
+            with Horizontal(classes="dialog-buttons"):
+                if self._action:
+                    yield Button(self._action, id="action", variant="primary")
+                yield Button(t("Do it later") if self._action else t("OK"), id="later",
+                             variant="default" if self._action else "primary")
+
+    def on_mount(self) -> None:
+        super().on_mount()
+        _focus_first(self, "#action" if self._action else "#later")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        bid = event.button.id or ""
+        if bid.startswith("open-"):
+            event.stop()
+            self.app.open_url(self._links[int(bid[5:])][1])
+        elif bid.startswith("copy-"):
+            event.stop()
+            self.app.copy_to_clipboard(self._links[int(bid[5:])][1])
+            self.notify(t("Copied."), timeout=2)
+        elif bid == "report":
+            event.stop()
+            self.app.push_screen(CheckReportScreen(self._report_title or t("Checks"), self._checks, final=True,
+                                                   details=self._details))
+        elif bid == "action":
+            event.stop()
+            self.dismiss("action")
+        elif bid == "later":
+            event.stop()
+            self.action_later()
+
+    def action_later(self) -> None:
+        self.dismiss(None)

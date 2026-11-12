@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PANEL = ROOT / 'panel' / 'kei_panel'
 SCREENS = ['dspace.py', 'routines/dspace.py', 'views/backups.py', 'views/dashboard.py', 'views/schedules.py']
 # Same word in both languages, on purpose.
-SAME = {'Koha', 'online', 'offline'}
+SAME = {'Koha', 'online', 'offline', 'Backup'}   # 'Backup' is the same word in Portuguese
 
 
 @pytest.fixture
