@@ -938,6 +938,20 @@ def _admin_lines(name: str, args: tuple[str, ...]) -> list[str] | None:
         + [f"@@result pending={sum(1 for v in steps.values() if v != 'done')}"]
 
 
+# The demo's visible names (U6), as --status-json "names" gives them.
+# KEI_PANEL_DEMO_NAMES=1 starts with the study's names.
+DEMO_NAMES: dict[str, str] = {}
+STUDY_NAMES = {"koha": "Biblioteca Central", "tainacan": "Museu Municipal", "dspace": "Repositório Institucional"}
+
+
+def demo_names() -> dict[str, str]:
+    import os
+    if os.environ.get("KEI_PANEL_DEMO_NAMES") == "1":
+        for key, value in STUDY_NAMES.items():
+            DEMO_NAMES.setdefault(key, value)
+    return dict(DEMO_NAMES)
+
+
 async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], reporter: "Reporter | None",
                     on_result: Callable[[str, str], None] | None, env: dict[str, str],
                     ask=None) -> "TaskOutcome":
@@ -1055,6 +1069,16 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
             if "--confirm" in args:
                 data["repaired"] = True
         out.feed("@@result payload=" + base64.b64encode(json.dumps(data).encode()).decode(), reporter, on_result)
+        return out
+    if name in ("instance-names", "instance-name"):
+        # The visible names (U6): kept in DEMO_NAMES, never on disk.
+        if name == "instance-name" and len(args) == 2:
+            DEMO_NAMES[args[0]] = args[1]
+        for key, system in (("koha", "Koha"), ("tainacan", "Tainacan"), ("dspace", "DSpace")):
+            if name == "instance-name" and key != (args[0] if args else ""):
+                continue
+            state = "named" if key in DEMO_NAMES else "proposed"
+            out.feed(f"@@result system={key}|{state}|{DEMO_NAMES.get(key, system)}", reporter, on_result)
         return out
     if name == "addresses":
         # The Addresses and access screen (views/addresses.py).

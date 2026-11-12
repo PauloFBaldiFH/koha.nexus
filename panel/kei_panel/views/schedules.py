@@ -16,7 +16,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Input, Label, Select, Static, Switch
 
-from .. import cloud, cron, platforms, schedules
+from .. import cloud, cron, names, platforms, schedules
 from ..schedule_controls import controls, EditError
 from ..screens.dialogs import ConfirmScreen
 from ..i18n import t
@@ -26,11 +26,27 @@ STATES = {"on": ("●", "green"), "off": ("○", "dim"), "internal": ("ℹ", "cy
 LAST = {"ok": "green", "bad": "red", "warn": "yellow", "": "dim"}
 
 
-def row_text(row: schedules.Row) -> Text:
+def platform_label(key: str, known: dict[str, str] | None = None, choice: bool = False) -> str:
+    """Whose a schedule is: the visible name of its system (U6) or the
+    system ("Koha"); several systems joined. A choice of the filter says
+    "name · system"."""
+    fallback = t(schedules.PLATFORM_LABELS.get(key, key))
+    known = known or {}
+    members = key.split("+")
+    if not all(m in names.SYSTEMS for m in members):
+        return fallback
+    if len(members) == 1:
+        if not names.custom(known, key):
+            return fallback
+        return names.label(known, key) if choice else names.short(known, key)
+    return names.joined(known, members, fallback)
+
+
+def row_text(row: schedules.Row, known: dict[str, str] | None = None) -> Text:
     mark, colour = STATES.get(row.state, STATES["off"])
     text = Text()
     text.append(f"{mark} ", style=colour)
-    text.append(t(schedules.PLATFORM_LABELS.get(row.platform, row.platform)) + " · ", style="dim")
+    text.append(platform_label(row.platform, known) + " · ", style="dim")
     text.append(row.name, style="bold" if row.state != "off" else "dim")
     if row.state == "internal":
         text.append("\n  " + row.when)
@@ -118,8 +134,15 @@ class SchedulesView(SectionView):
         if self.platform not in offered:
             self.platform = ""
         select = self.query_one("#sc-platform", Select)
-        select.set_options([(t("All"), "")] + [(t(schedules.PLATFORM_LABELS[p]), p) for p in offered])
+        select.set_options([(t("All"), "")] + [(platform_label(p, names.of(self.app), True), p) for p in offered])
         select.value = self.platform
+
+    def names_changed(self) -> None:
+        """A name was given (U6): the filter and the rows say it."""
+        if self.is_mounted:
+            self._platform_choices()
+            if self.rows:
+                self._draw()
 
     def set_scope(self, scope: str) -> None:
         """A platform group opens the center already filtered on it."""
@@ -279,7 +302,7 @@ class SchedulesView(SectionView):
             control = self.controls.get(id(row))
             block = Vertical(classes=f"sc-row -{row.state}")
             await box.mount(block)
-            await block.mount(Static(row_text(row), classes="sc-description"))
+            await block.mount(Static(row_text(row, names.of(self.app)), classes="sc-description"))
             if control is None:
                 reason = ("Linked schedule: change the platform backup schedule above." if row.key in ('tainacan:maintain', 'tainacan:verify')
                           else "Read-only: managed by its original tool or package.")
@@ -357,7 +380,7 @@ class SchedulesView(SectionView):
             if values['freq'] != 'custom': summary.hour, summary.minute = cron.parse_time(values['time'])
             description = t("Switched off") if not values['enabled'] else schedules.describe(summary.schedule())
             if not await self.app.push_screen_wait(ConfirmScreen(t("Schedules"),
-                    t(schedules.PLATFORM_LABELS.get(row.platform, row.platform)) + ' · ' + row.name + '\n' + description + '\n\n' + t(control.note or "Only this task is changed. Other schedules are kept."))):
+                    platform_label(row.platform, names.of(self.app)) + ' · ' + row.name + '\n' + description + '\n\n' + t(control.note or "Only this task is changed. Other schedules are kept."))):
                 return
             from ..routines.schedules import apply
             if await apply(self.app, control, values):

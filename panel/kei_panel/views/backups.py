@@ -18,6 +18,7 @@ routines/platforms.py for Tainacan); nothing is scheduled by opening it.
 
 from __future__ import annotations
 
+import dataclasses
 import time
 
 from textual.app import ComposeResult
@@ -25,7 +26,7 @@ from textual.containers import Grid, Horizontal, Vertical
 from rich.text import Text
 from textual.widgets import Label, Select, Static
 
-from .. import backup_center, cloud, cron, platforms
+from .. import backup_center, cloud, cron, names, platforms
 from ..backup_center import DSPACE_CODECS, TAINACAN_CODECS
 from ..i18n import t
 from ..widgets.cards import ActionCard, StatusCard
@@ -82,7 +83,7 @@ class BackupCenterView(PlatformSectionView):
             yield Label(t("Show:"), classes="form-label")
             offered = self.offered() or list(backup_center.SCOPES)
             first = backup_center.pick_scope(self.scope or getattr(self.app, "backup_scope", ""), offered)
-            select = Select([(t(backup_center.SCOPE_LABELS[s]), s) for s in offered],
+            select = Select([(self.scope_label(s), s) for s in offered],
                             value=first if first in offered else offered[0], allow_blank=False, id="bk-scope")
             select.offered = offered
             yield select
@@ -213,7 +214,7 @@ class BackupCenterView(PlatformSectionView):
         if offered and getattr(select, "offered", None) != offered:
             select.offered = offered
             with select.prevent(Select.Changed):
-                select.set_options([(t(backup_center.SCOPE_LABELS[s]), s) for s in offered])
+                select.set_options([(self.scope_label(s), s) for s in offered])
         if self.scope in offered and select.value != self.scope:
             with select.prevent(Select.Changed):
                 select.value = self.scope
@@ -425,7 +426,37 @@ class BackupCenterView(PlatformSectionView):
                 self.query_one('#bk-ds-' + key, StatusCard).set(t('Unavailable'), t('Refresh or check the DSpace diagnosis.'), 'warn')
             self.query_one('#bk-ds-codec', Select).disabled = True
 
+    def scope_label(self, scope: str) -> str:
+        """The choice of a system by its visible name (U6): "Biblioteca
+        Central · Koha", "Biblioteca Central + Museu Municipal"."""
+        fallback = t(backup_center.SCOPE_LABELS[scope])
+        members = backup_center.MEMBERS.get(scope, ())
+        known = names.of(self.app)
+        if scope == backup_center.NEXUS or not members:
+            return fallback
+        if len(members) == 1:
+            return names.label(known, members[0]) if names.custom(known, members[0]) else fallback
+        return names.joined(known, members, fallback)
+
+    def _named(self, rows: list[backup_center.PlanRow]) -> list[backup_center.PlanRow]:
+        """The plans of one named system say whose they are."""
+        members = backup_center.MEMBERS.get(self.scope, ())
+        name = names.custom(names.of(self.app), members[0]) if len(members) == 1 else ""
+        return [dataclasses.replace(row, name=f"{name} · {row.name}") for row in rows] if name else rows
+
+    def names_changed(self) -> None:
+        try:
+            select = self.query_one("#bk-scope", Select)
+        except Exception:  # noqa: BLE001 - not composed yet
+            return
+        select.offered = None             # the choices are written again
+        self._show_scope()
+        if getattr(self, "_raw_plans", None) is not None:
+            self._draw_plans(self._raw_plans)
+
     def _draw_plans(self, rows: list[backup_center.PlanRow]) -> None:
+        self._raw_plans = rows
+        rows = self._named(rows)
         title = t("Automatic backups") + (f" ({len(rows)})" if rows else "")
         self.query_one("#bk-plans-title", Label).update(title)
         box = self.query_one("#bk-plans", Vertical)

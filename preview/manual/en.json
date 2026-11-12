@@ -3142,6 +3142,13 @@
     "Choose Koha, Tainacan or DSpace. An installed one opens its page instead of a second installation, preserving its data."
    ]
   },
+  "instance-names": {
+   "summary": "Name the installations",
+   "overview": [
+    "Give each installed system the name people know it by, such as Biblioteca Central. The panel then shows it in the sidebar, the dashboard tabs, Add system, the Backup and Schedule centers and the removal confirmations.",
+    "Only the name changes: databases, files, services and addresses stay as they are. Opening it only reads; the name is saved after OK."
+   ]
+  },
   "instance-remove": {
    "summary": "Remove instance",
    "overview": [

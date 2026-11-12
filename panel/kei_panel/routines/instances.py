@@ -1,8 +1,10 @@
-"""Explicit creation/removal entry points using the installed application drivers."""
+"""Explicit creation/removal entry points using the installed application drivers,
+and the visible name of each installation (U6)."""
+from .. import names
 from ..i18n import t
 from ..screens.dialogs import ChoiceScreen, MessageScreen
 
-NAMES = {'koha': 'Koha', 'tainacan': 'Tainacan', 'dspace': 'DSpace'}
+NAMES = names.SYSTEMS
 
 
 # "Add system" (study 7.2): every system, the installed ones too, since
@@ -30,7 +32,9 @@ INSTALL = {'koha': 'install', 'tainacan': 'tainacan-install', 'dspace': 'dspace-
 def add_options(app) -> list[tuple[str, str]]:
     rows = []
     for key, (icon, name, _what, _happens, _needs) in ABOUT.items():
-        state = t('Installed · open') if app.platform_ready(key) else t('Not installed')
+        name = names.custom(names.of(app), key)
+        state = (t('Installed: ${name} · open', name=name) if name else t('Installed · open')) \
+            if app.platform_ready(key) else t('Not installed')
         rows.append((key, f'{icon} {t(name)} — {state}'))
     return rows
 
@@ -75,8 +79,86 @@ async def remove(app):
         return
     selected = await app.push_screen_wait(ChoiceScreen(t('Remove instance'), '\n\n'.join(filter(None, (
         t('Choose the installation. Its removal plan is shown before any change.'), koha))),
-                                                       [(key, NAMES[key]) for key in available]))
+                                                       [(key, names.label(names.of(app), key)) for key in available]))
     if selected not in available:
         return
     from . import ROUTINES
     await ROUTINES[{'tainacan': 'tainacan-uninstall', 'dspace': 'dspace-remove'}[selected]](app)
+
+
+# "Name the installations" (study 12, U6). The name lives only in the
+# instance registry: nothing is reinstalled, moved or renamed. Opening this
+# only reads; a name is written after OK, one system at a time.
+NAMING = "Name the installations"
+
+
+def systems_of(out) -> list[tuple[str, str, str]]:
+    """(system, "named" | "proposed", name) from `--task instance-names`."""
+    rows = []
+    for row in (out.lists.get("system") or ([out.get("system")] if out.get("system") else [])) if out else []:
+        key, _, rest = row.partition("|")
+        state, _, name = rest.partition("|")
+        if key in NAMES and state in ("named", "proposed") and names.valid(name) and key not in [r[0] for r in rows]:
+            rows.append((key, state, names.valid(name)))
+    return rows
+
+
+def choice_text(key: str, state: str, name: str) -> str:
+    if state == "named" and name != NAMES[key]:
+        return f"{name} · {NAMES[key]}"
+    return f"{NAMES[key]} — " + t("no name yet")
+
+
+def check_name(value: str) -> str:
+    return "" if names.valid(value) else t("Use 1 to 120 letters, numbers or signs, without line breaks.")
+
+
+async def name_instances(app, only: str = "") -> None:
+    from .common import run_task, show_failure, failed
+    from ..screens.dialogs import InputScreen
+    title = t(NAMING)
+    bridge = app.bridge
+    if not bridge.has_task("instance-names"):
+        await app.push_screen_wait(MessageScreen(title, t(
+            "This server's installer is older than the panel: update it (Update panel) to name the installations.")))
+        return
+    try:
+        out = await bridge.task("instance-names")
+    except Exception:  # noqa: BLE001 - said below
+        out = None
+    rows = [r for r in systems_of(out) if app.platform_ready(r[0]) and (not only or r[0] == only)]
+    if not rows:
+        problem = out.get("registry") if out else ""
+        await app.push_screen_wait(MessageScreen(title, "\n\n".join(filter(None, (t(
+            "No installed system was found to name.") if out else t("The names could not be read."), problem)))))
+        return
+    key = rows[0][0]
+    if len(rows) > 1:
+        key = await app.push_screen_wait(ChoiceScreen(title, t(
+            "The name is shown in this panel: in the sidebar, the tabs, backups, schedules and confirmations. "
+            "Only the name changes: databases, files, services and addresses stay as they are."),
+            [(k, choice_text(k, state, name)) for k, state, name in rows]))
+        if key not in NAMES:
+            return
+    _k, state, current = next(r for r in rows if r[0] == key)
+    value = await app.push_screen_wait(InputScreen(
+        f"{title} · {NAMES[key]}", t(
+            "A name for this ${system}, such as the institution's or the collection's. Only the name changes: "
+            "its database, files, services and addresses stay as they are.", system=NAMES[key]),
+        # Not named yet: the system's name is proposed (study 12), never the
+        # Koha site's internal name ("library").
+        t("Name:"), validate=check_name, value=current if state == "named" else NAMES[key]))
+    name = names.valid(value)
+    if not name or (state == "named" and name == current):
+        return
+    result = await run_task(app, title, "instance-name", key, name)
+    if failed(result):
+        await show_failure(app, title, result)
+        return
+    saved = dict(names.of(app))
+    for k, st, n in systems_of(result.value):
+        if st == "named":
+            saved[k] = n
+    # Shown at once; the next status read confirms it.
+    app.names_seen({"names": saved})
+    app.notify(t("Name saved: ${name}", name=names.label(saved, key)), timeout=5)

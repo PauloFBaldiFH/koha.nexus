@@ -82,7 +82,7 @@ class Section:
 # home section, which is also the group's name.
 GROUPS = ("koha", "tainacan", "dspace")
 # UI orchestration uses existing drivers and has no standalone Bash mutation.
-PANEL_ONLY_ACTIONS = frozenset({"instance-add", "instance-remove"})
+PANEL_ONLY_ACTIONS = frozenset({"instance-add", "instance-remove", "instance-names"})
 
 SECTIONS: tuple[Section, ...] = (
     # State, addresses and indicators of the server and of each platform
@@ -91,6 +91,7 @@ SECTIONS: tuple[Section, ...] = (
 
     Section("instances", "➕  Add system", "Instances", entries=(
         Entry("➕  Add instance", "instance-add", kind="native"),
+        Entry("🔖  Name the installations", "instance-names", kind="native"),
         Entry("🗑  Remove instance", "instance-remove", kind="native", zone="removal"),
     )),
 
@@ -496,6 +497,7 @@ def all_actions() -> set[str]:
 # tests/test_menus.py checks every entry has one.
 DESCRIPTIONS: dict[str, str] = {
     "instance-add": "Choose an available application driver and review its installation plan.",
+    "instance-names": "The name each installation shows in this panel, such as Biblioteca Central. Only the name changes.",
     "instance-remove": "Choose an installation and review whether to preserve or erase its data.",
     "dspace-address": "Plan a canonical local, institutional HTTPS or free repository address without modifying another platform. Existing certificate/key files or an external TLS proxy are required for HTTPS. A verified encrypted safety backup precedes URL changes.",
     "dspace-upgrade": "Updates only the reviewed recipe 3 to 4 of DSpace 10.1 using an immutable image catalog. It tests a safety backup, preserves the database schema and volumes, and rolls back configuration if validation fails.",

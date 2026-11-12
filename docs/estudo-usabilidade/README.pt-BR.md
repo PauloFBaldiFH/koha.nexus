@@ -1730,3 +1730,77 @@ Testes:
 - `tests/addresses.bats`: configurado, localhost e IP da rede sem a VPN; o
   `curl` só lê; preferências vazias do Koha; plataforma desconhecida
   recusada.
+
+## 23. U6: nome visível de cada instalação
+
+Cada sistema instalado pode ter um nome, como “Biblioteca Central”. O painel
+mostra “nome · sistema” nos seis lugares da seção 13:
+
+1. **Lateral:** “📚 Biblioteca Central · Koha”.
+2. **Abas do Painel de Controle:** “Geral │ Biblioteca Central │ Museu
+   Municipal │ Repositório Institucional”, e os cartões da aba Geral.
+3. **Adicionar sistema:** “Instalado: Biblioteca Central · abrir”.
+4. **Central de backups:** a escolha “Mostrar” e cada backup automático
+   (“Biblioteca Central · Backup do banco de dados”).
+5. **Agendamentos:** o filtro e cada tarefa (“Biblioteca Central · Backup
+   dos registros MARC21”).
+6. **Confirmações de remoção:** “Remover “Repositório Institucional”
+   (DSpace)”. Para apagar dados, a pessoa digita o nome. No DSpace, o
+   instalador continua recebendo a palavra de confirmação de antes
+   (`DSpace`), então o contrato da tarefa não muda.
+
+Sem nome, tudo fica como antes (“📚 Koha (biblioteca)”, abas “Koha”,
+“Tainacan”, “DSpace”).
+
+**Como o nome é dado.** Em “Adicionar sistema” há o botão **Dar nomes às
+instalações**. Ele lê os sistemas instalados, deixa escolher um e propõe o
+nome do sistema (“Koha”, nunca o nome interno do site, `library`). O nome só
+é gravado depois do OK. Abrir a tela, o painel ou qualquer outra tela não
+grava nada.
+
+**Onde o nome fica.** Só no registro de instâncias
+(`/var/lib/koha-nexus/instances`). Na primeira vez, a instalação existente é
+adotada pelo `discover_legacy()`, que registra as referências dela (site do
+Koha, pasta de estado do Tainacan ou do DSpace) sem mover nada. Depois disso,
+só o nome muda. Bancos, volumes, diretórios, portas e endereços continuam
+iguais. O registro do painel (`kei_panel/instance_registry.py`) é cópia exata
+de `nexus_core/instances.py`, e um teste confere que os dois arquivos são
+iguais.
+
+**Instalador.**
+
+- `--task instance-names` só lê: `system=APP|named|NOME` ou
+  `system=APP|proposed|NOME`.
+- `--task instance-name APP NOME` adota ou renomeia, e só isso.
+- `--status-json` ganhou o campo `"names"` no fim (`{"koha": "Biblioteca
+  Central"}`), sempre JSON válido (`{}` quando o registro não pode ser lido).
+- Um status antigo, sem `"names"`, deixa o painel como estava.
+- O U7 usa o mesmo campo no indicador do Windows.
+
+| Painel com nomes | Dar nomes | Nome do Koha |
+|---|---|---|
+| ![](capturas/u6/u6-1-painel-com-nomes-160x48.png) | ![](capturas/u6/u6-2-dar-nomes-160x48.png) | ![](capturas/u6/u6-3-nome-koha-160x48.png) |
+
+| Central de backups | Agendamentos | Remover pelo nome |
+|---|---|---|
+| ![](capturas/u6/u6-4-backups-com-nome-160x48.png) | ![](capturas/u6/u6-5-agendamentos-com-nome-160x48.png) | ![](capturas/u6/u6-6-remover-dspace-pelo-nome-160x48.png) |
+
+Em 80×24: ![](capturas/u6/u6-2-dar-nomes-80x24.png)
+
+Testes em `panel/tests/test_u6_names.py`:
+
+- O registro do painel é igual ao do `nexus_core`.
+- Ler não cria o registro nem muda o servidor.
+- Dar nome adota uma vez e renomear muda só o nome (mesmo ID e mesmas
+  referências). Os arquivos do servidor de teste ficam idênticos.
+- Nome inválido, sistema ausente ou site diferente: nada muda.
+- Um registro sem permissões privadas é recusado, e o status continua JSON
+  válido.
+- O instalador está ligado nas tarefas e no fim do `--status-json`.
+- Os nomes aparecem na lateral, nas abas, nos cartões, em Adicionar sistema,
+  nos backups e nos agendamentos.
+- Sem nomes, nada muda.
+- Dar nomes só lê até o OK e não grava o mesmo nome de novo.
+- As remoções do Tainacan e do DSpace pedem o nome digitado para apagar
+  dados.
+- Todos os textos novos têm tradução.

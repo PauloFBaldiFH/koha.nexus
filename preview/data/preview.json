@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.201",
+ "panel_version": "1.5.202",
  "languages": [
   {
    "code": "en",
@@ -248,6 +248,7 @@
    "parent": "",
    "entries": [
     "instance-add",
+    "instance-names",
     "instance-remove"
    ],
    "features": [],
@@ -1200,6 +1201,16 @@
    "section": "instances",
    "label": "➕  Add instance",
    "description": "Choose an available application driver and review its installation plan.",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "instance-names": {
+   "id": "instance-names",
+   "type": "entry",
+   "section": "instances",
+   "label": "🔖  Name the installations",
+   "description": "The name each installation shows in this panel, such as Biblioteca Central. Only the name changes.",
    "kind": "native",
    "status": "available",
    "media": []
@@ -4747,6 +4758,56 @@
   "Choose an available application driver and review its installation plan.": {
    "en": "Choose an available application driver and review its installation plan.",
    "pt-BR": "Escolha um aplicativo disponível e revise seu plano de instalação.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🔖  Name the installations": {
+   "en": "🔖  Name the installations",
+   "pt-BR": "🔖  Dar nomes às instalações",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "The name each installation shows in this panel, such as Biblioteca Central. Only the name changes.": {
+   "en": "The name each installation shows in this panel, such as Biblioteca Central. Only the name changes.",
+   "pt-BR": "O nome que cada instalação mostra neste painel, como Biblioteca Central. Só o nome muda.",
    "es": null,
    "fr": null,
    "it": null,
@@ -18544,6 +18605,23 @@
     ]
    }
   },
+  "instance-names": {
+   "en": {
+    "summary": "Name the installations",
+    "overview": [
+     "Give each installed system the name people know it by, such as Biblioteca Central. The panel then shows it in the sidebar, the dashboard tabs, Add system, the Backup and Schedule centers and the removal confirmations.",
+     "Only the name changes: databases, files, services and addresses stay as they are. Opening it only reads; the name is saved after OK."
+    ],
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Dar nomes às instalações",
+    "overview": [
+     "Dê a cada sistema instalado o nome pelo qual as pessoas o conhecem, como Biblioteca Central. O painel passa a mostrá-lo na lateral, nas abas do painel, em Adicionar sistema, nas centrais de backups e de agendamentos e nas confirmações de remoção.",
+     "Só o nome muda: bancos, arquivos, serviços e endereços continuam como estão. Abrir só lê; o nome é salvo depois do OK."
+    ]
+   }
+  },
   "instance-remove": {
    "en": {
     "summary": "Remove instance",
@@ -24739,165 +24817,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 192,
-   "manual_total": 192,
+   "manual": 193,
+   "manual_total": 193,
    "manual_outdated": [],
-   "strings": 548,
-   "strings_total": 548
+   "strings": 550,
+   "strings_total": 550
   },
   "pt-BR": {
-   "manual": 192,
-   "manual_total": 192,
+   "manual": 193,
+   "manual_total": 193,
    "manual_outdated": [],
-   "strings": 542,
-   "strings_total": 548
+   "strings": 544,
+   "strings_total": 550
   },
   "es": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 548
+   "strings_total": 550
   },
   "fr": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 548
+   "strings_total": 550
   },
   "it": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 548
+   "strings_total": 550
   },
   "de": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 397,
-   "strings_total": 548
+   "strings_total": 550
   },
   "nl": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "sv": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "pl": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "cs": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "ru": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "uk": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "tr": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "tl": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "id": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "ar": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "fa": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "hi": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "bn": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "vi": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "zh": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "ja": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   },
   "ko": {
    "manual": 0,
-   "manual_total": 192,
+   "manual_total": 193,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 548
+   "strings_total": 550
   }
  }
 }
