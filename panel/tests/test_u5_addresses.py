@@ -96,11 +96,20 @@ def run_screen(monkeypatch, sid, test=False):
                 return await real(name, *args, **kwargs)
             app.bridge.task = task
             app.screen.action_show(sid, from_sidebar=True)
-            await pilot.pause(2.5)
+            await pilot.pause(0.5)
             view = app.screen.query_one(f'#view-{sid}')
+
+            async def until(done):
+                # Read in the background: wait for it, never a fixed time.
+                for _ in range(300):
+                    if done():
+                        return
+                    await pilot.pause(0.1)
+            await until(lambda: str(view.query_one('#addr-internet', Label).render()) != '…')
             if test:
                 view.query_one('#addr-test', Button).press()
-                await pilot.pause(3)
+                await until(lambda: any(str(lb.render()).startswith(('✓', '✖')) for lb in view.query('.card-note')))
+                await pilot.pause(0.3)
             texts = [str(lb.render()) for lb in view.query(Label) if lb.display]
             buttons = {b.id for b in view.query(Button) if b.id}
             return texts, buttons, calls
