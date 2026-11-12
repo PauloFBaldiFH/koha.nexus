@@ -84,3 +84,55 @@ run_sql() { case \"\$1\" in *OPACBaseURL*) echo 'https://catalog.example.org/' ;
     run lib 'is_koha_installed() { return 1; }; kei_addresses koha'
     [ "$status" -eq 3 ]
 }
+
+# The access test made from Windows (U7 part 2): the tray opens each
+# configured address from Windows and records only an HTTP code and a
+# redirect, for configured addresses only.
+@test "windows-addresses lists only the configured addresses" {
+    printf 'status=installed\nurl=http://192.168.0.20:8090/\n' > "$KEI_TAINACAN_DIR/state"
+    run lib 'is_koha_installed() { return 1; }; kei_dspace_runtime() { echo "{}"; }; kei_windows_addresses'
+    [ "$status" -eq 0 ]
+    [ "$output" = '@@result configured=http://192.168.0.20:8090' ]
+}
+
+@test "windows-check records the answer; the addresses screen shows it under WSL only" {
+    printf 'status=installed\nurl=http://192.168.0.20:8090/\n' > "$KEI_TAINACAN_DIR/state"
+    export KEI_WINDOWS_CHECKS="$T/owned/windows-checks"
+    stub='is_koha_installed() { return 1; }; kei_dspace_runtime() { echo "{}"; }'
+    run lib "$stub; kei_windows_check http://192.168.0.20:8090 302 http://192.168.0.20:8090/wp-admin/"
+    [ "$status" -eq 0 ]
+    grep -qx '@@result recorded=1' <<< "$output"
+    grep -Eqx 'http://192\.168\.0\.20:8090\|302\|http://192\.168\.0\.20:8090/wp-admin/\|[0-9]+' "$KEI_WINDOWS_CHECKS"
+    # A second answer replaces the first: one line per address.
+    run lib "$stub; kei_windows_check http://192.168.0.20:8090 000 -"
+    [ "$(wc -l < "$KEI_WINDOWS_CHECKS")" -eq 1 ]
+    grep -Eqx 'http://192\.168\.0\.20:8090\|000\|\|[0-9]+' "$KEI_WINDOWS_CHECKS"
+    run lib "$stub; KEI_PLATFORM=wsl; kei_addresses tainacan"
+    grep -Eqx '@@result wincheck=http://192\.168\.0\.20:8090\|000\|\|[0-9]+' <<< "$output"
+    run lib "$stub; kei_addresses tainacan"
+    ! grep -q wincheck <<< "$output"
+}
+
+@test "windows-check refuses what is not a configured address or not an answer" {
+    printf 'status=installed\nurl=http://192.168.0.20:8090/\n' > "$KEI_TAINACAN_DIR/state"
+    export KEI_WINDOWS_CHECKS="$T/owned/windows-checks"
+    stub='is_koha_installed() { return 1; }; kei_dspace_runtime() { echo "{}"; }'
+    for args in "http://evil.example 200 -" "http://192.168.0.20:8090 2000 -" \
+        "http://192.168.0.20:8090 200 javascript:x" "http://192.168.0.20:8090 200 'http://a|b'" \
+        "http://192.168.0.20:8090 200" ""; do
+        run lib "$stub; kei_windows_check $args"
+        [ "$status" -eq 2 ]
+    done
+    [ ! -f "$KEI_WINDOWS_CHECKS" ]
+}
+
+@test "windows-check reads the tray's answers from stdin (Windows line ends)" {
+    printf 'status=installed\nurl=http://192.168.0.20:8090/\n' > "$KEI_TAINACAN_DIR/state"
+    export KEI_WINDOWS_CHECKS="$T/owned/windows-checks"
+    stub='is_koha_installed() { return 1; }; kei_dspace_runtime() { echo "{}"; }'
+    run lib "$stub; printf 'http://192.168.0.20:8090\t302\thttp://192.168.0.20:8090/?a=1&b=2\r\n' | kei_windows_check -"
+    [ "$status" -eq 0 ]
+    grep -Eqx 'http://192\.168\.0\.20:8090\|302\|http://192\.168\.0\.20:8090/\?a=1&b=2\|[0-9]+' "$KEI_WINDOWS_CHECKS"
+    run lib "$stub; printf '' | kei_windows_check -"
+    [ "$status" -eq 2 ]
+}

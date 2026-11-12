@@ -1092,6 +1092,10 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                 else [("site", "http://localhost" + port), ("site", "http://172.20.10.4" + port)])
         lines = ["@@result platform=wsl"] + [f"@@result configured={k}|{u}" for k, u in conf]
         lines += [f"@@result alternative={k}|{u}" for k, u in alts]
+        # What the tray found when it opened the configured address from
+        # Windows (DSpace: not tested from Windows yet).
+        lines += [f"@@result wincheck={u}|200||{int(time.time()) - 240}" for _k, u in conf
+                  if platform != "dspace"]
         if "test" in args:
             now = int(time.time())
             lines += [f"@@result check={u}|200||{now}" for _k, u in conf]

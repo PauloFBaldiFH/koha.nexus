@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.203"
+PANEL_VERSION=" 1.5.204"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2410,6 +2410,64 @@ kei_instance_names() {
         *) msg_error "" "instance-names | instance-name APP NAME"; return 2 ;;
     esac
 }
+# The access test made from Windows (U7, study 17.4): the tray opens each
+# configured address from Windows itself and records the answer here, one
+# line per address: URL|CODE|REDIRECT|EPOCH. Only configured addresses are
+# accepted, and only an HTTP code and an http(s) redirect: nothing else
+# from the Windows side is written.
+KEI_WINDOWS_CHECKS="${KEI_WINDOWS_CHECKS:-${KEI_OWNED_DIR:-/var/lib/koha-nexus}/windows-checks}"
+# kei_windows_addresses: configured=URL for every installed system (what
+# the tray opens). Read only.
+kei_windows_addresses() {
+    local p line
+    for p in koha tainacan dspace; do
+        while IFS= read -r line; do
+            case "$line" in '@@result configured='*) line="${line#@@result configured=}"; kei_result configured "${line#*|}" ;; esac
+        done < <(KEI_TASK=1 kei_addresses "$p" 2>&1)
+    done
+    return 0
+}
+# kei_windows_check URL CODE REDIRECT [URL CODE REDIRECT ...] ("-" = no
+# redirect), or "-" alone: one URL<TAB>CODE<TAB>REDIRECT per line on stdin
+# (the tray: wsl.exe hands its command line to a shell, stdin it does not).
+# Refuses everything when one triple is not valid.
+kei_windows_check() {
+    local known url code redirect now tmp n=0 line
+    local -a urls=() lines=() given=()
+    if [ $# -eq 1 ] && [ "$1" = - ]; then
+        while IFS= read -r line && [ ${#given[@]} -lt 150 ]; do
+            line="${line%$'\r'}"
+            [ -n "$line" ] || continue
+            IFS=$'\t' read -r url code redirect <<< "$line"
+            given+=("$url" "$code" "${redirect:--}")
+        done
+        set -- "${given[@]}"
+    fi
+    [ $(($# % 3)) -eq 0 ] && [ $# -gt 0 ] || { msg_error "" "windows-check URL CODE REDIRECT ..."; return 2; }
+    known=$(kei_windows_addresses 2>&1 | sed -n 's/^@@result configured=//p')
+    while [ $# -gt 0 ]; do
+        url="$1" code="$2" redirect="$3"; shift 3
+        [ "$redirect" = - ] && redirect=""
+        printf '%s\n' "$known" | grep -qxF -- "$url" || { msg_error "" "Not a configured address: nothing was recorded."; return 2; }
+        [[ "$code" =~ ^[0-9]{3}$ ]] || { msg_error "" "Invalid answer: nothing was recorded."; return 2; }
+        if [ -n "$redirect" ] && { ! [[ "$redirect" =~ ^https?://[^[:space:]|]{1,2000}$ ]]; }; then
+            msg_error "" "Invalid answer: nothing was recorded."; return 2
+        fi
+        urls+=("$url"); lines+=("$url|$code|$redirect")
+    done
+    now=$(date +%s)
+    mkdir -p "${KEI_WINDOWS_CHECKS%/*}" || return 1
+    tmp=$(mktemp "$KEI_WINDOWS_CHECKS.XXXXXX") || return 1
+    if [ -f "$KEI_WINDOWS_CHECKS" ]; then
+        awk -F'|' -v keep="$(printf '%s\n' "${urls[@]}")" 'BEGIN { n = split(keep, k, "\n"); for (i = 1; i <= n; i++) drop[k[i]] = 1 } !($1 in drop)' \
+            "$KEI_WINDOWS_CHECKS" > "$tmp" 2>/dev/null
+    fi
+    for url in "${lines[@]}"; do printf '%s|%s\n' "$url" "$now" >> "$tmp"; n=$((n + 1)); done
+    chmod 644 "$tmp" && mv -f "$tmp" "$KEI_WINDOWS_CHECKS" || { rm -f "$tmp"; return 1; }
+    kei_result recorded "$n"
+    return 0
+}
+
 kei_addresses() {
     local platform="${1:-}" mode="${2:-}" url kind scheme host port ifc a item code
     local -a configured=() shown=() ports=()
@@ -2457,6 +2515,15 @@ print(u if isinstance(u,str) else "")')
             shown+=("$url"); kei_result alternative "$kind|$url"
         done
     done
+    # Under WSL, what the Windows side found when it opened the configured
+    # addresses itself (the tray, kei_windows_check): read here, never made.
+    if [ "${KEI_PLATFORM:-}" = wsl ] && [ -f "$KEI_WINDOWS_CHECKS" ]; then
+        for item in "${configured[@]}"; do
+            url="${item#*|}"
+            a=$(awk -F'|' -v u="$url" '$1 == u { line = $0 } END { if (line) print line }' "$KEI_WINDOWS_CHECKS" 2>/dev/null)
+            [ -n "$a" ] && kei_result wincheck "$a"
+        done
+    fi
     [ "$mode" = test ] || return 0
     command -v curl >/dev/null 2>&1 || return 0
     for url in "${shown[@]}"; do
@@ -47042,6 +47109,8 @@ kei_task() {
             return 0 ;;
         tainacan-language)  _kei_docker_task kei_tainacan_language "${1:-}" ;;
         addresses)          kei_addresses "${1:-}" "${2:-}" ;;
+        windows-addresses)  kei_windows_addresses ;;
+        windows-check)      kei_windows_check "$@" ;;
         instance-names)     kei_instance_names read ;;
         instance-name)      kei_instance_names set "${1:-}" "${2:-}" ;;
         koha-languages)

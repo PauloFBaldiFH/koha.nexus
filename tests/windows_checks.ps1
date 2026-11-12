@@ -173,6 +173,15 @@ $i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus $kohaOk 'o
 Check 'indicator: a check older than 10 min is yellow' ($i.Colour -eq 'yellow' -and $i.Text -eq 'Could not check the state (13 min ago)') $i.Text
 Check 'indicator: unreadable state is yellow' ((Resolve-KohaIndicator -State 'not_responding' -Linux $null -Now $now).Colour -eq 'yellow')
 Check 'indicator: Debian stopped by the person is gray, otherwise red' ((Resolve-KohaIndicator -State 'stopped_by_user' -Linux $null -Now $now).Colour -eq 'gray' -and (Resolve-KohaIndicator -State 'stopped' -Linux $null -Now $now).Colour -eq 'red')
+# The access test made from Windows (U7 part 2): only the code and the redirect go back.
+$rl = ConvertFrom-KohaResultLines -Output ("@@msg info x`r`n@@result configured=http://192.168.0.20:8090`r`n@@result configured=http://192.168.0.20`n@@result platform=wsl") -Key 'configured'
+Check 'windows access: configured addresses are read from the task' (@($rl).Count -eq 2 -and $rl[0] -eq 'http://192.168.0.20:8090' -and $rl[1] -eq 'http://192.168.0.20') ($rl -join ',')
+Check 'windows access: a relative redirect becomes absolute' ((Format-KohaRedirect -Base 'http://192.168.0.20:8090/' -Location '/wp-login.php?a=1&b=2') -eq 'http://192.168.0.20:8090/wp-login.php?a=1&b=2') ''
+Check 'windows access: no redirect or a non-web one is -' ((Format-KohaRedirect -Base 'http://h/' -Location '') -eq '-' -and (Format-KohaRedirect -Base 'http://h/' -Location 'javascript:alert(1)') -eq '-') ''
+$fw = Format-KohaWindowsChecks @([pscustomobject]@{ Url = 'http://h:8090'; Code = '302'; Redirect = 'http://h:8090/x' }, [pscustomobject]@{ Url = 'http://h'; Code = '000'; Redirect = '-' })
+Check 'windows access: one tab-separated line per address for stdin' ($fw -eq ("http://h:8090`t302`thttp://h:8090/x`nhttp://h`t000`t-`n")) $fw
+$probe = Invoke-KohaHttpProbe -Url 'http://127.0.0.1:1' -TimeoutMs 3000
+Check 'windows access: no answer is 000' ($probe.Code -eq '000' -and $probe.Redirect -eq '-') ($probe.Code + ' ' + $probe.Redirect)
 $old = ConvertFrom-KohaStatusOutput -Output '{"schema":1,"state":"ok"}'
 $i = Resolve-KohaIndicator -State 'running' -Linux $old -Now $now
 Check 'indicator: an older installer keeps the old tray' ($i.Colour -eq 'green' -and $i.Text -eq 'Koha is running') $i.Text
