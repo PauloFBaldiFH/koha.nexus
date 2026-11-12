@@ -1681,3 +1681,52 @@ sistema ausente sem botão, abrir a central só lê, “Idioma só do painel” 
 grava `translation.conf` e não roda nada no instalador, o Tainacan só muda
 depois do Sim, a tarefa `koha-languages` não grava nada, o campo `lang` do
 status é validado, traduções).
+
+## 22. U5, terceira parte: Endereços e acesso
+
+Em cada sistema, “Endereços e acesso” agora separa as três coisas da 17.4:
+
+1. **Endereço configurado (use este).** É o endereço que o aplicativo usa
+   para montar links e redirecionar: `OPACBaseURL` e `staffClientBaseURL` no
+   Koha, o endereço do WordPress no Tainacan e o do DSpace. Só ele tem Abrir e
+   Copiar. No Koha, uma preferência vazia aparece como “Não definido”, com o
+   aviso de que o Koha monta os links a partir do endereço que o navegador
+   usou.
+2. **Outros nomes deste servidor.** São o localhost e os outros endereços de
+   rede da máquina (VPNs e redes virtuais ficam de fora). Cada um vem com o
+   efeito esperado: no Koha, os links levam ao endereço configurado; no
+   WordPress, o login só funciona no endereço configurado; no DSpace, pode
+   falhar, como no erro 500 em localhost do PR #358.
+3. **Verificado.** Nada é chamado de funcionando sem teste. **Testar acesso**
+   abre cada endereço a partir deste servidor e diz o resultado e quando:
+   “✓ respondeu (HTTP 200, agora há pouco)”, “Leva ao endereço configurado”,
+   “Erro (HTTP 500)” ou “Sem resposta”. No Windows (WSL) a tela diz
+   “? não verificado a partir do Windows”. O teste pelo lado do Windows entra
+   no U7.
+
+**Na internet** mostra o endereço do túnel (Koha) ou um endereço público
+configurado. Quando não há nenhum, mostra “Não publicado”. No Koha,
+“Publicar…” abre o Gerenciador do Cloudflare Tunnel. No Tainacan e no
+DSpace, “Mudar ou publicar o endereço…” abre a rotina de endereço que já
+existia, com o plano e a pergunta dela. Os cartões de antes continuam embaixo.
+
+Os dados vêm da nova tarefa só de leitura `addresses PLATAFORMA [test]`
+(`kei_addresses`). O teste usa `curl` com tempo-limite de 6 s, sem enviar
+dados, e o corpo da resposta não é guardado.
+
+| DSpace antes do teste | DSpace testado | Tainacan testado | Koha |
+|---|---|---|---|
+| ![](capturas/u5/u5-8-enderecos-dspace-160x48.png) | ![](capturas/u5/u5-9-enderecos-dspace-testado-160x48.png) | ![](capturas/u5/u5-10-enderecos-tainacan-testado-160x48.png) | ![](capturas/u5/u5-11-enderecos-koha-160x48.png) |
+
+Em 80×24: ![](capturas/u5/u5-9-enderecos-dspace-testado-80x24.png)
+
+Testes:
+
+- `panel/tests/test_u5_addresses.py`: telas e cartões; só endereços web são
+  aceitos; nada aparece com ✓ antes do teste; efeitos esperados por sistema;
+  redirecionamento reconhecido; “Na internet”; abrir a tela só lê e o teste
+  só lê; botões por sistema; a tarefa do instalador não grava nada;
+  traduções.
+- `tests/addresses.bats`: configurado, localhost e IP da rede sem a VPN; o
+  `curl` só lê; preferências vazias do Koha; plataforma desconhecida
+  recusada.

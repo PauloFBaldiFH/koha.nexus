@@ -319,7 +319,7 @@
    "prompt": "",
    "icon": "",
    "key": "",
-   "view": "section",
+   "view": "addresses",
    "sidebar": true,
    "parent": "",
    "entries": [
@@ -750,7 +750,7 @@
    "prompt": "",
    "icon": "",
    "key": "",
-   "view": "platform-section",
+   "view": "addresses",
    "sidebar": true,
    "parent": "",
    "entries": [
@@ -873,7 +873,7 @@
    "prompt": "",
    "icon": "",
    "key": "",
-   "view": "platform-section",
+   "view": "addresses",
    "sidebar": true,
    "parent": "",
    "entries": [
@@ -1370,7 +1370,7 @@
    "section": "koha-addresses",
    "label": "🌐  Addresses and access",
    "description": "",
-   "kind": "menu",
+   "kind": "view",
    "status": "available",
    "media": []
   },
@@ -19103,11 +19103,21 @@
   },
   "sec-koha-addresses": {
    "en": {
-    "summary": "How Koha is reached: the Cloudflare Tunnel, the free SSL certificate and the staff firewall. The same cards stay in the Security & access hub and in Koha security.",
+    "summary": "How Koha is reached: OPACBaseURL and staffClientBaseURL as configured, the other names of the server, the tunnel, and the cards for the Cloudflare Tunnel, the free SSL certificate and the staff firewall.",
+    "overview": [
+     "The screen keeps three things apart. The **configured address** is the one the application builds its links and redirections with, and the only one marked *use this*, with Open and Copy. **Other names of this server** (localhost, its other network addresses) are listed with the effect to expect. **On the internet** shows a published address, or *Not published*.",
+     "Nothing is called working without a test. **Test access** opens each address from this server and says when; on Windows (WSL) the screen also says the address was not checked from Windows, because a test from inside WSL does not prove it.",
+     "**Publish…** opens the Cloudflare Tunnel Manager, which also sets Koha's addresses."
+    ],
     "related": []
    },
    "pt-BR": {
-    "summary": "Como o Koha é acessado: o Cloudflare Tunnel, o certificado SSL gratuito e o firewall da equipe. Os mesmos cartões continuam na Central de Segurança & Acesso e em Segurança do Koha."
+    "summary": "Como o Koha é acessado: OPACBaseURL e staffClientBaseURL como configurados, os outros nomes do servidor, o túnel, e os cartões do Cloudflare Tunnel, do certificado SSL gratuito e do firewall da equipe.",
+    "overview": [
+     "A tela separa três coisas. O **endereço configurado** é o que o aplicativo usa para montar links e redirecionar, e é o único marcado *use este*, com Abrir e Copiar. **Outros nomes deste servidor** (localhost, os outros endereços de rede) aparecem com o efeito esperado. **Na internet** mostra um endereço publicado, ou *Não publicado*.",
+     "Nada é chamado de funcionando sem teste. **Testar acesso** abre cada endereço a partir deste servidor e diz quando; no Windows (WSL) a tela também avisa que o endereço não foi verificado pelo Windows, porque um teste de dentro do WSL não prova isso.",
+     "**Publicar…** abre o Gerenciador do Cloudflare Tunnel, que também define os endereços do Koha."
+    ]
    }
   },
   "sec-koha-backups": {
@@ -21087,11 +21097,21 @@
   },
   "sec-dspace-addresses": {
    "en": {
-    "summary": "The repository address and HTTPS, and the repair of web access without reinstalling.",
+    "summary": "The repository address DSpace builds pages with, the other names of the server and the internet, with a test from this server, and the repair of web access without reinstalling.",
+    "overview": [
+     "The screen keeps three things apart. The **configured address** is the one the application builds its links and redirections with, and the only one marked *use this*, with Open and Copy. **Other names of this server** (localhost, its other network addresses) are listed with the effect to expect. **On the internet** shows a published address, or *Not published*.",
+     "Nothing is called working without a test. **Test access** opens each address from this server and says when; on Windows (WSL) the screen also says the address was not checked from Windows, because a test from inside WSL does not prove it.",
+     "DSpace answers fully only at the configured address: another name can fail (the error 500 at localhost on Windows). **Change or publish the address…** is the address and HTTPS routine, with its plan and question."
+    ],
     "related": []
    },
    "pt-BR": {
-    "summary": "O endereço e o HTTPS do repositório, e o reparo do acesso web sem reinstalar."
+    "summary": "O endereço com que o DSpace monta as páginas, os outros nomes do servidor e a internet, com teste a partir deste servidor, e o reparo do acesso web sem reinstalar.",
+    "overview": [
+     "A tela separa três coisas. O **endereço configurado** é o que o aplicativo usa para montar links e redirecionar, e é o único marcado *use este*, com Abrir e Copiar. **Outros nomes deste servidor** (localhost, os outros endereços de rede) aparecem com o efeito esperado. **Na internet** mostra um endereço publicado, ou *Não publicado*.",
+     "Nada é chamado de funcionando sem teste. **Testar acesso** abre cada endereço a partir deste servidor e diz quando; no Windows (WSL) a tela também avisa que o endereço não foi verificado pelo Windows, porque um teste de dentro do WSL não prova isso.",
+     "O DSpace só responde por completo no endereço configurado: outro nome pode falhar (o erro 500 em localhost no Windows). **Mudar ou publicar o endereço…** é a rotina de endereço e HTTPS, com plano e pergunta."
+    ]
    }
   },
   "sec-dspace-backups": {

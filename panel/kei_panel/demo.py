@@ -1056,6 +1056,29 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                 data["repaired"] = True
         out.feed("@@result payload=" + base64.b64encode(json.dumps(data).encode()).decode(), reporter, on_result)
         return out
+    if name == "addresses":
+        # The Addresses and access screen (views/addresses.py).
+        import time
+        platform = args[0] if args else "koha"
+        conf = {"koha": [("opac", "http://192.168.0.20"), ("staff", "http://192.168.0.20:8080")],
+                "tainacan": [("site", "http://192.168.0.20:8090")],
+                "dspace": [("site", "http://192.168.1.20:8100")]}.get(platform, [])
+        port = {"koha": "", "tainacan": ":8090", "dspace": ":8100"}.get(platform, "")
+        alts = ([("opac", "http://localhost"), ("staff", "http://localhost:8080")] if platform == "koha"
+                else [("site", "http://localhost" + port), ("site", "http://172.20.10.4" + port)])
+        lines = ["@@result platform=wsl"] + [f"@@result configured={k}|{u}" for k, u in conf]
+        lines += [f"@@result alternative={k}|{u}" for k, u in alts]
+        if "test" in args:
+            now = int(time.time())
+            lines += [f"@@result check={u}|200||{now}" for _k, u in conf]
+            redirect = {"tainacan": conf[0][1] + "/", "dspace": ""}.get(platform, "")
+            lines += [f"@@result check={alts[0][1]}|{'302' if redirect else ('500' if platform == 'dspace' else '200')}|{redirect}|{now}"]
+            lines += [f"@@result check={u}|000||{now}" for _k, u in alts[1:]] if platform != "koha" else \
+                     [f"@@result check={alts[1][1]}|200||{now}"]
+            await asyncio.sleep(1.0)
+        for line in lines:
+            out.feed(line, reporter, on_result)
+        return out
     if name == "run":
         lines = [ln.replace("{tmp}", _demo_tmp()) for ln in _RUN.get(args[0] if args else "", _RUN_DEFAULT)]
         args = ()

@@ -2356,6 +2356,79 @@ kei_lan_address() {
     printf '%s %s\n' "$(get_server_ip)" "-"
 }
 
+# kei_addresses PLATFORM [test]: the "Addresses and access" screen of the
+# panel (study 17.4). Read only. Each line is a kei_result:
+#   configured=KIND|URL   the address the application builds its links and
+#                         redirections with (Koha OPACBaseURL and
+#                         staffClientBaseURL, WordPress home, DSpace's URL)
+#   unset=KIND            Koha: the preference is empty
+#   alternative=KIND|URL  another name of this server for the same port
+#                         (localhost, its other network addresses)
+#   check=URL|CODE|REDIRECT|EPOCH  with "test": the address opened from this
+#                         server (no body kept; 000 = no answer)
+_kei_addr_url() {   # SCHEME HOST PORT -> URL (the scheme's own port left out)
+    if { [ "$1" = http ] && [ "$3" = 80 ]; } || { [ "$1" = https ] && [ "$3" = 443 ]; }; then
+        printf '%s://%s' "$1" "$2"
+    else
+        printf '%s://%s:%s' "$1" "$2" "$3"
+    fi
+}
+kei_addresses() {
+    local platform="${1:-}" mode="${2:-}" url kind scheme host port ifc a item code
+    local -a configured=() shown=() ports=()
+    case "$platform" in
+        koha)
+            is_koha_installed || return 3
+            local pref k
+            for k in opac:OPACBaseURL staff:staffClientBaseURL; do
+                url=""
+                is_database_ready && url=$(run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable='${k#*:}' LIMIT 1;" 2>/dev/null)
+                url="${url%/}"
+                if read -r scheme host port < <(kei_tainacan_parse_url "$url" 2>/dev/null); then
+                    configured+=("${k%%:*}|$url")
+                else
+                    kei_result unset "${k%%:*}"
+                fi
+            done
+            ports=("opac|http|80" "staff|http|8080") ;;
+        tainacan)
+            url=$(_kei_tn_get url); url="${url%/}"
+            [ -n "$url" ] && configured+=("site|$url") ;;
+        dspace)
+            url=$(kei_dspace_runtime status 2>/dev/null | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d={}
+u=d.get("url","") if isinstance(d,dict) else ""
+print(u if isinstance(u,str) else "")')
+            url="${url%/}"
+            [ -n "$url" ] && configured+=("site|$url") ;;
+        *) return 2 ;;
+    esac
+    kei_result platform "${KEI_PLATFORM:-linux}"
+    for item in "${configured[@]}"; do
+        kei_result configured "$item"; shown+=("${item#*|}")
+        read -r scheme host port < <(kei_tainacan_parse_url "${item#*|}") || continue
+        ports+=("${item%%|*}|$scheme|$port")
+    done
+    for item in "${ports[@]}"; do
+        IFS='|' read -r kind scheme port <<< "$item"
+        for host in localhost $(ip -4 -o addr show scope global 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $2 "=" $4 }') ${WIN_LAN_IP:+win=$WIN_LAN_IP}; do
+            ifc="${host%%=*}"; a="${host#*=}"
+            [ "$host" = localhost ] || { kei_iface_virtual "$ifc" && continue; lan_ip_usable "$a" || continue; }
+            url=$(_kei_addr_url "$scheme" "$a" "$port")
+            case " ${shown[*]} " in *" $url "*) continue ;; esac
+            shown+=("$url"); kei_result alternative "$kind|$url"
+        done
+    done
+    [ "$mode" = test ] || return 0
+    command -v curl >/dev/null 2>&1 || return 0
+    for url in "${shown[@]}"; do
+        code=$(curl -s -o /dev/null --noproxy '*' --max-time 6 -w '%{http_code}|%{redirect_url}' "$url/" 2>/dev/null) || true
+        kei_result check "$url|${code:-000|}|$(date +%s)"
+    done
+    return 0
+}
+
 # lan_ip_usable TEXT: 0 for a dotted IPv4 address another machine could
 # use: not 0.x, 127.x, 169.254.x (link-local) nor a broadcast or multicast.
 lan_ip_usable() {
@@ -46918,6 +46991,7 @@ kei_task() {
             while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_start_plan; echo "rc	$?")
             return 0 ;;
         tainacan-language)  _kei_docker_task kei_tainacan_language "${1:-}" ;;
+        addresses)          kei_addresses "${1:-}" "${2:-}" ;;
         koha-languages)
             # Read only (the Language center): the Koha languages installed
             # here and the OPAC and staff lists (first = the active one).
