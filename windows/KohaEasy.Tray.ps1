@@ -84,6 +84,11 @@ $icons = @{
     stopped_by_user = New-DotIcon ([System.Drawing.Color]::FromArgb(210, 50, 45))
     not_installed   = New-DotIcon ([System.Drawing.Color]::FromArgb(140, 140, 140))
 }
+# The colours of Resolve-KohaIndicator (U7, every system).
+$icons.green = $icons.running
+$icons.yellow = $icons.starting
+$icons.red = $icons.not_responding
+$icons.gray = $icons.not_installed
 
 # A window nobody sees, for Windows' end-of-session messages. While Koha
 # runs it holds a shutdown block reason (ShutdownBlockReasonCreate), which
@@ -208,6 +213,7 @@ function Add-Separator {
 
 $header = Add-Item (Get-KohaStateText 'stopped') $null
 $header.Enabled = $false
+$systemItems = @()          # one disabled line per system, under the header
 Add-Separator
 # The quick actions. Open Dashboard is also the double-click.
 $miPanel = Add-Item (T 'Open Dashboard') { Invoke-KohaCommand 'Panel'; Request-Check 5 }
@@ -220,8 +226,9 @@ $more = Add-Item (T 'More options') $null
 $miStaff = Add-Item (T 'Open the staff interface') { Start-Process $cfg.StaffUrl } $more
 $miOpac = Add-Item (T 'Open the public catalog') { Start-Process $cfg.OpacUrl } $more
 Add-Separator $more
-$miStart = Add-Item (T 'Start Koha') { Invoke-KohaCommand 'Start'; Request-Check 5 } $more
-$miStop = Add-Item (T 'Stop Koha') { Invoke-KohaCommand 'Stop'; Request-Check 5 } $more
+# Start and Stop are of Debian as a whole: every system in it (U7).
+$miStart = Add-Item (T 'Start the systems') { Invoke-KohaCommand 'Start'; Request-Check 5 } $more
+$miStop = Add-Item (T 'Stop the systems') { Invoke-KohaCommand 'Stop'; Request-Check 5 } $more
 $miReindex = Add-Item (T 'Rebuild search index') {
     $q = (T 'Rebuild the search index from scratch?') + "`n`n" + (T 'Searches in the catalog may be incomplete until it finishes. On large catalogs this takes several minutes.')
     if ([string][System.Windows.Forms.MessageBox]::Show($q, (Get-KohaAppTitle), 'YesNo', 'Question') -eq 'Yes') { Invoke-KohaCommand 'RebuildIndex' }
@@ -305,10 +312,23 @@ function Start-Check {
 function Update-Menu {
     param($Status)
     $s = $Status.State
-    $tray.Icon = $icons[$s]
-    $text = Get-KohaStateText $s
-    $header.Text = $text
-    $tray.Text = $text.Substring(0, [Math]::Min(63, $text.Length))
+    # Every system (U7): the colour, the worst case and one line per system.
+    $ind = Resolve-KohaIndicator -State $s -Linux $Status.Linux
+    $tray.Icon = $icons[$ind.Colour]
+    $header.Text = $ind.Text
+    $tray.Text = $ind.Tooltip
+    foreach ($item in $script:systemItems) { $menu.Items.Remove($item) }
+    $script:systemItems = @()
+    $at = $menu.Items.IndexOf($header) + 1
+    foreach ($line in $ind.Lines) {
+        $item = New-Object System.Windows.Forms.ToolStripMenuItem $line
+        $item.Enabled = $false
+        $menu.Items.Insert($at, $item)
+        $at++
+        $script:systemItems += $item
+    }
+    $systems = @(Get-KohaSummarySystems $Status.Linux)
+    $koha = ($systems.Count -eq 0) -or (@($systems | Where-Object { $_.Id -eq 'koha' }).Count -gt 0)
     $on = @('running', 'starting', 'not_responding') -contains $s
     $miStart.Enabled = (-not $on) -and $s -ne 'not_installed'
     $miStop.Enabled = $on
@@ -317,8 +337,8 @@ function Update-Menu {
     # The shutdown watcher (KohaEasy.Watcher.ps1) holds its own reason and
     # does the stop while it runs; the tray only stands in for it.
     if ($on -and -not (Test-KohaWatcherRunning)) { $session.Block($blockReason) } else { $session.Unblock() }
-    $miStaff.Enabled = ($s -eq 'running')
-    $miOpac.Enabled = ($s -eq 'running')
+    $miStaff.Enabled = ($s -eq 'running') -and $koha
+    $miOpac.Enabled = ($s -eq 'running') -and $koha
     $st = Get-KohaState
     $miAuto.Checked = ($st.autostart -eq 'logon')
     $miBackupOk.Checked = [bool]$st.notifyBackupOk

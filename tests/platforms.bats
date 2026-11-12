@@ -50,7 +50,7 @@ kei_status_json'
     [ "$status" -eq 0 ]
     valid_json "$output"
     run python3 -c 'import json,sys; d=json.loads(sys.argv[1])
-for k in ("schema","generated_at","panel_version","platform","state","koha_installed","services","plack","http","backup","recovery","disk","memory","platforms"):
+for k in ("schema","generated_at","panel_version","platform","state","koha_installed","services","plack","http","backup","recovery","disk","memory","platforms","names","summary"):
     assert k in d, k
 assert d["schema"] == 1 and d["koha_installed"] is False
 print(d["state"], [p["id"] for p in d["platforms"]])' "$output"

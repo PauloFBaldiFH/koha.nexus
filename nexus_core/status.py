@@ -109,6 +109,42 @@ class Space:
     free: int = 0
 
 
+SUMMARY_STATES = ("ok", "attention", "critical", "stopped")
+SUMMARY_OVERALL = SUMMARY_STATES + ("none",)
+
+
+@dataclass(frozen=True)
+class SystemSummary:
+    """One installed system in "summary" (U7): koha, tainacan or dspace."""
+
+    id: str
+    name: str
+    state: str                  # ok | attention | critical | stopped
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class Summary:
+    """Every system in one look (kei_panel/status_summary.py, study 11)."""
+
+    state: str                  # ok | attention | critical | stopped | none
+    checked_at: int = 0
+    systems: tuple = ()
+
+    @classmethod
+    def from_json(cls, d: Any) -> Optional["Summary"]:
+        """None for an older installer (no block), null or a bad block."""
+        if not isinstance(d, Mapping) or d.get("state") not in SUMMARY_OVERALL:
+            return None
+        systems = []
+        for row in d.get("systems") if isinstance(d.get("systems"), list) else []:
+            if (isinstance(row, Mapping) and row.get("id") in ("koha", "tainacan", "dspace")
+                    and row.get("state") in SUMMARY_STATES and _str(row.get("name")).strip()):
+                systems.append(SystemSummary(row["id"], _str(row["name"]).strip()[:120], row["state"],
+                                             _str(row.get("reason"))[:48]))
+        return cls(d["state"], _int(d.get("checked_at")), tuple(systems))
+
+
 @dataclass(frozen=True)
 class LinuxStatus:
     """Koha's own view of itself, as config.sh --status-json prints it."""
@@ -130,6 +166,7 @@ class LinuxStatus:
     access: Access = field(default_factory=Access)
     disk: Space = field(default_factory=Space)
     memory: Space = field(default_factory=Space)
+    summary: Optional[Summary] = None      # U7; None from an older installer
     raw: Dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
 
     @classmethod
@@ -156,6 +193,7 @@ class LinuxStatus:
             access=Access.from_json(_block(data, "access")),
             disk=Space(_int(disk.get("total")), _int(disk.get("free"))),
             memory=Space(_int(mem.get("total")), _int(mem.get("available"))),
+            summary=Summary.from_json(data.get("summary")),
             raw=dict(data),
         )
 

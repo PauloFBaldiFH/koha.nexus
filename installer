@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.202"
+PANEL_VERSION=" 1.5.203"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2380,6 +2380,19 @@ _kei_addr_url() {   # SCHEME HOST PORT -> URL (the scheme's own port left out)
 #   kei_instance_names read          system=APP|named|NAME or APP|proposed|NAME
 #   kei_instance_names json          {"koha":"..."} for --status-json ({} if unknown)
 #   kei_instance_names set APP NAME  adopts (first time) or renames
+# The "summary" of --status-json (U7): kei_panel/status_summary.py reads the
+# parts on stdin and prints the block ("null" when it cannot).
+kei_status_summary() {
+    local py="${KEI_PANEL_VENV}/bin/python" out
+    [ -x "$py" ] || py=python3
+    if [ ! -f "${KEI_PANEL_SRC}/kei_panel/status_summary.py" ]; then
+        cat >/dev/null; printf 'null'; return 0
+    fi
+    out=$(cd / && PYTHONPATH="$KEI_PANEL_SRC" PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 \
+        "$py" -m kei_panel.status_summary 2>/dev/null)
+    [ -n "$out" ] || out=null
+    printf '%s' "$out"
+}
 kei_instance_names() {
     local mode="${1:-}" py="${KEI_PANEL_VENV}/bin/python"
     [ -x "$py" ] || py=python3
@@ -17983,9 +17996,12 @@ kei_status_json() {
     d_total="${df_line%% *}" d_free="${df_line##* }"
     mem_total=$(awk '/^MemTotal:/{print $2 * 1024}' /proc/meminfo 2>/dev/null)
     mem_avail=$(awk '/^MemAvailable:/{print $2 * 1024}' /proc/meminfo 2>/dev/null)
-    printf '{"schema":1,"generated_at":%s,"panel_version":%s,' "$(date +%s)" "$(json_str "${PANEL_VERSION# }")"
+    local now overall platforms docker names
+    now=$(date +%s)
+    overall=$(kei_overall_state "$apache" "$db" "$koha" "$staff")
+    printf '{"schema":1,"generated_at":%s,"panel_version":%s,' "$now" "$(json_str "${PANEL_VERSION# }")"
     printf '"platform":%s,"wsl_net":%s,"autostart":%s,' "$(json_str "$KEI_PLATFORM")" "$(json_str "${KEI_WSL_NET:-}")" "$(json_str "${WIN_AUTOSTART:-}")"
-    printf '"state":%s,"koha_installed":%s,' "$(json_str "$(kei_overall_state "$apache" "$db" "$koha" "$staff")")" "$(is_koha_installed && echo true || echo false)"
+    printf '"state":%s,"koha_installed":%s,' "$(json_str "$overall")" "$(is_koha_installed && echo true || echo false)"
     printf '"services":{%s},"plack":%s,' "$json" "$plack"
     printf '"http":{"staff":%s,"opac":%s},' "$(json_num "$staff")" "$(json_num "$opac")"
     printf '"backup":{"last_file":%s,"last_epoch":%s,"last_size":%s,"last_kind":%s,"last_result":%s,"log_epoch":%s},' \
@@ -17998,11 +18014,19 @@ kei_status_json() {
     printf '"memory":{"total":%s,"available":%s},' "$(json_num "$mem_total")" "$(json_num "$mem_avail")"
     # Added after the fields above (schema 1 unchanged): readers that do not
     # know "platforms", "proxy" or "docker" ignore them.
-    printf '"platforms":%s,' "$(kei_platforms_json "${svc_states[@]}")"
-    printf '"proxy":%s,' "$(kei_proxy_json)"
-    printf '"docker":%s,' "$(kei_docker_json)"
+    platforms=$(kei_platforms_json "${svc_states[@]}")
+    docker=$(kei_docker_json)
     # The visible names (U6): only the installations named in the registry.
-    printf '"names":%s}\n' "$(kei_instance_names json 2>/dev/null || printf '{}')"
+    names=$(kei_instance_names json 2>/dev/null || printf '{}')
+    printf '"platforms":%s,' "$platforms"
+    printf '"proxy":%s,' "$(kei_proxy_json)"
+    printf '"docker":%s,' "$docker"
+    printf '"names":%s,' "$names"
+    # Every system in one look (U7, study 11): computed once, here, from the
+    # values above; the tray and the panel only read it. null if unknown.
+    printf '"summary":%s}\n' "$(printf '{"generated_at":%s,"state":%s,"services":{%s},"http":{"staff":%s},"backup":{"last_epoch":%s,"last_result":%s},"platforms":%s,"docker":%s,"names":%s}' \
+        "$now" "$(json_str "$overall")" "$json" "$(json_num "$staff")" "$(json_num "$b_epoch")" "$(json_str "$b_result")" \
+        "$platforms" "$docker" "$names" | kei_status_summary)"
 }
 
 # Removes secrets from text on stdin: key=value / key: value pairs whose key

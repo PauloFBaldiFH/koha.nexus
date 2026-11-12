@@ -124,9 +124,10 @@ def test_the_installer_wiring():
     assert re.search(r'^        instance-names\)\s+kei_instance_names read ;;$', text, re.M)
     body = re.search(r'^kei_instance_names\(\) \{\n(.*?)^\}', text, re.S | re.M).group(1)
     assert 'cd /' in body and '"$INSTANCE"' in body
-    # Only added to --status-json, last, and always valid JSON.
+    # Only added to --status-json, after the older fields, always valid JSON.
     status = re.search(r'^kei_status_json\(\) \{\n(.*?)^\}', text, re.S | re.M).group(1)
-    assert status.rstrip().endswith("""printf '"names":%s}\\n' "$(kei_instance_names json 2>/dev/null || printf '{}')\"""")
+    assert """names=$(kei_instance_names json 2>/dev/null || printf '{}')""" in status
+    assert status.index("printf '\"names\":%s,' \"$names\"") > status.index('"docker":%s,')
 
 
 # --- what the panel shows -------------------------------------------------------
