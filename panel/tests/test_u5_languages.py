@@ -62,8 +62,14 @@ def run_center(monkeypatch, size=(160, 48), koha='1', tainacan='1', dspace='1', 
                 return await real(name, *args, **kwargs)
             app.bridge.task = task
             app.screen.action_show('languages', from_sidebar=True)
-            await pilot.pause(2.5)
+            await pilot.pause(0.5)
             view = app.screen.query_one('#view-languages')
+            # The rows are read in the background: wait until each one is filled
+            # (a slow machine takes longer), never a fixed time.
+            for _ in range(300):
+                if all(str(v.render()) != '…' for v in view.query('.lang-value')):
+                    break
+                await pilot.pause(0.1)
             rows = {}
             for row in view.query('.lang-row'):
                 labels = [str(lb.render()) for lb in row.query(Label)]
