@@ -15,6 +15,7 @@ import pytest
 
 from kei_panel.routines import common, platforms
 from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
+from kei_panel.screens.install_flow import PlanSummaryScreen
 from test_admin_setup import FakeApp, Result, outcome, pick
 
 
@@ -104,7 +105,7 @@ def test_a_domain_is_asked_and_confirmed_before_it_changes(ran):
     ("later", []),
 ])
 def test_the_installation_asks_where_the_collection_will_answer(ran, mode, after):
-    app = FakeApp([pick(mode), lambda s: isinstance(s, ConfirmScreen)], {
+    app = FakeApp([pick(mode), lambda s: isinstance(s, PlanSummaryScreen)], {
         "tainacan-free-status": free(available="yes"),
         "tainacan-plan": outcome({"plan": "install", "address": "http://192.168.0.10:8090"})})
     run(platforms.tainacan_install(app))

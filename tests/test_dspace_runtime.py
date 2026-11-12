@@ -108,6 +108,60 @@ class RuntimeTests(unittest.TestCase):
     def install(self):
         return self.rt.install('http://192.168.1.20:8100')
 
+    def test_install_reports_its_stages_in_order(self):
+        # U3: the panel's bar moves by stage; each one comes from a phase
+        # install() really marks, in the order the work is done.
+        seen = []
+        self.rt.progress = seen.append
+        self.install()
+        stages = [p for p in seen if p in ds.STAGES]
+        self.assertEqual(stages, ['requirements', 'images', 'network', 'dependencies', 'migration', 'application'])
+        self.assertEqual([ds.STAGES[p][0] for p in stages], [1, 3, 4, 5, 6, 7])
+        self.assertEqual(max(n for n, _l, _t in ds.STAGES.values()), ds.TOTAL_STAGES)
+
+    def test_protocol_stage_lines_carry_no_command_output(self):
+        out = io.StringIO()
+        with patch.object(sys, 'argv', ['runtime.py', '--protocol', '--root', str(self.root), 'status']), \
+                contextlib.redirect_stderr(out), contextlib.redirect_stdout(io.StringIO()), \
+                patch.object(ds.Runtime, 'status', lambda rt: (rt.progress('migration'), rt.progress('proxy'), {})[-1]):
+            ds.main()
+        lines = out.getvalue().splitlines()
+        self.assertIn('@@stage [6/7] Preparing the database\t' + ds.STAGES['migration'][2], lines)
+        self.assertEqual([x for x in lines if x.startswith('@@stage')], ['@@stage [6/7] Preparing the database\t' + ds.STAGES['migration'][2]])
+        self.assertIn('DSpace: proxy', lines)          # the older log line is kept
+
+    def test_wait_writes_activity_lines_without_output(self):
+        seen = []
+        rt = ds.Runtime(self.root, self.catalog, lab=True, progress=seen.append)
+        clock = iter(range(0, 10000, 20))
+        with patch.object(ds.time, 'monotonic', lambda: next(clock)), patch.object(ds.time, 'sleep', lambda s: None):
+            with self.assertRaises(ds.Refused):
+                rt.wait('DSpace REST API', lambda: (_ for _ in ()).throw(ds.Refused('secret=abc')), 120)
+        activity = [x for x in seen if x.startswith('Still waiting')]
+        self.assertTrue(activity)
+        self.assertTrue(all('secret' not in x for x in seen))
+        self.assertRegex(activity[0], r'^Still waiting for DSpace REST API \(attempt \d+, \d+ of up to 2 min\)$')
+
+    def test_preflight_lists_every_problem_and_changes_nothing(self):
+        rt = ds.Runtime(self.root, self.catalog, lab=True)
+        meminfo = 'MemTotal: 8000000 kB\nMemAvailable: 2000000 kB\n'
+        real_read = Path.read_text
+
+        def read(path, *a, **kw):
+            return meminfo if str(path) == '/proc/meminfo' else real_read(path, *a, **kw)
+        with patch.object(rt, 'docker', side_effect=ds.Refused('docker unavailable')), \
+                patch.object(ds.platform, 'machine', return_value='aarch64'), \
+                patch.object(Path, 'read_text', read), patch.object(ds, 'free_port', return_value=False):
+            result = rt.preflight()
+        states = {row['id']: row['state'] for row in result['checks']}
+        self.assertFalse(result['ok'])
+        self.assertEqual(states['architecture'], 'fail')
+        self.assertEqual(states['memory'], 'fail')
+        self.assertEqual(states['ports'], 'fail')
+        self.assertEqual(states['docker'], 'warn')     # Docker is prepared with its own confirmation
+        self.assertEqual(states['images'], 'ok')
+        self.assertFalse(self.root.exists())
+
     def test_origin_validation_rejects_injection_and_credentials(self):
         for value in ('http://user:secret@x.org', 'http://x.org/path', 'http://x.org?secret=x', 'http://x.org/#x',
                       'http://x.org\nListen 25', 'http://[::1]:8100', 'http://bad..org', 'http://999.999.0.1',

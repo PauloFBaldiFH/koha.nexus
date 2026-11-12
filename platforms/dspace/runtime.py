@@ -40,6 +40,24 @@ BACKEND_DIRS = ('assetstore', 'log', 'var', 'upload', 'reports', 'exports', 'imp
 VOLUMES = ('postgres', 'solr', 'discovery-state') + BACKEND_DIRS
 CORES = ('authority', 'oai', 'search', 'statistics', 'qaevent', 'suggestion', 'audit')
 HTTP = build_opener(ProxyHandler({}))  # probes are local, never an environment proxy
+# The installation's stages as the panel shows them ("@@stage [n/7] label").
+# Each comes from a phase install() already marks; the bar moves only when
+# a stage is reached, never with the clock. The texts are translated by the
+# panel. A phase not listed here (proxy, ready) stays inside its stage.
+TOTAL_STAGES = 7
+STAGES = {
+    'requirements': (1, 'Checking the requirements', 'Memory, disk, Docker and the reserved ports.'),
+    'prepare-images': (2, 'Preparing the programs (first time only)',
+                       'Builds the backend, the interface and Solr from the pinned recipe. It can take 30 to 90 minutes without new lines; the work goes on.'),
+    'images': (3, 'Checking the programs', 'Each image is compared with the reviewed recipe.'),
+    'network': (4, 'Creating the network and the data volumes', 'Only resources of DSpace are created.'),
+    'dependencies': (5, 'Starting the database and the search', 'PostgreSQL and the seven Solr cores.'),
+    'migration': (6, 'Preparing the database',
+                  'Creates the tables of the repository. It can take up to 20 minutes without new lines; the work goes on.'),
+    'application': (7, 'Starting, publishing and checking the repository',
+                    'The API, the interface, the address and the login page are checked before the end.'),
+}
+ACTIVITY_SECONDS = 30   # a waiting line in the log every 30 s, with no command output
 
 
 class Refused(Exception):
@@ -326,6 +344,60 @@ class Runtime:
                     # container alive. Never start another operation over it.
                     raise Refused('A DSpace administrative container is still running; inspect it before resuming.')
 
+    def preflight(self):
+        """Every requirement plan() checks, as a list, with nothing changed.
+
+        plan() stops at the first problem; the panel shows the whole list
+        before asking anything (study section 16.3). Each row is
+        {'id', 'state': ok|warn|fail, 'label', 'detail'}; the labels are
+        translated by the panel and the details carry only numbers/names."""
+        rows = []
+
+        def add(key, state, label, detail=''):
+            rows.append({'id': key, 'state': state, 'label': label, 'detail': detail})
+        old = self.state()
+        if old.get('status') == 'installed':
+            add('installed', 'fail', 'DSpace is already installed here', 'Use start or the diagnosis, not a new installation.')
+        machine = platform.machine()
+        add('architecture', 'ok' if machine in ('x86_64', 'amd64') else 'fail', 'amd64 processor', machine)
+        name = ''
+        if Path('/etc/os-release').exists():
+            text = Path('/etc/os-release').read_text(errors='replace')
+            found = re.search(r'^PRETTY_NAME="?([^"\n]*)', text, re.M)
+            name = found.group(1) if found else ''
+            supported = self.lab or any(x in text for x in ('ID=debian', 'ID=ubuntu'))
+        else:
+            supported = self.lab
+        add('system', 'ok' if supported else 'fail', 'Debian or Ubuntu', name)
+        mem = {}
+        if Path('/proc/meminfo').exists():
+            mem = {x.split(':')[0]: int(x.split()[1]) * 1024 for x in Path('/proc/meminfo').read_text().splitlines()}
+        available = mem.get('MemAvailable', 0)
+        add('memory', 'ok' if available >= 4 * 1024**3 else 'fail', 'Free memory (4 GB needed)',
+            '%.1f GB' % (available / 1024**3))
+        parent = self.root
+        while not parent.exists():
+            parent = parent.parent
+        free = shutil.disk_usage(parent).free
+        add('disk', 'ok' if free >= 8 * 1024**3 else 'fail', 'Free disk (8 GB needed)', '%.0f GB' % (free / 1024**3))
+        try:
+            info = json.loads(self.docker('info', '--format', '{{json .}}', log_failure=False))
+            if info.get('OSType') != 'linux':
+                add('docker', 'fail', 'Docker running on this server', 'not a local Linux engine')
+            elif any('rootless' in x or 'userns' in x for x in info.get('SecurityOptions', [])):
+                add('docker', 'fail', 'Docker running on this server', 'rootless or user-remapped Docker')
+            else:
+                self.docker('compose', 'version', log_failure=False)
+                add('docker', 'ok', 'Docker running on this server', str(info.get('ServerVersion', '')))
+        except (Refused, OSError, ValueError):
+            add('docker', 'warn', 'Docker running on this server', 'not running or not installed: prepared with your confirmation')
+        ports = old.get('ports') or {'ui': 18100, 'backend': 18101}
+        busy = [str(p) for p in ports.values() if not free_port(p)] if not old.get('prepared') else []
+        add('ports', 'fail' if busy else 'ok', 'Internal ports 18100 and 18101 free', ', '.join(busy))
+        add('images', 'ok' if self.catalog_path.exists() else 'warn', 'Programs of DSpace ready',
+            '' if self.catalog_path.exists() else 'built on this server first: 30 to 90 minutes')
+        return {'schema': 1, 'checks': rows, 'ok': not any(r['state'] == 'fail' for r in rows), 'changed': False}
+
     def plan(self, url=None):
         old = self.state()
         url = canonical_url(url or old.get('url', ''))
@@ -466,14 +538,23 @@ class Runtime:
         # first poll never shows as the installer error of a ready install.
         if self.progress:
             self.progress('Checking ' + label)
-        deadline = time.monotonic() + seconds
+        start = time.monotonic()
+        deadline = start + seconds
         last = None
+        tries = 0
+        said = start
         while time.monotonic() < deadline:
+            tries += 1
             try:
                 if fn():
                     return
             except (Refused, OSError, ValueError) as error:
                 last = error
+            # Activity only: the attempt and the time, never a command's output.
+            if self.progress and time.monotonic() - said >= ACTIVITY_SECONDS:
+                said = time.monotonic()
+                self.progress('Still waiting for %s (attempt %d, %d of up to %d min)'
+                              % (label, tries, int((said - start) // 60), max(1, seconds // 60)))
             time.sleep(3)
         if isinstance(last, OperationFailed):
             self.save_error(last)
@@ -571,6 +652,8 @@ class Runtime:
 
     def install(self, url=None, retry_migration=False):
         # Preflight first: a missing catalog never creates even the platform directory.
+        if self.progress:
+            self.progress('requirements')
         plan = self.plan(url)
         with self.lock():
             plan = self.plan(plan['url'])  # re-check after acquiring the operation lock
@@ -760,7 +843,9 @@ class Runtime:
             raise Refused('Use the installation assistant or the local installer to prepare images.')
         with self.lock():
             if not self.catalog_path.exists():
-                print('Preparing experimental DSpace images. Build output follows; this may take more than an hour.', file=sys.stderr, flush=True)
+                if self.progress:
+                    self.progress('prepare-images')
+                print('Preparing DSpace images. Build output follows; this may take more than an hour.', file=sys.stderr, flush=True)
                 try:
                     subprocess.run(['bash', self.driver, '--task', 'dspace-resource', 'prepare-images', str(self.catalog_path)],
                                    check=True, timeout=21600, env=dict(local_docker_env(), KEI_DSPACE_DIR=str(self.root)))
@@ -933,7 +1018,7 @@ def main():
         sub.add_parser(name).add_argument('--confirm', action='store_true')
     sub.add_parser('setup-mark').add_argument('values', nargs=2)
     sub.add_parser('setup-status').add_argument('--refresh', action='store_true')
-    for name in ('availability', 'admin-status', 'logs', 'setup-close', 'status', 'diagnose', 'proxy-config'):
+    for name in ('availability', 'preflight', 'admin-status', 'logs', 'setup-close', 'status', 'diagnose', 'proxy-config'):
         sub.add_parser(name)
     for name in ('backup-create', 'backup-rollback'):
         child = sub.add_parser(name)
@@ -962,9 +1047,13 @@ def main():
         raise Refused('Interrupted; data were preserved. Review the saved phase before resuming.')
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGHUP, interrupted)
+    def progress(phase):
+        print('DSpace: ' + phase, file=sys.stderr, flush=True)
+        if args.protocol and phase in STAGES:
+            number, label, note = STAGES[phase]
+            print('@@stage [%d/%d] %s\t%s' % (number, TOTAL_STAGES, label, note), file=sys.stderr, flush=True)
     try:
-        runtime = Runtime(args.root, args.catalog, args.lab, args.driver,
-                          progress=lambda phase: print('DSpace: ' + phase, file=sys.stderr, flush=True),
+        runtime = Runtime(args.root, args.catalog, args.lab, args.driver, progress=progress,
                           release_lock=args.release_lock, language=getattr(args,'language',None))
         if args.command in ('install','start','stop','admin-create','admin-password','backup-create','backup-test','backup-restore','backup-rollback','prepare-upgrade-images'):
             from operations import Operations
@@ -1007,6 +1096,8 @@ def main():
                 raise Refused(str(error)) from None
         elif args.command == 'availability':
             result = runtime.availability()
+        elif args.command == 'preflight':
+            result = runtime.preflight()
         elif args.command == 'prepare-upgrade-images':
             result = runtime.prepare_upgrade_images()
         elif args.command == 'prepare-images':

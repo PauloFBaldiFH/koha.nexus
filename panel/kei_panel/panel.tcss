@@ -935,3 +935,11 @@ App.-plain #picker-drop {
 #bk-scopes Button { width: 100%; min-width: 0; }
 .-narrow #bk-scopes { grid-size: 2; grid-columns: 1fr 1fr; }
 .-narrow #bk-scopes #scope-all { column-span: 2; }
+/* Installation: initial and final diagnosis (screens/install_flow.py). */
+.check-row { height: auto; }
+.check-mark { width: 3; text-style: bold; }
+.check-row.-ok .check-mark { color: $success; }
+.check-row.-warn .check-mark { color: $warning; }
+.check-row.-fail .check-mark { color: $error; }
+.check-label { width: 40; }
+.check-detail { width: 1fr; color: $text-muted; }

@@ -1521,3 +1521,44 @@ Entra no U5 (tela por sistema) e no U7 (teste pelo Windows na bandeja).
 | U5 | Árvore da 17.1 (sem juntar Aparência e IA, sem gaveta), Central de idiomas da 17.2 com o cartão do Tainacan, tela de endereços da 17.4 |
 | U7 | Teste de acesso feito pelo Windows, gravado para a tela de endereços |
 | **U11** (novo) | Remoção do Koha com backup verificado e dados guardados (17.3). Esforço G. Depende de U2 |
+
+## 18. U3 entregue: instalação em etapas, com diagnóstico antes e depois
+
+O que mudou no DSpace e no Tainacan (o Koha já tinha as etapas `[n/7]`):
+
+1. **Diagnóstico inicial.** Antes de qualquer pergunta, a lista completa dos
+   requisitos, só leitura: “Nada foi alterado até aqui.” Um item com ✖ deixa
+   Continuar desligado; ⚠ é algo que será preparado com confirmação (Docker,
+   Apache). Fontes: `runtime.py preflight` (novo, sem gravar nada) mais
+   `dspace-prerequisites plan`; `kei_tainacan_preflight` (nova tarefa
+   `tainacan-preflight`). O `plan()` e o `tainacan-plan` continuam recusando
+   como antes: a lista não afrouxa nenhuma verificação.
+2. **Resumo antes de instalar.** Linhas simples (endereço e de onde se abre,
+   idioma, tempo previsto, memória e disco, o que muda no servidor, que Koha e
+   Tainacan não mudam, que a conta admin é criada depois). O plano técnico em
+   JSON, idêntico ao de antes, fica em “Detalhes técnicos”.
+3. **Progresso por etapa.** O motor do DSpace escreve `@@stage [n/7]` a partir
+   das fases que já marcava (requisitos, preparação das imagens, conferência,
+   rede e volumes, banco e busca, migração, aplicação/endereço/verificação);
+   o Tainacan escreve `[n/6]`. A barra avança pelas etapas concluídas, nunca
+   pelo relógio. Numa etapa quieta, o carregador diz há quanto tempo ela está
+   em andamento. As esperas do DSpace escrevem uma linha de atividade a cada
+   30 s (“tentativa N, X de até Y min”), sem saída de comandos: a política de
+   não copiar a saída dos subprocessos foi mantida. O registro quebra linha.
+4. **Diagnóstico final.** Depois de instalar, o relatório das verificações
+   (serviços, API/interface/login, endereço verificado a partir do servidor;
+   no Tainacan, banco, WordPress, API das coleções, versões fixadas,
+   isolamento e site no Apache). O menu “Diagnóstico” do DSpace usa o mesmo
+   relatório, com o JSON em “Detalhes técnicos”.
+
+A conclusão comum e a criação do administrador ficam para o U4. O runtime
+mudou, então o SHA fixado no instalador foi atualizado.
+
+| Antes de instalar (DSpace) | Resumo | Etapa 6 de 7 | Diagnóstico final |
+|---|---|---|---|
+| ![](capturas/u3/u3-dspace-1-diagnostico-inicial-80x24.png) | ![](capturas/u3/u3-dspace-2-resumo-80x24.png) | ![](capturas/u3/u3-dspace-3-etapa-6-de-7-80x24.png) | ![](capturas/u3/u3-dspace-4-diagnostico-final-80x24.png) |
+
+Testes: `panel/tests/test_u3_install.py` (fluxos, barra por etapa, Continuar
+desligado com ✖ em 80×24 e 160×48, traduções), `tests/test_dspace_runtime.py`
+(ordem das etapas, linhas sem saída de comandos, `preflight` sem gravar) e
+`tests/tainacan.bats` (lista e etapas do Tainacan).

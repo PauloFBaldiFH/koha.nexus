@@ -48,6 +48,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
         self.last_output = 0.0
         self.has_output = False
         self.explicit_status = False
+        self.stage_started = 0.0     # when the current "@@stage" began
 
     def compose(self) -> ComposeResult:
         plain = getattr(self.app, "env", None) and self.app.env.plain
@@ -61,7 +62,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
                 yield Label("", id="loader-status", markup=False)
                 yield Label("", id="loader-clock", markup=False)
             yield Static("", id="loader-waiting", markup=False)
-            yield RichLog(id="loader-log", max_lines=500, wrap=False, markup=False)
+            yield RichLog(id="loader-log", max_lines=500, wrap=True, markup=False)
             with Horizontal(id="loader-buttons"):
                 yield Button("Log", id="toggle-log", variant="default")
                 yield Button(t("Cancel"), id="cancel", variant="error")
@@ -112,6 +113,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
         notice = self.query_one("#loader-notice", Static)
         notice.update(text)
         notice.display = bool(text)
+        self.stage_started = time.monotonic() if text else 0.0
 
     def set_cancellable(self, on: bool) -> None:
         self.cancellable = on
@@ -139,7 +141,13 @@ class LoadingScreen(ModalScreen[TaskResult]):
         silent = int(time.monotonic() - self.last_output)
         waiting = self.query_one("#loader-waiting", Static)
         waiting.display = silent >= 10
-        if waiting.display:
+        if waiting.display and self.stage_started:
+            # A stage that reports only when it ends (a build, a migration):
+            # how long it has run, so a quiet screen does not look stuck.
+            minutes = int(time.monotonic() - self.stage_started) // 60
+            waiting.update(t("This stage has been running for ${minutes} min. It reports only when it finishes; the work goes on.",
+                             minutes=minutes))
+        elif waiting.display:
             waiting.update(t("Waiting for the current step. No new output for ${seconds} seconds.", seconds=silent))
 
     # ------------------------------------------------------------------

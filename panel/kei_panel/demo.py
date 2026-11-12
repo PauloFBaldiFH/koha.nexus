@@ -535,10 +535,22 @@ _SCRIPTS: dict[str, list[str]] = {
                       "@@result data=Docker volumes kn-tainacan-db and kn-tainacan-wp",
                       "@@result kept=Not changed: Koha, its database and its sites, Docker's configuration and "
                       "anything of other programs.", "@@result rc=0"],
-    "tainacan-install": ["@@note Downloading the images (this can take a few minutes)...",
+    "dspace-prerequisites": ['@@result json={"apache_missing":false,"docker_stopped":false,"proxy_mode":"apache-nexus","platform":"debian"}'],
+    "tainacan-preflight": ["@@result check=ok|Docker running on this server|29.1.3",
+                           "@@result check=ok|Free memory (768 MB needed)|5934 MB",
+                           "@@result check=ok|Free disk (3072 MB needed)|41210 MB",
+                           "@@result check=ok|A free port for the collection|8090",
+                           "@@result check=warn|Web server (Apache)|not installed: installed with the installation, after your confirmation"],
+    "tainacan-install": ["@@stage [1/6] Checking the requirements\tDocker, memory, disk and the address.",
+                         "@@stage [2/6] Downloading the programs\tWordPress, MariaDB and the Tainacan plugin, each checked against its fixed version. This can take a few minutes.",
+                         "@@note Downloading the images (this can take a few minutes)...",
+                         "@@stage [3/6] Starting the database and WordPress\tUp to 5 minutes each, without new lines; the work goes on.",
+                         "@@stage [4/6] Setting up WordPress and Tainacan\tThe site, the plugin, the language and the home page.",
+                         "@@stage [5/6] Checking the isolation and the collection\tThe containers' rules and the API of the collections.",
+                         "@@stage [6/6] Publishing the address\tThe Apache site, the firewall port and the tunnel, when there is one.",
                          "@@msg ok OK\tTainacan is installed at http://192.168.0.10:8090. Administrator: knadmin "
                          "(password: Platforms, Tainacan, Administrator)."],
-    "tainacan-status": ["@@result status=installed", "@@result url=http://192.168.0.10:8090",
+    "tainacan-status": ["@@result status=installed", "@@result url=http://192.168.0.10:8090", "@@result apache_site=yes",
                         "@@result db=running", "@@result wordpress=running", "@@result health=healthy",
                         "@@result collections=3", "@@result items=128", "@@result attachments=117",
                         "@@result attachments_missing=0", "@@result wordpress_version=7.1.4",
@@ -957,8 +969,44 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         command = args[0] if args else "status"
         data = {"status": "installed" if os.environ.get("KEI_PANEL_DEMO_DSPACE") == "1" else "absent",
                 "phase": "ready", "url": "http://192.168.1.20:8100"}
+        flow = os.environ.get("KEI_PANEL_DEMO_DSPACE_FLOW") == "1"   # the U3 installation, for captures
         if command == "availability":
-            data = {"available": False, "reason": "Demo: no reviewed production image catalog."}
+            data = {"available": True} if flow else {"available": False, "reason": "Demo: no reviewed production image catalog."}
+        elif flow and command == "status" and data["status"] == "absent":
+            data = {"status": "absent"}
+        elif command == "preflight":
+            data = {"schema": 1, "ok": True, "changed": False, "checks": [
+                {"id": "architecture", "state": "ok", "label": "amd64 processor", "detail": "x86_64"},
+                {"id": "system", "state": "ok", "label": "Debian or Ubuntu", "detail": "Debian GNU/Linux 12 (bookworm)"},
+                {"id": "memory", "state": "ok", "label": "Free memory (4 GB needed)", "detail": "6.1 GB"},
+                {"id": "disk", "state": "ok", "label": "Free disk (8 GB needed)", "detail": "41 GB"},
+                {"id": "docker", "state": "ok", "label": "Docker running on this server", "detail": "29.1.3"},
+                {"id": "ports", "state": "ok", "label": "Internal ports 18100 and 18101 free", "detail": ""},
+                {"id": "images", "state": "ok", "label": "Programs of DSpace ready", "detail": ""}]}
+        elif command == "plan":
+            data = {"schema": 1, "experimental": True, "url": "http://192.168.1.20:8100", "api": "http://192.168.1.20:8100/server",
+                    "images": {"backend": "sha256:" + "1" * 64, "ui": "sha256:" + "2" * 64, "solr": "sha256:" + "3" * 64},
+                    "release_sha256": "4" * 64, "ports": {"ui": 18100, "backend": 18101}, "language": "pt_BR",
+                    "project": "kn-dspace", "proxy": "apache-nexus", "migration": "not-started"}
+        elif command == "install":
+            import asyncio as _asyncio
+            # The runtime's own stages (platforms/dspace/runtime.py STAGES).
+            stages = [(1, "Checking the requirements", "Memory, disk, Docker and the reserved ports."),
+                      (3, "Checking the programs", "Each image is compared with the reviewed recipe."),
+                      (4, "Creating the network and the data volumes", "Only resources of DSpace are created."),
+                      (5, "Starting the database and the search", "PostgreSQL and the seven Solr cores."),
+                      (6, "Preparing the database", "Creates the tables of the repository. It can take up to 20 "
+                       "minutes without new lines; the work goes on."),
+                      (7, "Starting, publishing and checking the repository",
+                       "The API, the interface, the address and the login page are checked before the end.")]
+            for number, text, note in stages:
+                out.feed(f"@@stage [{number}/7] {text}\t{note}", reporter, on_result)
+                await _asyncio.sleep(float(os.environ.get("KEI_PANEL_DEMO_STAGE_SECONDS", "0.05")))
+            data = {"status": "installed", "url": "http://192.168.1.20:8100", "proxy_status": "apache-configured"}
+        elif command == "diagnose":
+            data = {"status": "installed", "url": "http://192.168.1.20:8100", "health": "api-ui-dependencies",
+                    "public_access": "verified-local-proxy",
+                    "services": {"postgres": "running", "solr": "running", "backend": "running", "ui": "running"}}
         elif command == "setup-status":
             data = {"setup": "none"}
         elif command == "admin-status":
@@ -992,7 +1040,7 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
         return out
     pause = 0.0 if name in ("tool-install", "info", "marc-info", "cloud-remotes", "cloud-status", "cloud-list",
                             "cloud-about", "cloud-ls", "timezones", "credentials", "cf-status", "cf-check",
-                            "docker-plan", "tainacan-plan", "tainacan-status", "tainacan-backups",
+                            "docker-plan", "dspace-prerequisites", "tainacan-plan", "tainacan-preflight", "tainacan-status", "tainacan-backups",
                             "tainacan-restore-notes",
                             "platform-backup-status", "platform-backup-compression", "platform-backup-plan", "platform-backup-incomplete",
                             "set-inspect", "set-cleanup", "set-schedule-status", "admin-status", "setup-status", "setup-mark",

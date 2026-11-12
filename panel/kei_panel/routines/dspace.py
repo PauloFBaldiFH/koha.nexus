@@ -5,9 +5,10 @@ import json
 import re
 
 from ..bridge import TaskOutcome
-from ..dspace import origin, payload
+from ..dspace import diagnosis_rows, origin, payload, plan_rows, preflight_rows
 from ..i18n import t
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
+from ..screens.install_flow import CheckReportScreen, PlanSummaryScreen
 from .admin_access import ask_password
 from .common import run_task, show_failure
 
@@ -28,12 +29,45 @@ async def call(app, command, *args, **kwargs):
     return data
 
 
+async def initial_diagnosis(app):
+    """Every requirement in one list before any question (study 16.3).
+
+    Read only: the prerequisites plan and the runtime's preflight. Returns
+    the prerequisites (for the confirmations that follow) or None when the
+    person stopped here or something must be fixed first."""
+    pre = await run_task(app, TITLE, 'dspace-prerequisites', 'plan')
+    out = pre.value if isinstance(pre.value, TaskOutcome) else None
+    if pre.cancelled or not pre.ok or out is None or not out.ok:
+        await show_failure(app, TITLE, pre)
+        return None
+    deps = payload(out)
+    checks = await call(app, 'preflight')
+    if checks is None:
+        return None
+    rows = preflight_rows(checks, deps)
+    if not await app.push_screen_wait(CheckReportScreen(t('Before installing DSpace'), rows)):
+        return None
+    return deps
+
+
+async def final_diagnosis(app):
+    """The installation's own checks, read again and shown as a report."""
+    data = await call(app, 'diagnose')
+    if data is not None:
+        await app.push_screen_wait(CheckReportScreen(
+            t('DSpace diagnosis after the installation'), diagnosis_rows(data), final=True,
+            details=json.dumps(data, ensure_ascii=False, indent=2)))
+
+
 async def install(app):
     available = await call(app, 'availability')
     if available is None:
         return
     if not available.get('available'):
         await app.push_screen_wait(MessageScreen(TITLE, t('DSpace image configuration could not be used.') + '\n\n' + str(available.get('reason', ''))))
+        return
+    deps = await initial_diagnosis(app)
+    if deps is None:
         return
     from .platforms import install_docker
     status = await app.bridge.status()
@@ -43,13 +77,14 @@ async def install(app):
         status = await app.bridge.status()
         if not (status.get("docker") or {}).get("installed"):
             return
-    # Re-read prerequisites; closing any confirmation never continues installing.
-    pre = await run_task(app, TITLE, 'dspace-prerequisites', 'plan')
-    out = pre.value if isinstance(pre.value, TaskOutcome) else None
-    if pre.cancelled or not pre.ok or out is None or not out.ok:
-        await show_failure(app, TITLE, pre)
-        return
-    deps = payload(out)
+        # Docker is new: read the prerequisites again before using them.
+        pre = await run_task(app, TITLE, 'dspace-prerequisites', 'plan')
+        out = pre.value if isinstance(pre.value, TaskOutcome) else None
+        if pre.cancelled or not pre.ok or out is None or not out.ok:
+            await show_failure(app, TITLE, pre)
+            return
+        deps = payload(out)
+    # Closing any confirmation never continues installing.
     for needed, operation, question in (
         ('docker_stopped', 'docker-start', 'Start the existing Docker service for DSpace?'),
         ('apache_missing', 'apache', 'Install Apache to serve DSpace? Its package will be registered as a shared resource.')):
@@ -87,8 +122,11 @@ async def install(app):
     plan = await call(app, 'plan', '--url', url, '--language', language)
     if plan is None:
         return
-    text = t('Review the DSpace installation plan. Only its own resources are created; existing repository data are preserved.') + '\n\n' + json.dumps(plan, ensure_ascii=False, indent=2)
-    if not await app.push_screen_wait(ConfirmScreen(TITLE, text)):
+    # The plain summary first; the technical plan (JSON) stays one button away.
+    if not await app.push_screen_wait(PlanSummaryScreen(
+            t('Install DSpace · Review'), plan_rows(plan),
+            body=t('Only its own resources are created; existing repository data are preserved.'),
+            details=json.dumps(plan, ensure_ascii=False, indent=2))):
         return
     # A migration retry is a second, explicit decision, never implied by resume.
     retry = []
@@ -99,6 +137,7 @@ async def install(app):
     result = await call(app, 'install', '--url', url, '--language', language, '--confirm', *retry)
     if result is not None:
         app.check_platforms()
+        await final_diagnosis(app)
         if isinstance(result.get('note'), str) and result['note']:
             await app.push_screen_wait(MessageScreen(TITLE, t(result['note'])))
         await app.push_screen_wait(MessageScreen(TITLE, t("DSpace is installed. Administrative access, addresses and backups are available in the menus.") + '\n\n' + origin(result.get('url', url)) + '/login'))
@@ -139,7 +178,8 @@ async def stop(app):
 async def diagnose(app):
     data = await call(app, 'diagnose')
     if data is not None:
-        await app.push_screen_wait(MessageScreen(t('DSpace diagnosis'), json.dumps(data, ensure_ascii=False, indent=2)))
+        await app.push_screen_wait(CheckReportScreen(t('DSpace diagnosis'), diagnosis_rows(data), final=True,
+                                                     details=json.dumps(data, ensure_ascii=False, indent=2)))
 
 
 async def logs(app):

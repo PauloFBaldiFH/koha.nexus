@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.196"
+PANEL_VERSION=" 1.5.197"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -12564,7 +12564,7 @@ kei_docker_audit() {
 KEI_DSPACE_DIR="${KEI_DSPACE_DIR:-/var/lib/koha-nexus/platforms/dspace}"
 KEI_DSPACE_ADAPTER_DIR="${KEI_DSPACE_ADAPTER_DIR:-/usr/local/lib/koha-nexus/dspace}"
 KEI_DSPACE_OPERATIONS_SHA="237449d79e30137611af73a7211e671eef32844101644a58a7c439d6349f306a"
-KEI_DSPACE_RUNTIME_SHA="2fee27fd37f08aeeb3fa385ece462bc5de88c99e08e91ab124a6b54750bbcdb0"
+KEI_DSPACE_RUNTIME_SHA="852b3b40bfeba03eb556b2529fee8f9c0a0bd98b4c7110c287d1f00fbc880ade"
 KEI_DSPACE_BACKUP_SHA="efd5fae6805cabbe048e53337c9ecd382f17ccc35027be368c0c29b636cf94ad"
 KEI_DSPACE_R4_SHA="6dd6415902639539e3c3770cabb3a6086894e17164a72b36a20fd3b0c5a00012"
 KEI_DSPACE_LANGUAGES_SHA="78da0fd86aef9f4145e7f22f17ab5e5d71665a32e05e48ae94bd7fbc28f1df5d"
@@ -13343,6 +13343,47 @@ _kei_tn_fetch_plugin() {
 _kei_tn_mem_mb() { awk '/^MemAvailable:/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null; }
 _kei_tn_disk_mb() { df -Pm "$1" 2>/dev/null | awk 'NR == 2 { print $4 }'; }
 
+# kei_tainacan_preflight: every requirement of an installation, read only,
+# as "STATE<TAB>LABEL<TAB>DETAIL" lines (ok, warn or fail). kei_tainacan_plan
+# stops at the first problem; the panel shows this whole list before asking
+# anything (usability study, section 16.3). Labels go in English and the
+# panel translates them; details are numbers and names.
+kei_tainacan_preflight() {
+    local status mem disk dockerdir mode _s port
+    status=$(_kei_tn_get status)
+    [ "$status" = installed ] && printf 'fail\tTainacan is not installed yet\t%s\n' "$(t "Tainacan is already installed.")"
+    if ! command -v docker >/dev/null 2>&1; then
+        printf 'warn\tDocker running on this server\t%s\n' "$(t "not installed: prepared first, with its own plan")"
+    elif ! _kei_docker_running || ! _kei_docker compose version >/dev/null 2>&1; then
+        printf 'fail\tDocker running on this server\t%s\n' "$(t "installed but not running, or without Compose v2")"
+    else
+        printf 'ok\tDocker running on this server\t%s\n' "$(_kei_docker version --format '{{.Server.Version}}' 2>/dev/null)"
+    fi
+    mem=$(_kei_tn_mem_mb)
+    if [ -n "$mem" ]; then
+        printf '%s\tFree memory (%s MB needed)\t%s MB\n' "$([ "$mem" -ge "$KEI_TAINACAN_MIN_RAM_MB" ] && echo ok || echo fail)" "$KEI_TAINACAN_MIN_RAM_MB" "$mem"
+    fi
+    dockerdir=/var/lib/docker
+    command -v docker >/dev/null 2>&1 && _kei_docker_running && dockerdir=$(_kei_docker info --format '{{.DockerRootDir}}' 2>/dev/null)
+    dockerdir="${dockerdir:-/var/lib/docker}"
+    while [ ! -d "$dockerdir" ] && [ "$dockerdir" != / ]; do dockerdir=$(dirname "$dockerdir"); done
+    disk=$(_kei_tn_disk_mb "$dockerdir")
+    if [ -n "$disk" ]; then
+        printf '%s\tFree disk (%s MB needed)\t%s MB\n' "$([ "$disk" -ge "$KEI_TAINACAN_MIN_DISK_MB" ] && echo ok || echo fail)" "$KEI_TAINACAN_MIN_DISK_MB" "$disk"
+    fi
+    port=$(_kei_tn_get lan_port)
+    [ -n "$port" ] || port=$(_kei_tn_pick_port "$KEI_TAINACAN_LAN_PORTS")
+    if [ -n "$port" ]; then printf 'ok\tA free port for the collection\t%s\n' "$port"
+    else printf 'fail\tA free port for the collection\t%s\n' "$KEI_TAINACAN_LAN_PORTS"; fi
+    read -r mode _s < <(kei_proxy_detect)
+    case "$mode" in
+        none) printf 'warn\tWeb server (Apache)\t%s\n' "$(t "not installed: installed with the installation, after your confirmation")" ;;
+        external) printf 'warn\tWeb server (Apache)\t%s\n' "$(s="$_s"; t "another web server (\${s}) answers: Koha.Nexus shows the block to add to it")" ;;
+        *) printf 'ok\tWeb server (Apache)\t%s\n' "apache2" ;;
+    esac
+    return 0
+}
+
 # kei_tainacan_plan [URL]: what an installation would do, "key<TAB>text"
 # lines; plan = install | refuse. Returns 3 on refuse.
 kei_tainacan_plan() {
@@ -13492,6 +13533,14 @@ kei_tainacan_web_apply() {
     return 0
 }
 
+# _kei_tn_stage N LABEL NOTE: a stage of the installation for the panel's
+# loader ("@@stage [N/6] ..."), only inside a panel task.
+KEI_TN_STAGES=6
+_kei_tn_stage() {
+    [ -n "${KEI_TASK:-}" ] || return 0
+    printf '@@stage [%s/%s] %s\t%s\n' "$1" "$KEI_TN_STAGES" "$(t "$2")" "$(t "$3")" >&2
+}
+
 # kei_tainacan_install confirm [URL] [LANG]: installs with the person's
 # "yes" (the word confirm) after the plan. Each step can be repeated: a
 # failure leaves status=failed and running it again goes on.
@@ -13502,6 +13551,7 @@ kei_tainacan_install() {
         echo "$(t "Nothing was installed: the plan needs a yes (confirm).")" >&2
         return 3
     fi
+    _kei_tn_stage 1 "Checking the requirements" "Docker, memory, disk and the address."
     [ -n "$url" ] || url=$(_kei_tn_get url)
     [ -n "$url" ] || url=$(kei_tainacan_default_url)
     out=$(kei_tainacan_plan "$url"); rc=$?
@@ -13515,13 +13565,16 @@ kei_tainacan_install() {
     _kei_tn_fail() { _kei_tn_set status failed; log "tainacan: install failed: $1"; echo "$1" >&2; return 1; }
     kei_tainacan_write_files || { _kei_tn_fail "$(t "The platform files could not be written.")"; return 1; }
     kei_docker_network_create "$KEI_TAINACAN_ID" >/dev/null || { _kei_tn_fail "$(t "The Docker network of the platform could not be created.")"; return 1; }
+    _kei_tn_stage 2 "Downloading the programs" "WordPress, MariaDB and the Tainacan plugin, each checked against its fixed version. This can take a few minutes."
     echo "$(t "Downloading the images (this can take a few minutes)...")" >&2
     _kei_tn_dc pull -q db wordpress >/dev/null 2>&1 && timeout 900 docker pull -q "$(_kei_tn_image cli)" >/dev/null 2>&1 \
         || { _kei_tn_fail "$(t "The images could not be downloaded.")"; return 1; }
     _kei_tn_fetch_plugin || { _kei_tn_fail "$(t "The Tainacan plugin was not installed.")"; return 1; }
+    _kei_tn_stage 3 "Starting the database and WordPress" "Up to 5 minutes each, without new lines; the work goes on."
     _kei_tn_dc up -d --remove-orphans db wordpress >/dev/null 2>&1 || { _kei_tn_fail "$(t "The containers did not start.")"; return 1; }
     _kei_tn_wait 300 _kei_tn_db_ready || { _kei_tn_fail "$(t "The database did not start.")"; return 1; }
     _kei_tn_wait 300 _kei_tn_wp_ready || { _kei_tn_fail "$(t "WordPress did not start.")"; return 1; }
+    _kei_tn_stage 4 "Setting up WordPress and Tainacan" "The site, the plugin, the language and the home page."
     if ! _kei_tn_wp core is-installed >/dev/null 2>&1; then
         _kei_tn_wp core install --url="$url" --title="Tainacan" --admin_user="$(_kei_tn_env KN_ADMIN_USER)" \
             --admin_password="$(_kei_tn_env KN_ADMIN_PASSWORD)" --admin_email="admin@$(hostname -f 2>/dev/null || echo localhost).invalid" \
@@ -13555,12 +13608,14 @@ kei_tainacan_install() {
             || echo "$(t "Tainacan works, but its home page was not prepared: prepare it from the panel (Tainacan).")" >&2
         _kei_tn_set site_fresh done
     fi
+    _kei_tn_stage 5 "Checking the isolation and the collection" "The containers' rules and the API of the collections."
     if ! out=$(kei_docker_audit "$KEI_TAINACAN_ID"); then
         _kei_tn_fail "$(t "The containers do not follow the isolation rules:") $out"; return 1
     fi
     if ! out=$(kei_tainacan_health); then
         _kei_tn_fail "$(t "Tainacan did not pass the functional check:") $out"; return 1
     fi
+    _kei_tn_stage 6 "Publishing the address" "The Apache site, the firewall port and the tunnel, when there is one."
     kei_tainacan_web_apply "$url" || { _kei_tn_fail "$(t "Tainacan works, but the web address could not be set up.")"; return 1; }
     _kei_tn_set status installed
     _kei_tn_set installed_at "$(date '+%Y-%m-%d %H:%M:%S')"
@@ -46696,6 +46751,12 @@ kei_task() {
                 msg_error "" "$(t "The diagnosis could not read Tainacan.") ${v:-$(t "Its containers are not running.")}"
             fi
             return "$rc" ;;
+        tainacan-preflight)
+            local st label detail
+            while IFS=$'\t' read -r st label detail; do
+                [ -n "$st" ] && kei_result check "$st|$label|$detail"
+            done < <(kei_tainacan_preflight)
+            return 0 ;;
         tainacan-plan)
             local k v
             while IFS=$'\t' read -r k v; do [ -n "$k" ] && kei_result "$k" "$v"; done < <(kei_tainacan_plan "${1:-}"; echo "rc	$?")
