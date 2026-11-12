@@ -960,3 +960,16 @@ App.-plain #picker-drop {
 .lang-note { color: $text-muted; }
 .lang-row Button { margin-left: 1; min-width: 12; }
 .-narrow .lang-name { width: 14; }
+
+/* Addresses and access (views/addresses.py, study 17.4). */
+#addr-configured, #addr-alternatives { height: auto; }
+#addr-configured > * { margin-bottom: 1; }
+#addr-alternatives { margin-bottom: 1; padding-left: 1; }
+.addr-head { padding-top: 1; padding-bottom: 0; }
+.addr-line { width: 1fr; }
+#addr-windows { color: $warning; padding-left: 1; margin-bottom: 1; }
+.addr-row { height: auto; margin-bottom: 1; }
+.addr-name { width: 18; text-style: bold; padding-left: 1; }
+.addr-value { width: 1fr; }
+.addr-buttons { height: auto; margin-bottom: 1; }
+.addr-buttons Button { margin-right: 2; width: auto; }

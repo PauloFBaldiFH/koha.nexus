@@ -2800,7 +2800,13 @@
    "summary": "O acesso administrativo do Koha num só lugar: os superbibliotecários, as credenciais do primeiro acesso e criar um superbibliotecário. Os mesmos cartões continuam na página do Koha."
   },
   "sec-koha-addresses": {
-   "summary": "Como o Koha é acessado: o Cloudflare Tunnel, o certificado SSL gratuito e o firewall da equipe. Os mesmos cartões continuam na Central de Segurança & Acesso e em Segurança do Koha."
+   "summary": "Como o Koha é acessado: OPACBaseURL e staffClientBaseURL como configurados, os outros nomes do servidor, o túnel, e os cartões do Cloudflare Tunnel, do certificado SSL gratuito e do firewall da equipe.",
+   "overview": [
+    "A tela separa três coisas. O **endereço configurado** é o que o aplicativo usa para montar links e redirecionar, e é o único marcado *use este*, com Abrir e Copiar. **Outros nomes deste servidor** (localhost, os outros endereços de rede) aparecem com o efeito esperado. **Na internet** mostra um endereço publicado, ou *Não publicado*.",
+    "Nada é chamado de funcionando sem teste. **Testar acesso** abre cada endereço a partir deste servidor e diz quando; no Windows (WSL) a tela também avisa que o endereço não foi verificado pelo Windows, porque um teste de dentro do WSL não prova isso.",
+    "**Publicar…** abre o Gerenciador do Cloudflare Tunnel, que também define os endereços do Koha."
+   ],
+   "_en": "7ea073fbc0"
   },
   "sec-koha-backups": {
    "summary": "Abre a Central de backups já mostrando os backups do Koha."
@@ -2812,7 +2818,13 @@
    "summary": "Abre a Central de backups já mostrando os backups do Tainacan."
   },
   "sec-dspace-addresses": {
-   "summary": "O endereço e o HTTPS do repositório, e o reparo do acesso web sem reinstalar."
+   "summary": "O endereço com que o DSpace monta as páginas, os outros nomes do servidor e a internet, com teste a partir deste servidor, e o reparo do acesso web sem reinstalar.",
+   "overview": [
+    "A tela separa três coisas. O **endereço configurado** é o que o aplicativo usa para montar links e redirecionar, e é o único marcado *use este*, com Abrir e Copiar. **Outros nomes deste servidor** (localhost, os outros endereços de rede) aparecem com o efeito esperado. **Na internet** mostra um endereço publicado, ou *Não publicado*.",
+    "Nada é chamado de funcionando sem teste. **Testar acesso** abre cada endereço a partir deste servidor e diz quando; no Windows (WSL) a tela também avisa que o endereço não foi verificado pelo Windows, porque um teste de dentro do WSL não prova isso.",
+    "O DSpace só responde por completo no endereço configurado: outro nome pode falhar (o erro 500 em localhost no Windows). **Mudar ou publicar o endereço…** é a rotina de endereço e HTTPS, com plano e pergunta."
+   ],
+   "_en": "50ef70148a"
   },
   "sec-dspace-backups": {
    "summary": "Abre a Central de backups já mostrando os backups do DSpace."

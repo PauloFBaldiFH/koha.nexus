@@ -131,7 +131,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native"),
         Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native"),
         Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
-    ), requires="koha", group="koha"),
+    ), view="addresses", requires="koha", group="koha"),
     Section("koha-backups", "💾  Backups and schedules", requires="koha", group="koha", opens="backups"),
     # Koha's diagnosis and maintenance (the server's own: Server diagnostics).
     Section("diagnostics", "🩺  Koha diagnostics & maintenance", "🩺  Koha diagnostics & maintenance",
@@ -261,7 +261,7 @@ SECTIONS: tuple[Section, ...] = (
     ), view="platform-section", requires="tainacan", group="tainacan"),
     Section("tainacan-addresses", "🌐  Addresses and access", "🌐  Addresses and access", entries=(
         Entry("🌐  Tainacan address", "tainacan-address", kind="native"),
-    ), view="platform-section", requires="tainacan", group="tainacan"),
+    ), view="addresses", requires="tainacan", group="tainacan"),
     Section("tainacan-backups", "💾  Backups and schedules", requires="tainacan", group="tainacan", opens="backups"),
     Section("tainacan-maintenance", "🩺  Tainacan diagnosis & maintenance", "🩺  Tainacan diagnosis & maintenance",
             "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown "
@@ -299,7 +299,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("dspace-addresses", "🌐  Addresses and access", "🌐  Addresses and access", entries=(
         Entry("🌐  DSpace address and HTTPS", "dspace-address", kind="native"),
         Entry("🔧  Repair DSpace web access", "dspace-repair-web", kind="native"),
-    ), view="platform-section", requires="dspace", group="dspace"),
+    ), view="addresses", requires="dspace", group="dspace"),
     Section("dspace-backups", "💾  Backups and schedules", requires="dspace", group="dspace", opens="backups"),
     Section("dspace-maintenance", "🩺  DSpace diagnosis & maintenance", "🩺  DSpace diagnosis & maintenance", entries=(
         Entry("🩺  DSpace diagnosis", "dspace-diagnose", kind="native"),

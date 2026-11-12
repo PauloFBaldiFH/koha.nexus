@@ -3242,7 +3242,12 @@
    "summary": "Koha's administrative access in one place: the superlibrarians, the first-access credentials and creating a superlibrarian. The same cards stay on Koha's home."
   },
   "sec-koha-addresses": {
-   "summary": "How Koha is reached: the Cloudflare Tunnel, the free SSL certificate and the staff firewall. The same cards stay in the Security & access hub and in Koha security."
+   "summary": "How Koha is reached: OPACBaseURL and staffClientBaseURL as configured, the other names of the server, the tunnel, and the cards for the Cloudflare Tunnel, the free SSL certificate and the staff firewall.",
+   "overview": [
+    "The screen keeps three things apart. The **configured address** is the one the application builds its links and redirections with, and the only one marked *use this*, with Open and Copy. **Other names of this server** (localhost, its other network addresses) are listed with the effect to expect. **On the internet** shows a published address, or *Not published*.",
+    "Nothing is called working without a test. **Test access** opens each address from this server and says when; on Windows (WSL) the screen also says the address was not checked from Windows, because a test from inside WSL does not prove it.",
+    "**Publish…** opens the Cloudflare Tunnel Manager, which also sets Koha's addresses."
+   ]
   },
   "sec-koha-backups": {
    "summary": "Opens the Backup center already showing Koha's backups."
@@ -3254,7 +3259,12 @@
    "summary": "Opens the Backup center already showing Tainacan's backups."
   },
   "sec-dspace-addresses": {
-   "summary": "The repository address and HTTPS, and the repair of web access without reinstalling."
+   "summary": "The repository address DSpace builds pages with, the other names of the server and the internet, with a test from this server, and the repair of web access without reinstalling.",
+   "overview": [
+    "The screen keeps three things apart. The **configured address** is the one the application builds its links and redirections with, and the only one marked *use this*, with Open and Copy. **Other names of this server** (localhost, its other network addresses) are listed with the effect to expect. **On the internet** shows a published address, or *Not published*.",
+    "Nothing is called working without a test. **Test access** opens each address from this server and says when; on Windows (WSL) the screen also says the address was not checked from Windows, because a test from inside WSL does not prove it.",
+    "DSpace answers fully only at the configured address: another name can fail (the error 500 at localhost on Windows). **Change or publish the address…** is the address and HTTPS routine, with its plan and question."
+   ]
   },
   "sec-dspace-backups": {
    "summary": "Opens the Backup center already showing DSpace's backups."

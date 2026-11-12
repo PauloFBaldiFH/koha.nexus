@@ -1,5 +1,6 @@
 """The right-hand side of the main screen: one view per sidebar entry."""
 
+from .addresses import AddressesView
 from .ai import AIView
 from .backups import BackupCenterView
 from .base import SectionView, UnavailableView
@@ -18,6 +19,7 @@ from .z3950 import Z3950View
 
 VIEWS = {
     "section": SectionView,
+    "addresses": AddressesView,
     "dashboard": DashboardView,
     "backups": BackupCenterView,
     "database": DatabaseView,
@@ -36,5 +38,5 @@ VIEWS = {
     "platform-section": PlatformSectionView,
 }
 
-__all__ = ["VIEWS", "SectionView", "DashboardView", "BackupCenterView", "DatabaseView", "AIView", "Z3950View", "EnrichView", "OnDemandView", "OpacView",
+__all__ = ["VIEWS", "AddressesView", "SectionView", "DashboardView", "BackupCenterView", "DatabaseView", "AIView", "Z3950View", "EnrichView", "OnDemandView", "OpacView",
            "HubView", "LanguagesView", "CronView", "SchedulesView", "VpnView", "PlatformHomeView", "PlatformSectionView", "UnavailableView"]
