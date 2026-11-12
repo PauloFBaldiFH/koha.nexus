@@ -116,6 +116,30 @@ $1" 3>&-
     [ "$status" -eq 3 ]
 }
 
+@test "preflight: the whole list, read only; without Docker it is prepared first (warn)" {
+    # U3: every requirement in one list before any question, nothing written.
+    run lib 'KEI_TAINACAN_MIN_RAM_MB=99999999 kei_tainacan_preflight'
+    [ "$status" -eq 0 ]
+    grep -q "^warn$(printf '\t')Docker running on this server$(printf '\t')" <<< "$output"
+    grep -q "^fail$(printf '\t')Free memory (99999999 MB needed)$(printf '\t')[0-9]* MB$" <<< "$output"
+    grep -q "^ok$(printf '\t')Free disk (3072 MB needed)" <<< "$output" || grep -q "^fail$(printf '\t')Free disk" <<< "$output"
+    grep -q "$(printf '\t')Web server (Apache)$(printf '\t')" <<< "$output"
+    [ ! -e "$KEI_TAINACAN_DIR/state" ]
+    # The panel task sends each row as "check=state|label|detail".
+    grep -q 'tainacan-preflight)' "$REPO/installer"
+    grep -q 'kei_result check "$st|$label|$detail"' "$REPO/installer"
+}
+
+@test "install stages: six numbered stages, only inside a panel task" {
+    run lib '_kei_tn_stage 3 "Starting the database and WordPress" "note" 2>&1'
+    [ -z "$output" ]
+    run lib 'KEI_TASK=tainacan-install; _kei_tn_stage 3 "Starting the database and WordPress" "Up to 5 minutes." 2>&1'
+    [ "$output" = "$(printf '@@stage [3/6] Starting the database and WordPress\tUp to 5 minutes.')" ]
+    # Every stage of kei_tainacan_install, in order.
+    run grep -o '_kei_tn_stage [0-9]' "$REPO/installer"
+    [ "$(tr -d '\n' <<< "$output")" = "_kei_tn_stage 1_kei_tn_stage 2_kei_tn_stage 3_kei_tn_stage 4_kei_tn_stage 5_kei_tn_stage 6" ]
+}
+
 # A plugin package and its checksums, in the format wordpress.org uses.
 mkplugin() {
     python3 -I - "$T" "$@" <<'EOF'

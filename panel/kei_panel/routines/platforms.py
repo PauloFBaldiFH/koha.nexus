@@ -101,12 +101,76 @@ async def remove_docker(app) -> None:
     await show_done(app, title, result, t("Docker was removed."))
 
 
+# The rows of kei_tainacan_plan, in the summary before installing (U3).
+TAINACAN_PLAN_LABELS = (("address", "Address"), ("web", "Web"), ("apache", "Web server"), ("images", "Images"),
+                        ("plugin", "Plugin"), ("network", "Network"), ("data", "Data"), ("reuse", "Data"),
+                        ("site", "Home page"), ("updates", "Updates"), ("kept", "Other systems"),
+                        ("undo", "Undo"))
+
+
+def tainacan_check_rows(values: list[str]) -> list[tuple[str, str, str]]:
+    """The "check=state|label|detail" results of tainacan-preflight."""
+    rows = []
+    for value in values:
+        state, _s, rest = value.partition("|")
+        label, _s, detail = rest.partition("|")
+        if state in ("ok", "warn", "fail") and label:
+            rows.append((state, label, t(detail)))
+    return rows
+
+
+def tainacan_status_rows(results: dict) -> list[tuple[str, str, str]]:
+    """tainacan-status (the diagnosis) -> rows of the final report."""
+    def state(ok: bool, warn: bool = False) -> str:
+        return "ok" if ok else "warn" if warn else "fail"
+    rows = []
+    for key, label in (("db", "Database (MariaDB)"), ("wordpress", "WordPress")):
+        value = results.get(key, "")
+        rows.append((state(value == "running"), label, t("Running") if value == "running" else value or t("Unknown")))
+    health = results.get("health", "")
+    rows.append((state(health == "healthy"), "Collections API checked",
+                 results.get("reason", "") if health != "healthy" else results.get("collections", "")))
+    rows.append((state(results.get("images_pinned") == "yes"), "Programs in their fixed versions",
+                 " · ".join(v for v in (results.get("wordpress_version", ""), results.get("tainacan_version", "")) if v)))
+    audit = results.get("audit", "")
+    rows.append((state(audit == "ok"), "Containers isolated", "" if audit == "ok" else audit))
+    site = results.get("apache_site", "")
+    rows.append((state(site == "yes", warn=True), "Apache site", results.get("url", "")))
+    return rows
+
+
+async def tainacan_initial_diagnosis(app, title: str) -> bool:
+    """Every requirement in one list before any question; nothing changes."""
+    from ..screens.install_flow import CheckReportScreen
+
+    if not app.bridge.has_task("tainacan-preflight"):
+        return True          # an older installer: its plan still refuses with the reason
+    out = await app.bridge.task("tainacan-preflight")
+    rows = tainacan_check_rows(out.lists.get("check", []))
+    if not rows:
+        return True
+    return bool(await app.push_screen_wait(CheckReportScreen(t("Before installing Tainacan"), rows)))
+
+
+async def tainacan_final_diagnosis(app) -> None:
+    from ..screens.install_flow import CheckReportScreen
+
+    out = await app.bridge.task("tainacan-status")
+    if out.results:
+        await app.push_screen_wait(CheckReportScreen(
+            t("Tainacan diagnosis after the installation"), tainacan_status_rows(out.results), final=True))
+
+
 async def tainacan_install(app) -> None:
-    """An address (or the server's own), the plan, a Yes, the install."""
+    """The initial diagnosis, an address, the summary, the stages, the
+    final diagnosis."""
     from .common import run_task, show_done
     from ..screens.dialogs import ChoiceScreen, ConfirmScreen, MessageScreen
+    from ..screens.install_flow import PlanSummaryScreen
 
     title = t("Install Tainacan")
+    if not await tainacan_initial_diagnosis(app, title):
+        return
     # Docker first, when it is missing: its own plan and Yes, then Tainacan
     # goes on here (no other screen to look for).
     docker = platforms.docker_from_status(await _status(app))
@@ -155,17 +219,15 @@ async def tainacan_install(app) -> None:
         await app.push_screen_wait(MessageScreen(
             title, plan.get("note") or t("Tainacan cannot be installed here."), kind="error"))
         return
-    labels = (("address", t("Address")), ("web", t("Web")), ("apache", ""), ("images", t("Images")),
-              ("plugin", t("Plugin")), ("network", t("Network")), ("data", t("Data")), ("reuse", ""),
-              ("updates", ""), ("kept", ""), ("undo", ""))
-    steps = "\n".join(f"{label}: {plan.get(key)}" if label else plan.get(key)
-                      for key, label in labels if plan.get(key))
-    if not await app.push_screen_wait(ConfirmScreen(
-            title, t("Install Tainacan now? It takes a few minutes."), preview=steps,
-            preview_title=t("What will change on this server"))):
+    rows = [(t(label), plan.get(key)) for key, label in TAINACAN_PLAN_LABELS if plan.get(key)]
+    if not await app.push_screen_wait(PlanSummaryScreen(
+            t("Install Tainacan · Review"), rows,
+            body=t("Install Tainacan now? It takes a few minutes."))):
         return
     args = ["confirm"] + ([plan.get("address")] if plan.get("address") else [])
     result = await run_task(app, title, "tainacan-install", *args)
+    if _done(result):
+        await tainacan_final_diagnosis(app)
     await show_done(app, title, result, t("Tainacan is installed."))
     if _done(result):
         # The address chosen before: the local network on purpose is the

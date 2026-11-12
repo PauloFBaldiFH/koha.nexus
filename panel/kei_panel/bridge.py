@@ -247,6 +247,31 @@ def unescape(text: str) -> str:
     return text.replace("\\n", "\n")
 
 
+_STAGE = re.compile(r"^\[(\d+)/(\d+)\]\s+(.*)$")
+
+
+def translated(text: str) -> str:
+    """The panel's translation of a text an engine sent in English (the
+    DSpace runtime has no catalogue of its own); a text the installer
+    already translated has no entry and comes back as it is."""
+    from .i18n import t
+    try:
+        return t(text)
+    except Exception:          # a text with ${...} that is not a template
+        return text
+
+
+def stage_parts(stage: str) -> tuple[str, int, int]:
+    """"[3/7] Label" -> ("[3/7] Label translated", 3, 7); no number -> 0, 0."""
+    found = _STAGE.match(stage)
+    if not found:
+        return stage, 0, 0
+    number, total = int(found.group(1)), int(found.group(2))
+    if not 0 < number <= total:
+        return stage, 0, 0
+    return f"[{number}/{total}] {translated(found.group(3))}", number, total
+
+
 @dataclass
 class TaskOutcome:
     """What a `--task` routine said: its exit code, the boxes it would have
@@ -322,10 +347,16 @@ class TaskOutcome:
         elif tag == "stage":
             # A stage of a long routine ("[3/7] Database and Koha") and its note.
             stage, _, note = rest.partition("\t")
+            stage, number, total = stage_parts(stage)
+            note = translated(unescape(note)) if note else ""
             self.stages.append(stage)
             log(f"== {stage}")
             if reporter:
-                reporter.notice(f"{stage}\n{unescape(note)}" if note else stage)
+                reporter.notice(f"{stage}\n{note}" if note else stage)
+                # A routine without steps of its own (DSpace, Tainacan): the
+                # bar shows the stages already done, never the clock.
+                if number and not self.total_steps:
+                    reporter.progress(number - 1, total)
         elif tag in ("msg", "say"):
             kind, _, rest = rest.partition(" ")
             title, _, text = rest.partition("\t")

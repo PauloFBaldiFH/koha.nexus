@@ -14,6 +14,7 @@ from kei_panel.dspace import origin, payload
 from kei_panel.env import PanelEnv
 from kei_panel.routines import dspace
 from kei_panel.screens.dialogs import InputScreen, MessageScreen
+from kei_panel.screens.install_flow import CheckReportScreen, PlanSummaryScreen
 from kei_panel.tasks import TaskResult
 from kei_panel.widgets.cards import ActionCard
 
@@ -75,15 +76,22 @@ class App:
     async def push_screen_wait(self,screen):
         self.screens.append(screen)
         if isinstance(screen,MessageScreen):return None
+        if isinstance(screen,CheckReportScreen) and screen._final:return True   # a report, not a question
         assert self.answers,'Unexpected question'
         return self.answers.pop(0)
+
+
+# U3: the initial diagnosis and the final report read these.
+DEFAULTS={'preflight':{'checks':[{'id':'memory','state':'ok','label':'Free memory (4 GB needed)','detail':'6.1 GB'}],'ok':True},
+          'diagnose':{'status':'installed','services':{},'health':'not-checked'}}
 
 
 def mock_calls(monkeypatch,answers):
     calls=[]
     async def run(app,title,name,*args,**kwargs):
         calls.append((name,args,kwargs))
-        data=answers.get(args[0] if name=='dspace-panel' else name,{})
+        key=args[0] if name=='dspace-panel' else name
+        data=answers.get(key,DEFAULTS.get(key,{}))
         return response(data)
     monkeypatch.setattr(dspace,'run_task',run)
     return calls
@@ -101,7 +109,8 @@ def test_experimental_preparation_is_offered_and_can_be_postponed(monkeypatch, c
     calls = mock_calls(monkeypatch, {
         'availability': {'available': True, 'prepare_required': True},
         'dspace-prerequisites': {}, 'prepare-images': {'prepared': True}})
-    app = App([confirm, None] if confirm else [confirm])
+    # The first answer is the initial diagnosis' Continue (U3).
+    app = App([True, confirm, None] if confirm else [True, confirm])
     async def status(): return {'docker': {'installed': True}}
     app.bridge = SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
@@ -113,11 +122,11 @@ def test_experimental_preparation_is_offered_and_can_be_postponed(monkeypatch, c
 @pytest.mark.parametrize('confirmed',[False,None])
 def test_declining_apache_confirmation_stops_install(monkeypatch,confirmed):
     calls=mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'apache_missing':True}})
-    app=App([confirmed])
+    app=App([True,confirmed])
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
-    assert [c[:2] for c in calls]==[('dspace-panel',('availability',)),('dspace-prerequisites',('plan',))]
+    assert [c[:2] for c in calls]==[('dspace-panel',('availability',)),('dspace-prerequisites',('plan',)),('dspace-panel',('preflight',))]
 
 
 @pytest.mark.parametrize('answers',[[None],['create','admin@example.org','Name','Last','en',None],['create','admin@example.org','Name','Last','en','Private-password-123','Does-not-match']])
@@ -153,7 +162,7 @@ def test_migration_retry_requires_its_own_confirmation(monkeypatch,retry):
     calls=mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'apache_missing':False},
                                 'status':{'url':'http://192.168.1.20:8100','migration':'failed'},
                                 'plan':{'url':'http://192.168.1.20:8100'},'install':{'status':'installed'},'setup-status':{'setup':'none'}})
-    app=App([True,retry])
+    app=App([True,True,retry])
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     app.check_platforms=lambda: None
@@ -174,7 +183,7 @@ def test_external_proxy_instructions_are_shown_before_setup(monkeypatch):
     mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'apache_missing':False},
                            'status':{'url':'http://192.168.1.20:8100'},'plan':{'url':'http://192.168.1.20:8100'},
                            'install':{'status':'installed','note':note},'setup-status':{'setup':'none'}})
-    app=App([True]);app.check_platforms=lambda:None
+    app=App([True,True]);app.check_platforms=lambda:None
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
@@ -345,7 +354,7 @@ def test_web_repair_uses_the_chosen_actual_network_ip_and_explicit_confirmation(
 
 def test_wsl_install_can_choose_localhost_without_copying_an_example_ip(monkeypatch):
     calls=mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'platform':'wsl2'},'status':{'status':'absent'},'plan':{'url':'http://localhost:8100'}})
-    app=App(['local',False])
+    app=App([True,'local',False])
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))
