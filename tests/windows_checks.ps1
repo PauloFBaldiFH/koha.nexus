@@ -159,10 +159,10 @@ Check 'indicator: one system ok is green with its name' ($i.Colour -eq 'green' -
 $i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus ($kohaOk + ',' + $museuDown) 'critical') -Now $now
 Check 'indicator: one down says which, others running' ($i.Colour -eq 'red' -and $i.Text -eq ('Museu Municipal: not responding ' + [char]0x00B7 + ' others running') -and @($i.Lines).Count -eq 2) ($i.Colour + ' ' + $i.Text)
 $noKoha = New-SummaryStatus '{"id":"tainacan","name":"Museu Municipal","state":"ok","reason":""}' 'ok' 'not_installed'
-$word = Resolve-KohaState -Installed $true -Running $true -Linux $noKoha -State @{} -Now $now
+$word = Resolve-KohaState -Installed $true -Running $true -Linux $noKoha -State @{ desired = 'running'; autostart = 'logon'; startedAt = 0 } -Now $now
 Check 'indicator: Tainacan without Koha is not "not installed" (2.7)' ($word -eq 'running' -and (Resolve-KohaIndicator -State $word -Linux $noKoha -Now $now).Text -eq 'Museu Municipal is running') $word
 $none = New-SummaryStatus '' 'none' 'not_installed'
-$word = Resolve-KohaState -Installed $true -Running $true -Linux $none -State @{} -Now $now
+$word = Resolve-KohaState -Installed $true -Running $true -Linux $none -State @{ desired = 'running'; autostart = 'logon'; startedAt = 0 } -Now $now
 $i = Resolve-KohaIndicator -State $word -Linux $none -Now $now
 Check 'indicator: no system is gray' ($word -eq 'not_installed' -and $i.Colour -eq 'gray' -and $i.Text -eq 'No system installed. Open the panel to install.') ($word + ' ' + $i.Text)
 $i = Resolve-KohaIndicator -State 'running' -Linux (New-SummaryStatus '{"id":"dspace","name":"Repositorio","state":"stopped","reason":"stopped"}' 'stopped') -Now $now
