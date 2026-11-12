@@ -1645,3 +1645,39 @@ grupos, ferramentas do Koha com nomes e atalhos de antes, todos os atalhos
 mantidos, divisor não selecionável, filtro da Central, abrir as telas novas
 sem rodar nada que altere o servidor, “Adicionar sistema” com os três,
 traduções) e `tests/test_instance_navigation.py` atualizado.
+
+## 21. U5, segunda parte: Central de idiomas
+
+“Idiomas” continua na lateral do servidor, com o mesmo nome, e agora abre a
+**Central de idiomas** (17.2). A central tem uma linha para o painel e uma
+para cada sistema. Cada linha mostra o idioma em uso agora, lido de onde o
+próprio aplicativo o guarda, e tem um botão:
+
+| Linha | O que mostra | De onde lê | Botão |
+|---|---|---|---|
+| Painel koha.nexus | o idioma do painel | `translation.conf` (`KOHA_PANEL_LANG_FULL`), o mesmo que a primeira tela grava | **Mudar**: muda só o painel, que fecha e abre de novo no idioma escolhido. O Koha não muda |
+| Koha | OPAC e equipe (o primeiro de cada lista é o ativo) e os pacotes instalados | nova tarefa só de leitura `koha-languages` (`koha-translate --list` e as preferências `OPACLanguages` e `StaffInterfaceLanguages`/`language`) | **Gerenciar**: as quatro rotinas de antes (baixar e ativar, só baixar, ativar um instalado, listar) |
+| Tainacan | o idioma do WordPress | `--status-json`, campo novo `lang` do arquivo de estado (sem rodar o diagnóstico) | **Mudar**: o cartão novo **Idioma do Tainacan**, sobre `tainacan-language` (`kei_tainacan_language`, que já existia sem cartão). Pergunta antes; acervos, itens e contas não mudam |
+| DSpace | os idiomas da interface e o padrão | `dspace-panel operations languages` (só leitura) | **Escolha**: a rotina de idiomas do DSpace de antes |
+
+Um sistema que não está instalado aparece como “Não instalado”, sem botão.
+Abrir a central só lê. Os cartões de antes continuam embaixo das linhas, com
+dois novos: “Idioma só do painel” e “Idioma do Tainacan”. O código de idioma
+escolhido para o Tainacan é conferido de novo pelo instalador, como antes.
+
+O atalho opcional “Idiomas deste sistema” dentro de “Diagnóstico e
+manutenção” não entrou. O lugar principal é a central, que fica a um clique
+na lateral.
+
+| Central (tudo instalado) | Central (só Koha) | Idioma do Tainacan | Confirmação |
+|---|---|---|---|
+| ![](capturas/u5/u5-5-central-idiomas-160x48.png) | ![](capturas/u5/u5-5-central-idiomas-so-koha-160x48.png) | ![](capturas/u5/u5-6-idioma-tainacan-80x24.png) | ![](capturas/u5/u5-7-idioma-tainacan-confirmar-80x24.png) |
+
+Em 80×24: ![](capturas/u5/u5-5-central-idiomas-80x24.png)
+
+Testes: `panel/tests/test_u5_languages.py` (Idiomas continua na lateral e
+fora do Diagnóstico, uma linha por painel e sistema com os valores lidos,
+sistema ausente sem botão, abrir a central só lê, “Idioma só do painel” só
+grava `translation.conf` e não roda nada no instalador, o Tainacan só muda
+depois do Sim, a tarefa `koha-languages` não grava nada, o campo `lang` do
+status é validado, traduções).

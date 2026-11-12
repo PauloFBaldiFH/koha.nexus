@@ -948,3 +948,15 @@ App.-plain #picker-drop {
 .completion-row.-warn .detail-value { color: $warning; }
 .completion-row.-fail .detail-value { color: $error; }
 .completion-reminder { margin-top: 1; }
+
+/* The Language center (views/languages.py): one row per panel and system. */
+#lang-rows { height: auto; margin-bottom: 1; }
+.lang-row { height: auto; padding: 0 1; margin-bottom: 1; border-left: outer $success; }
+.lang-row.-absent { border-left: outer $panel-lighten-2; }
+.lang-row.-absent .lang-value { color: $text-muted; }
+.lang-name { width: 26; text-style: bold; }
+.lang-text { width: 1fr; height: auto; }
+.lang-value, .lang-note { width: 1fr; }
+.lang-note { color: $text-muted; }
+.lang-row Button { margin-left: 1; min-width: 12; }
+.-narrow .lang-name { width: 14; }

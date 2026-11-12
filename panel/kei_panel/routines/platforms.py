@@ -662,6 +662,31 @@ async def tainacan_address(app) -> None:
         await _setup_done(app, "tainacan", "public")
 
 
+async def tainacan_language(app) -> None:
+    """The language of WordPress and Tainacan (installer:
+    kei_tainacan_language): WordPress downloads it and makes it the active
+    one. Nothing changes before the person's Yes."""
+    from .common import run_task, show_done
+    from ..languages import TAINACAN_LOCALES, name_of
+    from ..screens.dialogs import ChoiceScreen, ConfirmScreen
+
+    title = t("🏺  Tainacan language")
+    state = platforms.tainacan_from_status(await _status(app))
+    current = state.lang or state.check("lang")
+    code = await app.push_screen_wait(ChoiceScreen(
+        title, t("The language of WordPress and of the Tainacan plugin, for visitors and administrators."),
+        [(c, f"{n}   ({c})") for c, n in TAINACAN_LOCALES], default=current))
+    if not code or code == current:
+        return
+    if not await app.push_screen_wait(ConfirmScreen(title, t(
+            "Set Tainacan to ${name}? WordPress downloads its translation and makes it the active language. "
+            "The collections, items and accounts do not change.", name=name_of(code, TAINACAN_LOCALES)))):
+        return
+    result = await run_task(app, title, "tainacan-language", code)
+    await show_done(app, title, result)
+    app.check_platforms()
+
+
 async def ask_domain(app, title: str) -> str | None:
     """A name of the person's own domain (http://name or https://name)."""
     from ..screens.dialogs import InputScreen

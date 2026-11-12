@@ -182,7 +182,15 @@ async def until(pilot, ready, seconds=30.0):
 
 def loaded(app):
     view = current_view(app)
-    return lambda: bool(view.query("#platform-loader")) and not view.query_one("#platform-loader").display
+
+    def drawn():
+        # The rows are drawn after the plans are read: a busy runner can be
+        # between the two, so both must be done.
+        plans = getattr(view, "plans", [])
+        blocks = [str(w.render()) for w in view.query("#bk-plans Static")]
+        return all(r.name in b and r.destination in b and r.last in b for r, b in zip(plans, blocks))
+    return lambda: (bool(view.query("#platform-loader")) and not view.query_one("#platform-loader").display
+                    and drawn())
 
 
 def state(view):

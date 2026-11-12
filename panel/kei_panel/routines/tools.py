@@ -57,6 +57,37 @@ async def language_activate(app) -> None:
     await _language_change(app, "✅  Set an installed language as active", "lang-activate")
 
 
+async def panel_language(app) -> None:
+    """Only the panel's language (study 17.2): written where the first
+    screen and set_panel_language write it, then the panel starts again in
+    it. Koha, Tainacan and DSpace are not touched."""
+    from .. import languages
+    from ..env import TRANSLATION_CONFIG
+    from ..screens.dialogs import ConfirmScreen
+    from ..screens.language import language_items, option_label, write_language
+    title = t("🖥  Panel language only")
+    items = language_items(app.env.installer)
+    current = languages.panel_code(TRANSLATION_CONFIG, app.env.lang)
+    code = await app.push_screen_wait(ChoiceScreen(
+        title, t("The language of this panel. Koha, Tainacan and DSpace keep theirs."),
+        [(c, option_label(c, n)) for c, n in items], default=current))
+    if not code or code == current:
+        return
+    name = languages.name_of(code, items)
+    if not await app.push_screen_wait(ConfirmScreen(title, t(
+            "Show this panel in ${name}? It closes and opens again in it; nothing else changes.", name=name))):
+        return
+    if app.env.demo:
+        app.notify(f"[demo] {name}", timeout=4)
+        return
+    try:
+        write_language(code, TRANSLATION_CONFIG)
+    except OSError as error:
+        await app.push_screen_wait(MessageScreen(title, str(error), kind="error"))
+        return
+    app.exit(return_code=RESTART_CODE)
+
+
 async def update_panel(app) -> None:
     result = await run_interactive(app, t("🆕  Update this panel via GitHub"), "run", "update-panel")
     out = result.value if result else None

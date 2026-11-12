@@ -26,6 +26,7 @@ only: the panel never opens Koha's database to decide what to show.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -321,6 +322,7 @@ class TainacanState:
     admin_url: str = ""
     checked: tuple[tuple[str, str], ...] = ()   # the last diagnosis kept (installer: last-status)
     home: str = ""               # "prepared": the home page of the collection made by Koha.Nexus
+    lang: str = ""               # the WordPress language the installer set (state file)
 
     def check(self, key: str) -> str:
         return dict(self.checked).get(key, "")
@@ -373,7 +375,8 @@ def tainacan_from_status(status: dict | None) -> TainacanState:
                 events=_norm(raw.get("events"), ("off", "on"), "off"),
                 events_dependency=_norm(raw.get("events_dependency"), ("ours", "preexisting"), ""),
                 admin_url=_web_url(raw.get("admin_url")), checked=_checked(raw.get("checked")),
-                home=_norm(raw.get("home"), ("prepared",), ""))
+                home=_norm(raw.get("home"), ("prepared",), ""),
+                lang=raw["lang"] if isinstance(raw.get("lang"), str) and re.fullmatch(r"[a-z]{2,3}(_[A-Z]{2})?", raw["lang"]) else "")
     return TainacanState()
 
 

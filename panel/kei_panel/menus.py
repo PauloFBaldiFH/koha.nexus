@@ -387,13 +387,17 @@ SECTIONS: tuple[Section, ...] = (
         Entry("📦  Export diagnostics", "export-diagnostics", kind="native"),
         Entry("🗂  Open diagnostics", "open-diagnostics", kind="native"),
     )),
-    Section("languages", "🌍  Languages", "🌍 Panel & application languages", "Choose an action:", (
-        Entry("🏛  DSpace interface languages", "dspace-languages", kind="native", requires="dspace"),
+    # The Language center (study 17.2): a row for the panel and for each
+    # system (views/languages.py), these cards below them.
+    Section("languages", "🌍  Languages", "🌍 Language center", "The language of this panel and of each system:", (
+        Entry("🖥  Panel language only", "panel-language", kind="native"),
         Entry("🌍  Download & activate a language", "languages", kind="native"),
         Entry("📥  Download a language pack only", "lang-download", kind="native", requires="koha"),
         Entry("✅  Set an installed language as active", "lang-activate", kind="native", requires="koha"),
         Entry("📋  Installed languages & active one", "lang-list", kind="native", requires="koha"),
-    )),
+        Entry("🏺  Tainacan language", "tainacan-language", kind="native", requires="tainacan"),
+        Entry("🏛  DSpace interface languages", "dspace-languages", kind="native", requires="dspace"),
+    ), view="languages"),
     Section("update", "🔄  Update center", "🔄 Update Center", "Choose what to update:", (
         Entry("🆙  Update OS packages & Koha schemas", "update-system", kind="native"),
         Entry("🆕  Update this panel via GitHub", "update-panel", kind="native"),
@@ -437,13 +441,13 @@ PLATFORM_TASKS: dict[str, str] = {
     **{action: "nexus-full" for action in ("nexus-backup-create", "nexus-backup-verify", "nexus-backup-restore", "nexus-backup-sessions")},
     "nexus-backup-key": "platform-backup-setup", "nexus-backup-kit": "platform-backup-kit",
     "set-backup": "set-backup", "restore-assisted": "set-inspect", "set-schedule": "set-schedule",
-    "tainacan-address": "tainacan-address", "admin-koha": "admin-status", "admin-tainacan": "admin-status",
+    "tainacan-address": "tainacan-address", "tainacan-language": "tainacan-language", "admin-koha": "admin-status", "admin-tainacan": "admin-status",
     "setup-koha": "setup-status", "setup-tainacan": "setup-status",
 }
 
 # Panel routines with no installer routine of their own (routines/).
 PANEL_ONLY = frozenset({"backup-download", "user-folder", "terminal", "export-diagnostics",
-                        "open-diagnostics"} | set(PLATFORM_TASKS))
+                        "open-diagnostics", "panel-language"} | set(PLATFORM_TASKS))
 
 # Routines started from a button rather than a menu card, with the
 # platform they work on (the dashboard's "Restart Koha").
@@ -507,6 +511,7 @@ DESCRIPTIONS: dict[str, str] = {
     "dspace-start": "Starts the existing DSpace services without reinstalling, restoring or changing the approved migration history.",
     "dspace-stop": "Stops the repository gracefully, retaining configuration and every data volume.",
     "dspace-diagnose": "Explicitly checks PostgreSQL, all seven Solr cores, API, interface and isolation; process state alone does not establish health.",
+    "tainacan-language": "The language of WordPress and Tainacan: downloads it and makes it the active one",
     "dspace-languages": "Selects bundled interface translations and the fallback language. Existing account, browser and panel preferences remain independent.",
     "dspace-repair-web": "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.",
     "dspace-logs": "Shows bounded container logs with sensitive fields redacted. It never exports private configuration or the database password.",
@@ -579,6 +584,7 @@ DESCRIPTIONS: dict[str, str] = {
     "crons": "Turns Koha's scheduled jobs on or off",
     "schedules": "Every scheduled job of this server, its last and next run",
     "schedules:koha": "Koha's scheduled jobs: when they run, the last and the next run",
+    "panel-language": "Changes only this panel's language; Koha and the other systems stay as they are",
     "languages": "Downloads a language and makes it the OPAC, staff and panel one",
     "lang-download": "Downloads a Koha language pack and changes nothing else",
     "lang-activate": "Makes an installed language the active one, no download",
