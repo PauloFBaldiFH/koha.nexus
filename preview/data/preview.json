@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.198",
+ "panel_version": "1.5.199",
  "languages": [
   {
    "code": "en",
@@ -238,7 +238,7 @@
   {
    "id": "instances",
    "item": "sec-instances",
-   "label": "➕  Add or remove instance",
+   "label": "➕  Add system",
    "title": "Instances",
    "prompt": "",
    "icon": "",
@@ -286,6 +286,84 @@
     "sec-settings",
     "sec-diagnostics",
     "sec-koha-security"
+   ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "koha-admin",
+   "item": "sec-koha-admin",
+   "label": "🔐  Administrative access",
+   "title": "🔐  Administrative access",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "admin-koha",
+    "credentials",
+    "superlibrarian"
+   ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "koha-addresses",
+   "item": "sec-koha-addresses",
+   "label": "🌐  Addresses and access",
+   "title": "🌐  Addresses and access",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "cloudflare",
+    "ssl",
+    "staff-firewall"
+   ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "koha-backups",
+   "item": "sec-koha-backups",
+   "label": "💾  Backups and schedules",
+   "title": "",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "diagnostics",
+   "item": "sec-diagnostics",
+   "label": "🩺  Koha diagnostics & maintenance",
+   "title": "🩺  Koha diagnostics & maintenance",
+   "prompt": "Choose a tool:",
+   "icon": "",
+   "key": "",
+   "view": "section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "health",
+    "apache-log",
+    "db-maintenance",
+    "sec-database",
+    "repair-services"
    ],
    "features": [],
    "media": [],
@@ -578,28 +656,6 @@
    "single": ""
   },
   {
-   "id": "diagnostics",
-   "item": "sec-diagnostics",
-   "label": "🩺  Koha diagnostics & maintenance",
-   "title": "🩺  Koha diagnostics & maintenance",
-   "prompt": "Choose a tool:",
-   "icon": "",
-   "key": "",
-   "view": "section",
-   "sidebar": true,
-   "parent": "",
-   "entries": [
-    "health",
-    "apache-log",
-    "db-maintenance",
-    "sec-database",
-    "repair-services"
-   ],
-   "features": [],
-   "media": [],
-   "single": ""
-  },
-  {
    "id": "database",
    "item": "sec-database",
    "label": "📑  Database tables",
@@ -663,6 +719,59 @@
     "sec-backups",
     "tainacan-uninstall"
    ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "tainacan-admin",
+   "item": "sec-tainacan-admin",
+   "label": "🔐  Administrative access",
+   "title": "🔐  Administrative access",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "platform-section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "admin-tainacan",
+    "tainacan-credentials"
+   ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "tainacan-addresses",
+   "item": "sec-tainacan-addresses",
+   "label": "🌐  Addresses and access",
+   "title": "🌐  Addresses and access",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "platform-section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "tainacan-address"
+   ],
+   "features": [],
+   "media": [],
+   "single": "tainacan-address"
+  },
+  {
+   "id": "tainacan-backups",
+   "item": "sec-tainacan-backups",
+   "label": "💾  Backups and schedules",
+   "title": "",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [],
    "features": [],
    "media": [],
    "single": ""
@@ -734,6 +843,59 @@
     "dspace-help",
     "dspace-remove"
    ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "dspace-admin-access",
+   "item": "sec-dspace-admin-access",
+   "label": "🔐  Administrative access",
+   "title": "🔐  Administrative access",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "platform-section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "dspace-admin"
+   ],
+   "features": [],
+   "media": [],
+   "single": "dspace-admin"
+  },
+  {
+   "id": "dspace-addresses",
+   "item": "sec-dspace-addresses",
+   "label": "🌐  Addresses and access",
+   "title": "🌐  Addresses and access",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "platform-section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [
+    "dspace-address",
+    "dspace-repair-web"
+   ],
+   "features": [],
+   "media": [],
+   "single": ""
+  },
+  {
+   "id": "dspace-backups",
+   "item": "sec-dspace-backups",
+   "label": "💾  Backups and schedules",
+   "title": "",
+   "prompt": "",
+   "icon": "",
+   "key": "",
+   "view": "section",
+   "sidebar": true,
+   "parent": "",
+   "entries": [],
    "features": [],
    "media": [],
    "single": ""
@@ -1054,7 +1216,7 @@
    "id": "sec-instances",
    "type": "section",
    "section": "instances",
-   "label": "➕  Add or remove instance",
+   "label": "➕  Add system",
    "description": "",
    "kind": "menu",
    "status": "available",
@@ -1147,6 +1309,96 @@
    "label": "📚  Koha (library)",
    "description": "",
    "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "superlibrarian": {
+   "id": "superlibrarian",
+   "type": "entry",
+   "section": "koha-admin",
+   "label": "👑  Create super librarian",
+   "description": "Creates a staff account with every permission",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "sec-koha-admin": {
+   "id": "sec-koha-admin",
+   "type": "section",
+   "section": "koha-admin",
+   "label": "🔐  Administrative access",
+   "description": "",
+   "kind": "menu",
+   "status": "available",
+   "media": []
+  },
+  "cloudflare": {
+   "id": "cloudflare",
+   "type": "entry",
+   "section": "koha-addresses",
+   "label": "🌉  Cloudflare Tunnel Manager (Recommended)",
+   "description": "Publishes the OPAC and the staff site through Cloudflare",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "ssl": {
+   "id": "ssl",
+   "type": "entry",
+   "section": "koha-addresses",
+   "label": "🔏  Free SSL certificate (Certbot / Apache)",
+   "description": "Free HTTPS certificate, only for your own domain without the tunnel",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "staff-firewall": {
+   "id": "staff-firewall",
+   "type": "entry",
+   "section": "koha-addresses",
+   "label": "🚧  Staff firewall (restrict port 8080)",
+   "description": "Blocks or opens the staff port 8080 to the internet",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "sec-koha-addresses": {
+   "id": "sec-koha-addresses",
+   "type": "section",
+   "section": "koha-addresses",
+   "label": "🌐  Addresses and access",
+   "description": "",
+   "kind": "menu",
+   "status": "available",
+   "media": []
+  },
+  "sec-koha-backups": {
+   "id": "sec-koha-backups",
+   "type": "section",
+   "section": "koha-backups",
+   "label": "💾  Backups and schedules",
+   "description": "",
+   "kind": "menu",
+   "status": "available",
+   "media": []
+  },
+  "db-maintenance": {
+   "id": "db-maintenance",
+   "type": "entry",
+   "section": "diagnostics",
+   "label": "🧹  Deep database optimization & log cleanup",
+   "description": "Optimizes the tables and clears old logs, with a preview",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "sec-diagnostics": {
+   "id": "sec-diagnostics",
+   "type": "section",
+   "section": "diagnostics",
+   "label": "🩺  Koha diagnostics & maintenance",
+   "description": "Choose a tool:",
+   "kind": "menu",
    "status": "available",
    "media": []
   },
@@ -1500,42 +1752,12 @@
    "status": "available",
    "media": []
   },
-  "superlibrarian": {
-   "id": "superlibrarian",
-   "type": "entry",
-   "section": "settings",
-   "label": "👑  Create super librarian",
-   "description": "Creates a staff account with every permission",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
   "sec-settings": {
    "id": "sec-settings",
    "type": "section",
    "section": "settings",
    "label": "🔧  Koha settings & parameters",
    "description": "Choose a parameter:",
-   "kind": "menu",
-   "status": "available",
-   "media": []
-  },
-  "db-maintenance": {
-   "id": "db-maintenance",
-   "type": "entry",
-   "section": "diagnostics",
-   "label": "🧹  Deep database optimization & log cleanup",
-   "description": "Optimizes the tables and clears old logs, with a preview",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "sec-diagnostics": {
-   "id": "sec-diagnostics",
-   "type": "section",
-   "section": "diagnostics",
-   "label": "🩺  Koha diagnostics & maintenance",
-   "description": "Choose a tool:",
    "kind": "menu",
    "status": "available",
    "media": []
@@ -1547,16 +1769,6 @@
    "label": "📑  Database tables",
    "description": "",
    "kind": "view",
-   "status": "available",
-   "media": []
-  },
-  "staff-firewall": {
-   "id": "staff-firewall",
-   "type": "entry",
-   "section": "koha-security",
-   "label": "🚧  Staff firewall (restrict port 8080)",
-   "description": "Blocks or opens the staff port 8080 to the internet",
-   "kind": "native",
    "status": "available",
    "media": []
   },
@@ -1693,10 +1905,30 @@
   "tainacan-credentials": {
    "id": "tainacan-credentials",
    "type": "entry",
-   "section": "tainacan-maintenance",
+   "section": "tainacan-admin",
    "label": "👤  WordPress administrator",
    "description": "The WordPress account of Tainacan's administrators",
    "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "sec-tainacan-admin": {
+   "id": "sec-tainacan-admin",
+   "type": "section",
+   "section": "tainacan-admin",
+   "label": "🔐  Administrative access",
+   "description": "",
+   "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "sec-tainacan-backups": {
+   "id": "sec-tainacan-backups",
+   "type": "section",
+   "section": "tainacan-backups",
+   "label": "💾  Backups and schedules",
+   "description": "",
+   "kind": "menu",
    "status": "available",
    "media": []
   },
@@ -1873,10 +2105,30 @@
   "dspace-repair-web": {
    "id": "dspace-repair-web",
    "type": "entry",
-   "section": "dspace-maintenance",
+   "section": "dspace-addresses",
    "label": "🔧  Repair DSpace web access",
    "description": "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.",
    "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "sec-dspace-addresses": {
+   "id": "sec-dspace-addresses",
+   "type": "section",
+   "section": "dspace-addresses",
+   "label": "🌐  Addresses and access",
+   "description": "",
+   "kind": "view",
+   "status": "available",
+   "media": []
+  },
+  "sec-dspace-backups": {
+   "id": "sec-dspace-backups",
+   "type": "section",
+   "section": "dspace-backups",
+   "label": "💾  Backups and schedules",
+   "description": "",
+   "kind": "menu",
    "status": "available",
    "media": []
   },
@@ -2230,32 +2482,12 @@
    "status": "available",
    "media": []
   },
-  "cloudflare": {
-   "id": "cloudflare",
-   "type": "entry",
-   "section": "security",
-   "label": "🌉  Cloudflare Tunnel Manager (Recommended)",
-   "description": "Publishes the OPAC and the staff site through Cloudflare",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
   "ufw": {
    "id": "ufw",
    "type": "entry",
    "section": "security",
    "label": "🧱  Show active UFW rules",
    "description": "Lists the firewall rules active on this server",
-   "kind": "native",
-   "status": "available",
-   "media": []
-  },
-  "ssl": {
-   "id": "ssl",
-   "type": "entry",
-   "section": "security",
-   "label": "🔏  Free SSL certificate (Certbot / Apache)",
-   "description": "Free HTTPS certificate, only for your own domain without the tunnel",
    "kind": "native",
    "status": "available",
    "media": []
@@ -4415,9 +4647,9 @@
    "ja": "コントロールパネル",
    "ko": "제어판"
   },
-  "➕  Add or remove instance": {
-   "en": "➕  Add or remove instance",
-   "pt-BR": "➕  Adicionar ou remover instância",
+  "➕  Add system": {
+   "en": "➕  Add system",
+   "pt-BR": "➕  Adicionar sistema",
    "es": null,
    "fr": null,
    "it": null,
@@ -4989,6 +5221,356 @@
    "zh": null,
    "ja": null,
    "ko": null
+  },
+  "👑  Create super librarian": {
+   "en": "👑  Create super librarian",
+   "pt-BR": "👑  Criar superbibliotecário",
+   "es": "👑  Crear superbibliotecario",
+   "fr": "👑  Créer un super-bibliothécaire",
+   "it": "👑  Crea super bibliotecario",
+   "de": "👑  Superbibliothekar anlegen",
+   "nl": "👑  Superbibliothecaris aanmaken",
+   "sv": "👑  Skapa superbibliotekarie",
+   "pl": "👑  Utwórz superbibliotekarza",
+   "cs": "👑  Vytvořit superknihovníka",
+   "ru": "👑  Создать суперлибрариана",
+   "uk": "👑  Створити суперкористувача-бібліотекаря",
+   "tr": "👑  Süper kütüphaneci oluştur",
+   "tl": "👑  Gumawa ng super librarian",
+   "id": "👑  Buat pustakawan super",
+   "ar": "👑  إنشاء أمين مكتبة خارق",
+   "fa": "👑  ایجاد ابرکتابدار",
+   "hi": "👑  सुपर लाइब्रेरियन बनाएँ",
+   "bn": "👑  সুপার লাইব্রেরিয়ান তৈরি করুন",
+   "vi": "👑  Tạo thủ thư quản trị cao nhất",
+   "zh": "👑  创建超级馆员",
+   "ja": "👑  スーパーライブラリアンを作成",
+   "ko": "👑  슈퍼 사서 만들기"
+  },
+  "Creates a staff account with every permission": {
+   "en": "Creates a staff account with every permission",
+   "pt-BR": "Cria uma conta da equipe com todas as permissões",
+   "es": "Crea una cuenta de personal con todos los permisos",
+   "fr": "Crée un compte bibliothécaire avec tous les droits",
+   "it": "Crea un account staff con tutti i permessi",
+   "de": "Legt ein Mitarbeiterkonto mit allen Rechten an",
+   "nl": "Maakt een medewerkersaccount met alle rechten",
+   "sv": "Skapar ett personalkonto med alla behörigheter",
+   "pl": "Tworzy konto bibliotekarza ze wszystkimi uprawnieniami",
+   "cs": "Vytvoří účet knihovníka se všemi oprávněními",
+   "ru": "Создаёт служебную учётную запись со всеми разрешениями",
+   "uk": "Створює службовий обліковий запис з усіма дозволами",
+   "tr": "Tüm izinlere sahip bir personel hesabı oluşturur",
+   "tl": "Gumagawa ng account ng kawani na may lahat ng pahintulot",
+   "id": "Membuat akun staf dengan semua izin",
+   "ar": "ينشئ حساب موظف بجميع الصلاحيات",
+   "fa": "حساب کارکنان با همهٔ مجوزها می‌سازد",
+   "hi": "सभी अनुमतियों वाला कर्मचारी खाता बनाता है",
+   "bn": "সব অনুমতিসহ কর্মী অ্যাকাউন্ট তৈরি করে",
+   "vi": "Tạo tài khoản nhân viên có mọi quyền",
+   "zh": "创建拥有全部权限的馆员账户",
+   "ja": "すべての権限を持つ職員アカウントを作成します",
+   "ko": "모든 권한을 가진 직원 계정을 만듭니다"
+  },
+  "🌐  Addresses and access": {
+   "en": "🌐  Addresses and access",
+   "pt-BR": "🌐  Endereços e acesso",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🌉  Cloudflare Tunnel Manager (Recommended)": {
+   "en": "🌉  Cloudflare Tunnel Manager (Recommended)",
+   "pt-BR": "🌉  Gerenciador do Túnel Cloudflare (recomendado)",
+   "es": "🌉  Gestor del túnel de Cloudflare (recomendado)",
+   "fr": "🌉  Gestionnaire du tunnel Cloudflare (recommandé)",
+   "it": "🌉  Gestione del tunnel Cloudflare (consigliato)",
+   "de": "🌉  Cloudflare-Tunnel-Verwaltung (empfohlen)",
+   "nl": "🌉  Cloudflare-tunnelbeheer (aanbevolen)",
+   "sv": "🌉  Hantera Cloudflare-tunnel (rekommenderas)",
+   "pl": "🌉  Menedżer tunelu Cloudflare (zalecane)",
+   "cs": "🌉  Správa tunelu Cloudflare (doporučeno)",
+   "ru": "🌉  Управление туннелем Cloudflare (рекомендуется)",
+   "uk": "🌉  Керування тунелем Cloudflare (рекомендовано)",
+   "tr": "🌉  Cloudflare Tüneli yöneticisi (önerilir)",
+   "tl": "🌉  Tagapamahala ng Cloudflare Tunnel (inirerekomenda)",
+   "id": "🌉  Pengelola terowongan Cloudflare (disarankan)",
+   "ar": "🌉  مدير نفق Cloudflare (موصى به)",
+   "fa": "🌉  مدیریت تونل Cloudflare (پیشنهادی)",
+   "hi": "🌉  Cloudflare टनल प्रबंधक (अनुशंसित)",
+   "bn": "🌉  Cloudflare টানেল ব্যবস্থাপক (প্রস্তাবিত)",
+   "vi": "🌉  Quản lý đường hầm Cloudflare (khuyến nghị)",
+   "zh": "🌉  Cloudflare 隧道管理（推荐）",
+   "ja": "🌉  Cloudflare トンネル管理 (推奨)",
+   "ko": "🌉  Cloudflare 터널 관리자 (권장)"
+  },
+  "Publishes the OPAC and the staff site through Cloudflare": {
+   "en": "Publishes the OPAC and the staff site through Cloudflare",
+   "pt-BR": "Publica o OPAC e a intranet na internet via Cloudflare",
+   "es": "Publica el OPAC y el sitio del personal a través de Cloudflare",
+   "fr": "Publie l'OPAC et le site de l'interface bibliothécaire via Cloudflare",
+   "it": "Pubblica l'OPAC e il sito staff tramite Cloudflare",
+   "de": "Veröffentlicht den OPAC und die Mitarbeiterseite über Cloudflare",
+   "nl": "Publiceert de OPAC en de medewerkerssite via Cloudflare",
+   "sv": "Publicerar OPAC och personalsidan via Cloudflare",
+   "pl": "Udostępnia OPAC i stronę bibliotekarza przez Cloudflare",
+   "cs": "Zpřístupní OPAC a stránku pro knihovníky přes Cloudflare",
+   "ru": "Публикует OPAC и служебный сайт через Cloudflare",
+   "uk": "Публікує OPAC і службовий сайт через Cloudflare",
+   "tr": "OPAC ve personel sitesini Cloudflare üzerinden yayımlar",
+   "tl": "Inilalathala ang OPAC at site ng kawani sa Cloudflare",
+   "id": "Mempublikasikan OPAC dan situs staf melalui Cloudflare",
+   "ar": "ينشر OPAC وموقع الموظفين عبر Cloudflare",
+   "fa": "OPAC و وب‌سایت کارکنان را از طریق Cloudflare منتشر می‌کند",
+   "hi": "Cloudflare से OPAC और कर्मचारी साइट प्रकाशित करता है",
+   "bn": "Cloudflare দিয়ে OPAC ও কর্মী সাইট প্রকাশ করে",
+   "vi": "Công bố OPAC và trang nhân viên qua Cloudflare",
+   "zh": "通过 Cloudflare 发布 OPAC 和馆员网站",
+   "ja": "Cloudflare 経由で OPAC と職員用サイトを公開します",
+   "ko": "Cloudflare를 통해 OPAC 및 직원 사이트를 공개합니다"
+  },
+  "🔏  Free SSL certificate (Certbot / Apache)": {
+   "en": "🔏  Free SSL certificate (Certbot / Apache)",
+   "pt-BR": "🔏  Certificado SSL gratuito (Certbot / Apache)",
+   "es": "🔏  Certificado SSL gratuito (Certbot / Apache)",
+   "fr": "🔏  Certificat SSL gratuit (Certbot / Apache)",
+   "it": "🔏  Certificato SSL gratuito (Certbot / Apache)",
+   "de": "🔏  Kostenloses SSL-Zertifikat (Certbot / Apache)",
+   "nl": "🔏  Gratis SSL-certificaat (Certbot / Apache)",
+   "sv": "🔏  Gratis SSL-certifikat (Certbot / Apache)",
+   "pl": "🔏  Darmowy certyfikat SSL (Certbot / Apache)",
+   "cs": "🔏  Bezplatný certifikát SSL (Certbot / Apache)",
+   "ru": "🔏  Бесплатный SSL-сертификат (Certbot / Apache)",
+   "uk": "🔏  Безкоштовний SSL-сертифікат (Certbot / Apache)",
+   "tr": "🔏  Ücretsiz SSL sertifikası (Certbot / Apache)",
+   "tl": "🔏  Libreng SSL certificate (Certbot / Apache)",
+   "id": "🔏  Sertifikat SSL gratis (Certbot / Apache)",
+   "ar": "🔏  شهادة SSL مجانية (Certbot / Apache)",
+   "fa": "🔏  گواهی SSL رایگان (Certbot / Apache)",
+   "hi": "🔏  मुफ़्त SSL प्रमाणपत्र (Certbot / Apache)",
+   "bn": "🔏  বিনামূল্যের SSL সার্টিফিকেট (Certbot / Apache)",
+   "vi": "🔏  Chứng chỉ SSL miễn phí (Certbot / Apache)",
+   "zh": "🔏  免费 SSL 证书（Certbot / Apache）",
+   "ja": "🔏  無料の SSL 証明書 (Certbot / Apache)",
+   "ko": "🔏  무료 SSL 인증서 (Certbot / Apache)"
+  },
+  "Free HTTPS certificate, only for your own domain without the tunnel": {
+   "en": "Free HTTPS certificate, only for your own domain without the tunnel",
+   "pt-BR": "Certificado HTTPS gratuito, só para domínio próprio sem o túnel",
+   "es": "Certificado HTTPS gratuito, solo para su propio dominio sin el túnel",
+   "fr": "Certificat HTTPS gratuit, seulement pour votre propre domaine sans le tunnel",
+   "it": "Certificato HTTPS gratuito, solo per il tuo dominio senza il tunnel",
+   "de": "Kostenloses HTTPS-Zertifikat, nur für Ihre eigene Domain ohne Tunnel",
+   "nl": "Gratis HTTPS-certificaat, alleen voor uw eigen domein zonder de tunnel",
+   "sv": "Kostnadsfritt HTTPS-certifikat, endast för egen domän utan tunneln",
+   "pl": "Bezpłatny certyfikat HTTPS, tylko dla własnej domeny bez tunelu",
+   "cs": "Bezplatný certifikát HTTPS, pouze pro vlastní doménu bez tunelu",
+   "ru": "Бесплатный сертификат HTTPS, только для своего домена без туннеля",
+   "uk": "Безкоштовний сертифікат HTTPS, лише для власного домену без тунелю",
+   "tr": "Ücretsiz HTTPS sertifikası, yalnızca tünel olmadan kendi alan adınız için",
+   "tl": "Libreng sertipikong HTTPS, para lamang sa sarili mong domain na walang tunnel",
+   "id": "Sertifikat HTTPS gratis, hanya untuk domain sendiri tanpa tunnel",
+   "ar": "شهادة HTTPS مجانية، لنطاقك الخاص فقط دون النفق",
+   "fa": "گواهی رایگان HTTPS، فقط برای دامنهٔ خودتان بدون تونل",
+   "hi": "मुफ़्त HTTPS प्रमाणपत्र, केवल अपने डोमेन के लिए बिना टनल",
+   "bn": "বিনামূল্যের HTTPS সনদ, শুধু টানেল ছাড়া নিজের ডোমেনের জন্য",
+   "vi": "Chứng chỉ HTTPS miễn phí, chỉ cho tên miền riêng không dùng đường hầm",
+   "zh": "免费 HTTPS 证书，仅用于不经过隧道的自有域名",
+   "ja": "トンネルを使わない独自ドメイン専用の無料 HTTPS 証明書",
+   "ko": "터널을 사용하지 않는 자체 도메인 전용 무료 HTTPS 인증서"
+  },
+  "🚧  Staff firewall (restrict port 8080)": {
+   "en": "🚧  Staff firewall (restrict port 8080)",
+   "pt-BR": "🚧  Firewall do Staff (restringir a porta 8080)",
+   "es": "🚧  Cortafuegos del Staff (restringir el puerto 8080)",
+   "fr": "🚧  Pare-feu Staff (restreindre le port 8080)",
+   "it": "🚧  Firewall dello Staff (limita la porta 8080)",
+   "de": "🚧  Staff-Firewall (Port 8080 einschränken)",
+   "nl": "🚧  Staff-firewall (poort 8080 beperken)",
+   "sv": "🚧  Staff-brandvägg (begränsa port 8080)",
+   "pl": "🚧  Zapora Staff (ogranicz port 8080)",
+   "cs": "🚧  Firewall pro Staff (omezit port 8080)",
+   "ru": "🚧  Брандмауэр Staff (ограничить порт 8080)",
+   "uk": "🚧  Брандмауер Staff (обмежити порт 8080)",
+   "tr": "🚧  Personel güvenlik duvarı (8080 portunu kısıtla)",
+   "tl": "🚧  Firewall ng Staff (limitahan ang port 8080)",
+   "id": "🚧  Firewall Staff (batasi port 8080)",
+   "ar": "🚧  جدار حماية واجهة الموظفين (تقييد المنفذ 8080)",
+   "fa": "🚧  دیوار آتش Staff (محدود کردن درگاه 8080)",
+   "hi": "🚧  Staff फ़ायरवॉल (पोर्ट 8080 सीमित करें)",
+   "bn": "🚧  Staff ফায়ারওয়াল (পোর্ট 8080 সীমিত করুন)",
+   "vi": "🚧  Tường lửa Staff (giới hạn cổng 8080)",
+   "zh": "🚧  馆员端防火墙（限制端口 8080）",
+   "ja": "🚧  スタッフ用ファイアウォール (ポート 8080 を制限)",
+   "ko": "🚧  Staff 방화벽 (포트 8080 제한)"
+  },
+  "Blocks or opens the staff port 8080 to the internet": {
+   "en": "Blocks or opens the staff port 8080 to the internet",
+   "pt-BR": "Bloqueia ou libera a porta 8080 da intranet na internet",
+   "es": "Bloquea o abre a Internet el puerto 8080 del personal",
+   "fr": "Bloque ou ouvre le port 8080 de l'interface bibliothécaire sur Internet",
+   "it": "Blocca o apre la porta 8080 dello staff verso internet",
+   "de": "Sperrt den Mitarbeiterport 8080 oder öffnet ihn für das Internet",
+   "nl": "Blokkeert of opent personeelspoort 8080 voor het internet",
+   "sv": "Blockerar eller öppnar personalport 8080 mot internet",
+   "pl": "Blokuje lub otwiera port 8080 interfejsu bibliotekarza dla internetu",
+   "cs": "Zablokuje nebo otevře port 8080 pro knihovníky vůči internetu",
+   "ru": "Закрывает или открывает служебный порт 8080 для интернета",
+   "uk": "Закриває або відкриває службовий порт 8080 для інтернету",
+   "tr": "Personel arayüzünün 8080 bağlantı noktasını internete kapatır veya açar",
+   "tl": "Hinaharangan o binubuksan sa internet ang port na 8080 ng kawani",
+   "id": "Memblokir atau membuka port staf 8080 ke internet",
+   "ar": "يحظر أو يفتح منفذ الموظفين 8080 للإنترنت",
+   "fa": "درگاه 8080 کارکنان را به روی اینترنت می‌بندد یا باز می‌کند",
+   "hi": "कर्मचारी पोर्ट 8080 का इंटरनेट से प्रवेश रोकता या खोलता है",
+   "bn": "কর্মী পোর্ট 8080-এ ইন্টারনেট থেকে প্রবেশ বন্ধ বা চালু করে",
+   "vi": "Chặn hoặc mở cổng nhân viên 8080 ra Internet",
+   "zh": "阻止或开放馆员端口 8080 的互联网访问",
+   "ja": "職員用ポート 8080 のインターネットからのアクセスを遮断または許可します",
+   "ko": "직원용 8080 포트의 인터넷 접근을 차단하거나 허용합니다"
+  },
+  "💾  Backups and schedules": {
+   "en": "💾  Backups and schedules",
+   "pt-BR": "💾  Backups e agendamentos",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🩺  Koha diagnostics & maintenance": {
+   "en": "🩺  Koha diagnostics & maintenance",
+   "pt-BR": "🩺  Diagnóstico e manutenção do Koha",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Choose a tool:": {
+   "en": "Choose a tool:",
+   "pt-BR": "Escolha uma ferramenta:",
+   "es": "Elija una herramienta:",
+   "fr": "Choisissez un outil :",
+   "it": "Scegli uno strumento:",
+   "de": "Werkzeug wählen:",
+   "nl": "Kies een hulpmiddel:",
+   "sv": "Välj ett verktyg:",
+   "pl": "Wybierz narzędzie:",
+   "cs": "Vyberte nástroj:",
+   "ru": "Выберите инструмент:",
+   "uk": "Виберіть інструмент:",
+   "tr": "Bir araç seçin:",
+   "tl": "Pumili ng tool:",
+   "id": "Pilih alat:",
+   "ar": "اختر أداة:",
+   "fa": "یک ابزار انتخاب کنید:",
+   "hi": "एक टूल चुनें:",
+   "bn": "একটি টুল বেছে নিন:",
+   "vi": "Chọn một công cụ:",
+   "zh": "请选择工具：",
+   "ja": "ツールを選んでください:",
+   "ko": "도구를 선택하세요:"
+  },
+  "🧹  Deep database optimization & log cleanup": {
+   "en": "🧹  Deep database optimization & log cleanup",
+   "pt-BR": "🧹  Otimização profunda do banco e limpeza de logs",
+   "es": "🧹  Optimización profunda de la base y limpieza de logs",
+   "fr": "🧹  Optimisation approfondie de la base et nettoyage des journaux",
+   "it": "🧹  Ottimizzazione profonda del database e pulizia dei log",
+   "de": "🧹  Gründliche Datenbankoptimierung und Protokollbereinigung",
+   "nl": "🧹  Grondige database-optimalisatie en logopschoning",
+   "sv": "🧹  Djupoptimering av databasen och loggrensning",
+   "pl": "🧹  Gruntowna optymalizacja bazy i czyszczenie dzienników",
+   "cs": "🧹  Důkladná optimalizace databáze a čištění protokolů",
+   "ru": "🧹  Глубокая оптимизация базы и очистка журналов",
+   "uk": "🧹  Глибока оптимізація бази та очищення журналів",
+   "tr": "🧹  Veritabanını derinlemesine optimize et ve günlükleri temizle",
+   "tl": "🧹  Malalimang optimization ng database at paglilinis ng log",
+   "id": "🧹  Optimasi mendalam basis data dan pembersihan log",
+   "ar": "🧹  تحسين عميق لقاعدة البيانات وتنظيف السجلات",
+   "fa": "🧹  بهینه‌سازی عمیق پایگاه داده و پاک‌سازی گزارش‌ها",
+   "hi": "🧹  डेटाबेस का गहन अनुकूलन और लॉग सफ़ाई",
+   "bn": "🧹  ডাটাবেসের গভীর অপ্টিমাইজেশন ও লগ পরিষ্কার",
+   "vi": "🧹  Tối ưu sâu cơ sở dữ liệu và dọn nhật ký",
+   "zh": "🧹  深度优化数据库并清理日志",
+   "ja": "🧹  データベースの徹底最適化とログ整理",
+   "ko": "🧹  데이터베이스 심층 최적화 및 로그 정리"
+  },
+  "Optimizes the tables and clears old logs, with a preview": {
+   "en": "Optimizes the tables and clears old logs, with a preview",
+   "pt-BR": "Otimiza as tabelas e limpa logs antigos, com prévia",
+   "es": "Optimiza las tablas y borra los registros antiguos, con una vista previa",
+   "fr": "Optimise les tables et supprime les vieux journaux, avec un aperçu",
+   "it": "Ottimizza le tabelle e cancella i vecchi log, con anteprima",
+   "de": "Optimiert die Tabellen und löscht alte Protokolle, mit Vorschau",
+   "nl": "Optimaliseert de tabellen en wist oude logboeken, met een voorbeeld",
+   "sv": "Optimerar tabellerna och rensar gamla loggar, med förhandsvisning",
+   "pl": "Optymalizuje tabele i czyści stare dzienniki, z podglądem",
+   "cs": "Optimalizuje tabulky a vymaže staré protokoly, s náhledem",
+   "ru": "Оптимизирует таблицы и очищает старые журналы с предварительным просмотром",
+   "uk": "Оптимізує таблиці й очищає старі журнали з попереднім переглядом",
+   "tr": "Önizleme ile tabloları iyileştirir ve eski günlükleri temizler",
+   "tl": "Ino-optimize ang mga talahanayan at nililinis ang mga lumang log, may paunang tingin",
+   "id": "Mengoptimalkan tabel dan membersihkan log lama, dengan pratinjau",
+   "ar": "يحسّن الجداول ويمسح السجلات القديمة، مع معاينة",
+   "fa": "جدول‌ها را بهینه و گزارش‌های قدیمی را پاک می‌کند، همراه با پیش‌نمایش",
+   "hi": "पूर्वावलोकन के साथ तालिकाएँ अनुकूलित करता है और पुराने लॉग साफ़ करता है",
+   "bn": "পূর্বরূপসহ টেবিল উন্নত করে এবং পুরোনো লগ মুছে দেয়",
+   "vi": "Tối ưu hóa các bảng và xóa nhật ký cũ, có bản xem trước",
+   "zh": "优化数据表并清理旧日志，提供预览",
+   "ja": "プレビュー付きでテーブルを最適化し、古いログを削除します",
+   "ko": "미리보기와 함께 테이블을 최적화하고 오래된 로그를 정리합니다"
   },
   "🪄  Magic Import Tool": {
    "en": "🪄  Magic Import Tool",
@@ -6665,156 +7247,6 @@
    "ja": "このサーバーの RAM に合わせてメモリとワーカーを調整します",
    "ko": "이 서버의 RAM에 맞게 메모리 및 작업자를 조정합니다"
   },
-  "👑  Create super librarian": {
-   "en": "👑  Create super librarian",
-   "pt-BR": "👑  Criar superbibliotecário",
-   "es": "👑  Crear superbibliotecario",
-   "fr": "👑  Créer un super-bibliothécaire",
-   "it": "👑  Crea super bibliotecario",
-   "de": "👑  Superbibliothekar anlegen",
-   "nl": "👑  Superbibliothecaris aanmaken",
-   "sv": "👑  Skapa superbibliotekarie",
-   "pl": "👑  Utwórz superbibliotekarza",
-   "cs": "👑  Vytvořit superknihovníka",
-   "ru": "👑  Создать суперлибрариана",
-   "uk": "👑  Створити суперкористувача-бібліотекаря",
-   "tr": "👑  Süper kütüphaneci oluştur",
-   "tl": "👑  Gumawa ng super librarian",
-   "id": "👑  Buat pustakawan super",
-   "ar": "👑  إنشاء أمين مكتبة خارق",
-   "fa": "👑  ایجاد ابرکتابدار",
-   "hi": "👑  सुपर लाइब्रेरियन बनाएँ",
-   "bn": "👑  সুপার লাইব্রেরিয়ান তৈরি করুন",
-   "vi": "👑  Tạo thủ thư quản trị cao nhất",
-   "zh": "👑  创建超级馆员",
-   "ja": "👑  スーパーライブラリアンを作成",
-   "ko": "👑  슈퍼 사서 만들기"
-  },
-  "Creates a staff account with every permission": {
-   "en": "Creates a staff account with every permission",
-   "pt-BR": "Cria uma conta da equipe com todas as permissões",
-   "es": "Crea una cuenta de personal con todos los permisos",
-   "fr": "Crée un compte bibliothécaire avec tous les droits",
-   "it": "Crea un account staff con tutti i permessi",
-   "de": "Legt ein Mitarbeiterkonto mit allen Rechten an",
-   "nl": "Maakt een medewerkersaccount met alle rechten",
-   "sv": "Skapar ett personalkonto med alla behörigheter",
-   "pl": "Tworzy konto bibliotekarza ze wszystkimi uprawnieniami",
-   "cs": "Vytvoří účet knihovníka se všemi oprávněními",
-   "ru": "Создаёт служебную учётную запись со всеми разрешениями",
-   "uk": "Створює службовий обліковий запис з усіма дозволами",
-   "tr": "Tüm izinlere sahip bir personel hesabı oluşturur",
-   "tl": "Gumagawa ng account ng kawani na may lahat ng pahintulot",
-   "id": "Membuat akun staf dengan semua izin",
-   "ar": "ينشئ حساب موظف بجميع الصلاحيات",
-   "fa": "حساب کارکنان با همهٔ مجوزها می‌سازد",
-   "hi": "सभी अनुमतियों वाला कर्मचारी खाता बनाता है",
-   "bn": "সব অনুমতিসহ কর্মী অ্যাকাউন্ট তৈরি করে",
-   "vi": "Tạo tài khoản nhân viên có mọi quyền",
-   "zh": "创建拥有全部权限的馆员账户",
-   "ja": "すべての権限を持つ職員アカウントを作成します",
-   "ko": "모든 권한을 가진 직원 계정을 만듭니다"
-  },
-  "🩺  Koha diagnostics & maintenance": {
-   "en": "🩺  Koha diagnostics & maintenance",
-   "pt-BR": "🩺  Diagnóstico e manutenção do Koha",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "Choose a tool:": {
-   "en": "Choose a tool:",
-   "pt-BR": "Escolha uma ferramenta:",
-   "es": "Elija una herramienta:",
-   "fr": "Choisissez un outil :",
-   "it": "Scegli uno strumento:",
-   "de": "Werkzeug wählen:",
-   "nl": "Kies een hulpmiddel:",
-   "sv": "Välj ett verktyg:",
-   "pl": "Wybierz narzędzie:",
-   "cs": "Vyberte nástroj:",
-   "ru": "Выберите инструмент:",
-   "uk": "Виберіть інструмент:",
-   "tr": "Bir araç seçin:",
-   "tl": "Pumili ng tool:",
-   "id": "Pilih alat:",
-   "ar": "اختر أداة:",
-   "fa": "یک ابزار انتخاب کنید:",
-   "hi": "एक टूल चुनें:",
-   "bn": "একটি টুল বেছে নিন:",
-   "vi": "Chọn một công cụ:",
-   "zh": "请选择工具：",
-   "ja": "ツールを選んでください:",
-   "ko": "도구를 선택하세요:"
-  },
-  "🧹  Deep database optimization & log cleanup": {
-   "en": "🧹  Deep database optimization & log cleanup",
-   "pt-BR": "🧹  Otimização profunda do banco e limpeza de logs",
-   "es": "🧹  Optimización profunda de la base y limpieza de logs",
-   "fr": "🧹  Optimisation approfondie de la base et nettoyage des journaux",
-   "it": "🧹  Ottimizzazione profonda del database e pulizia dei log",
-   "de": "🧹  Gründliche Datenbankoptimierung und Protokollbereinigung",
-   "nl": "🧹  Grondige database-optimalisatie en logopschoning",
-   "sv": "🧹  Djupoptimering av databasen och loggrensning",
-   "pl": "🧹  Gruntowna optymalizacja bazy i czyszczenie dzienników",
-   "cs": "🧹  Důkladná optimalizace databáze a čištění protokolů",
-   "ru": "🧹  Глубокая оптимизация базы и очистка журналов",
-   "uk": "🧹  Глибока оптимізація бази та очищення журналів",
-   "tr": "🧹  Veritabanını derinlemesine optimize et ve günlükleri temizle",
-   "tl": "🧹  Malalimang optimization ng database at paglilinis ng log",
-   "id": "🧹  Optimasi mendalam basis data dan pembersihan log",
-   "ar": "🧹  تحسين عميق لقاعدة البيانات وتنظيف السجلات",
-   "fa": "🧹  بهینه‌سازی عمیق پایگاه داده و پاک‌سازی گزارش‌ها",
-   "hi": "🧹  डेटाबेस का गहन अनुकूलन और लॉग सफ़ाई",
-   "bn": "🧹  ডাটাবেসের গভীর অপ্টিমাইজেশন ও লগ পরিষ্কার",
-   "vi": "🧹  Tối ưu sâu cơ sở dữ liệu và dọn nhật ký",
-   "zh": "🧹  深度优化数据库并清理日志",
-   "ja": "🧹  データベースの徹底最適化とログ整理",
-   "ko": "🧹  데이터베이스 심층 최적화 및 로그 정리"
-  },
-  "Optimizes the tables and clears old logs, with a preview": {
-   "en": "Optimizes the tables and clears old logs, with a preview",
-   "pt-BR": "Otimiza as tabelas e limpa logs antigos, com prévia",
-   "es": "Optimiza las tablas y borra los registros antiguos, con una vista previa",
-   "fr": "Optimise les tables et supprime les vieux journaux, avec un aperçu",
-   "it": "Ottimizza le tabelle e cancella i vecchi log, con anteprima",
-   "de": "Optimiert die Tabellen und löscht alte Protokolle, mit Vorschau",
-   "nl": "Optimaliseert de tabellen en wist oude logboeken, met een voorbeeld",
-   "sv": "Optimerar tabellerna och rensar gamla loggar, med förhandsvisning",
-   "pl": "Optymalizuje tabele i czyści stare dzienniki, z podglądem",
-   "cs": "Optimalizuje tabulky a vymaže staré protokoly, s náhledem",
-   "ru": "Оптимизирует таблицы и очищает старые журналы с предварительным просмотром",
-   "uk": "Оптимізує таблиці й очищає старі журнали з попереднім переглядом",
-   "tr": "Önizleme ile tabloları iyileştirir ve eski günlükleri temizler",
-   "tl": "Ino-optimize ang mga talahanayan at nililinis ang mga lumang log, may paunang tingin",
-   "id": "Mengoptimalkan tabel dan membersihkan log lama, dengan pratinjau",
-   "ar": "يحسّن الجداول ويمسح السجلات القديمة، مع معاينة",
-   "fa": "جدول‌ها را بهینه و گزارش‌های قدیمی را پاک می‌کند، همراه با پیش‌نمایش",
-   "hi": "पूर्वावलोकन के साथ तालिकाएँ अनुकूलित करता है और पुराने लॉग साफ़ करता है",
-   "bn": "পূর্বরূপসহ টেবিল উন্নত করে এবং পুরোনো লগ মুছে দেয়",
-   "vi": "Tối ưu hóa các bảng và xóa nhật ký cũ, có bản xem trước",
-   "zh": "优化数据表并清理旧日志，提供预览",
-   "ja": "プレビュー付きでテーブルを最適化し、古いログを削除します",
-   "ko": "미리보기와 함께 테이블을 최적화하고 오래된 로그를 정리합니다"
-  },
   "📑  Database tables": {
    "en": "📑  Database tables",
    "pt-BR": "📑  Tabelas do banco de dados",
@@ -6864,56 +7296,6 @@
    "zh": null,
    "ja": null,
    "ko": null
-  },
-  "🚧  Staff firewall (restrict port 8080)": {
-   "en": "🚧  Staff firewall (restrict port 8080)",
-   "pt-BR": "🚧  Firewall do Staff (restringir a porta 8080)",
-   "es": "🚧  Cortafuegos del Staff (restringir el puerto 8080)",
-   "fr": "🚧  Pare-feu Staff (restreindre le port 8080)",
-   "it": "🚧  Firewall dello Staff (limita la porta 8080)",
-   "de": "🚧  Staff-Firewall (Port 8080 einschränken)",
-   "nl": "🚧  Staff-firewall (poort 8080 beperken)",
-   "sv": "🚧  Staff-brandvägg (begränsa port 8080)",
-   "pl": "🚧  Zapora Staff (ogranicz port 8080)",
-   "cs": "🚧  Firewall pro Staff (omezit port 8080)",
-   "ru": "🚧  Брандмауэр Staff (ограничить порт 8080)",
-   "uk": "🚧  Брандмауер Staff (обмежити порт 8080)",
-   "tr": "🚧  Personel güvenlik duvarı (8080 portunu kısıtla)",
-   "tl": "🚧  Firewall ng Staff (limitahan ang port 8080)",
-   "id": "🚧  Firewall Staff (batasi port 8080)",
-   "ar": "🚧  جدار حماية واجهة الموظفين (تقييد المنفذ 8080)",
-   "fa": "🚧  دیوار آتش Staff (محدود کردن درگاه 8080)",
-   "hi": "🚧  Staff फ़ायरवॉल (पोर्ट 8080 सीमित करें)",
-   "bn": "🚧  Staff ফায়ারওয়াল (পোর্ট 8080 সীমিত করুন)",
-   "vi": "🚧  Tường lửa Staff (giới hạn cổng 8080)",
-   "zh": "🚧  馆员端防火墙（限制端口 8080）",
-   "ja": "🚧  スタッフ用ファイアウォール (ポート 8080 を制限)",
-   "ko": "🚧  Staff 방화벽 (포트 8080 제한)"
-  },
-  "Blocks or opens the staff port 8080 to the internet": {
-   "en": "Blocks or opens the staff port 8080 to the internet",
-   "pt-BR": "Bloqueia ou libera a porta 8080 da intranet na internet",
-   "es": "Bloquea o abre a Internet el puerto 8080 del personal",
-   "fr": "Bloque ou ouvre le port 8080 de l'interface bibliothécaire sur Internet",
-   "it": "Blocca o apre la porta 8080 dello staff verso internet",
-   "de": "Sperrt den Mitarbeiterport 8080 oder öffnet ihn für das Internet",
-   "nl": "Blokkeert of opent personeelspoort 8080 voor het internet",
-   "sv": "Blockerar eller öppnar personalport 8080 mot internet",
-   "pl": "Blokuje lub otwiera port 8080 interfejsu bibliotekarza dla internetu",
-   "cs": "Zablokuje nebo otevře port 8080 pro knihovníky vůči internetu",
-   "ru": "Закрывает или открывает служебный порт 8080 для интернета",
-   "uk": "Закриває або відкриває службовий порт 8080 для інтернету",
-   "tr": "Personel arayüzünün 8080 bağlantı noktasını internete kapatır veya açar",
-   "tl": "Hinaharangan o binubuksan sa internet ang port na 8080 ng kawani",
-   "id": "Memblokir atau membuka port staf 8080 ke internet",
-   "ar": "يحظر أو يفتح منفذ الموظفين 8080 للإنترنت",
-   "fa": "درگاه 8080 کارکنان را به روی اینترنت می‌بندد یا باز می‌کند",
-   "hi": "कर्मचारी पोर्ट 8080 का इंटरनेट से प्रवेश रोकता या खोलता है",
-   "bn": "কর্মী পোর্ট 8080-এ ইন্টারনেট থেকে প্রবেশ বন্ধ বা চালু করে",
-   "vi": "Chặn hoặc mở cổng nhân viên 8080 ra Internet",
-   "zh": "阻止或开放馆员端口 8080 的互联网访问",
-   "ja": "職員用ポート 8080 のインターネットからのアクセスを遮断または許可します",
-   "ko": "직원용 8080 포트의 인터넷 접근을 차단하거나 허용합니다"
   },
   "🔐  Rotate database password": {
    "en": "🔐  Rotate database password",
@@ -7415,56 +7797,6 @@
    "ja": null,
    "ko": null
   },
-  "🩺  Tainacan diagnosis & maintenance": {
-   "en": "🩺  Tainacan diagnosis & maintenance",
-   "pt-BR": "🩺  Diagnóstico e manutenção do Tainacan",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
-  "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown in the Control Dashboard, Tainacan tab.": {
-   "en": "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown in the Control Dashboard, Tainacan tab.",
-   "pt-BR": "O diagnóstico só roda quando você pede; o resultado fica guardado com a hora da leitura e aparece no Painel de Controle, aba Tainacan.",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
   "👤  WordPress administrator": {
    "en": "👤  WordPress administrator",
    "pt-BR": "👤  Administrador do WordPress",
@@ -7493,6 +7825,56 @@
   "The WordPress account of Tainacan's administrators": {
    "en": "The WordPress account of Tainacan's administrators",
    "pt-BR": "A conta do WordPress dos administradores do Tainacan",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🩺  Tainacan diagnosis & maintenance": {
+   "en": "🩺  Tainacan diagnosis & maintenance",
+   "pt-BR": "🩺  Diagnóstico e manutenção do Tainacan",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown in the Control Dashboard, Tainacan tab.": {
+   "en": "The diagnosis runs only when you ask for it; its result is kept with the time it was read and shown in the Control Dashboard, Tainacan tab.",
+   "pt-BR": "O diagnóstico só roda quando você pede; o resultado fica guardado com a hora da leitura e aparece no Painel de Controle, aba Tainacan.",
    "es": null,
    "fr": null,
    "it": null,
@@ -8240,31 +8622,6 @@
    "ja": null,
    "ko": null
   },
-  "🩺  DSpace diagnosis & maintenance": {
-   "en": "🩺  DSpace diagnosis & maintenance",
-   "pt-BR": "🩺  Diagnóstico e manutenção do DSpace",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
-   "nl": null,
-   "sv": null,
-   "pl": null,
-   "cs": null,
-   "ru": null,
-   "uk": null,
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
-  },
   "🔧  Repair DSpace web access": {
    "en": "🔧  Repair DSpace web access",
    "pt-BR": "🔧  Corrigir acesso web do DSpace",
@@ -8293,6 +8650,31 @@
   "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.": {
    "en": "Repairs the UI/API address and managed proxy with a private configuration rollback copy. No database migration, image replacement or data deletion.",
    "pt-BR": "Corrige o endereço da interface/API e o proxy gerenciado, com cópia privada da configuração para desfazer. Não migra o banco, troca imagens nem apaga dados.",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🩺  DSpace diagnosis & maintenance": {
+   "en": "🩺  DSpace diagnosis & maintenance",
+   "pt-BR": "🩺  Diagnóstico e manutenção do DSpace",
    "es": null,
    "fr": null,
    "it": null,
@@ -10115,56 +10497,6 @@
    "ja": null,
    "ko": null
   },
-  "🌉  Cloudflare Tunnel Manager (Recommended)": {
-   "en": "🌉  Cloudflare Tunnel Manager (Recommended)",
-   "pt-BR": "🌉  Gerenciador do Túnel Cloudflare (recomendado)",
-   "es": "🌉  Gestor del túnel de Cloudflare (recomendado)",
-   "fr": "🌉  Gestionnaire du tunnel Cloudflare (recommandé)",
-   "it": "🌉  Gestione del tunnel Cloudflare (consigliato)",
-   "de": "🌉  Cloudflare-Tunnel-Verwaltung (empfohlen)",
-   "nl": "🌉  Cloudflare-tunnelbeheer (aanbevolen)",
-   "sv": "🌉  Hantera Cloudflare-tunnel (rekommenderas)",
-   "pl": "🌉  Menedżer tunelu Cloudflare (zalecane)",
-   "cs": "🌉  Správa tunelu Cloudflare (doporučeno)",
-   "ru": "🌉  Управление туннелем Cloudflare (рекомендуется)",
-   "uk": "🌉  Керування тунелем Cloudflare (рекомендовано)",
-   "tr": "🌉  Cloudflare Tüneli yöneticisi (önerilir)",
-   "tl": "🌉  Tagapamahala ng Cloudflare Tunnel (inirerekomenda)",
-   "id": "🌉  Pengelola terowongan Cloudflare (disarankan)",
-   "ar": "🌉  مدير نفق Cloudflare (موصى به)",
-   "fa": "🌉  مدیریت تونل Cloudflare (پیشنهادی)",
-   "hi": "🌉  Cloudflare टनल प्रबंधक (अनुशंसित)",
-   "bn": "🌉  Cloudflare টানেল ব্যবস্থাপক (প্রস্তাবিত)",
-   "vi": "🌉  Quản lý đường hầm Cloudflare (khuyến nghị)",
-   "zh": "🌉  Cloudflare 隧道管理（推荐）",
-   "ja": "🌉  Cloudflare トンネル管理 (推奨)",
-   "ko": "🌉  Cloudflare 터널 관리자 (권장)"
-  },
-  "Publishes the OPAC and the staff site through Cloudflare": {
-   "en": "Publishes the OPAC and the staff site through Cloudflare",
-   "pt-BR": "Publica o OPAC e a intranet na internet via Cloudflare",
-   "es": "Publica el OPAC y el sitio del personal a través de Cloudflare",
-   "fr": "Publie l'OPAC et le site de l'interface bibliothécaire via Cloudflare",
-   "it": "Pubblica l'OPAC e il sito staff tramite Cloudflare",
-   "de": "Veröffentlicht den OPAC und die Mitarbeiterseite über Cloudflare",
-   "nl": "Publiceert de OPAC en de medewerkerssite via Cloudflare",
-   "sv": "Publicerar OPAC och personalsidan via Cloudflare",
-   "pl": "Udostępnia OPAC i stronę bibliotekarza przez Cloudflare",
-   "cs": "Zpřístupní OPAC a stránku pro knihovníky přes Cloudflare",
-   "ru": "Публикует OPAC и служебный сайт через Cloudflare",
-   "uk": "Публікує OPAC і службовий сайт через Cloudflare",
-   "tr": "OPAC ve personel sitesini Cloudflare üzerinden yayımlar",
-   "tl": "Inilalathala ang OPAC at site ng kawani sa Cloudflare",
-   "id": "Mempublikasikan OPAC dan situs staf melalui Cloudflare",
-   "ar": "ينشر OPAC وموقع الموظفين عبر Cloudflare",
-   "fa": "OPAC و وب‌سایت کارکنان را از طریق Cloudflare منتشر می‌کند",
-   "hi": "Cloudflare से OPAC और कर्मचारी साइट प्रकाशित करता है",
-   "bn": "Cloudflare দিয়ে OPAC ও কর্মী সাইট প্রকাশ করে",
-   "vi": "Công bố OPAC và trang nhân viên qua Cloudflare",
-   "zh": "通过 Cloudflare 发布 OPAC 和馆员网站",
-   "ja": "Cloudflare 経由で OPAC と職員用サイトを公開します",
-   "ko": "Cloudflare를 통해 OPAC 및 직원 사이트를 공개합니다"
-  },
   "🧱  Show active UFW rules": {
    "en": "🧱  Show active UFW rules",
    "pt-BR": "🧱  Mostrar as regras ativas do UFW",
@@ -10214,56 +10546,6 @@
    "zh": "列出此服务器上生效的防火墙规则",
    "ja": "このサーバーで有効なファイアウォール規則を一覧表示します",
    "ko": "이 서버에서 활성화된 방화벽 규칙을 표시합니다"
-  },
-  "🔏  Free SSL certificate (Certbot / Apache)": {
-   "en": "🔏  Free SSL certificate (Certbot / Apache)",
-   "pt-BR": "🔏  Certificado SSL gratuito (Certbot / Apache)",
-   "es": "🔏  Certificado SSL gratuito (Certbot / Apache)",
-   "fr": "🔏  Certificat SSL gratuit (Certbot / Apache)",
-   "it": "🔏  Certificato SSL gratuito (Certbot / Apache)",
-   "de": "🔏  Kostenloses SSL-Zertifikat (Certbot / Apache)",
-   "nl": "🔏  Gratis SSL-certificaat (Certbot / Apache)",
-   "sv": "🔏  Gratis SSL-certifikat (Certbot / Apache)",
-   "pl": "🔏  Darmowy certyfikat SSL (Certbot / Apache)",
-   "cs": "🔏  Bezplatný certifikát SSL (Certbot / Apache)",
-   "ru": "🔏  Бесплатный SSL-сертификат (Certbot / Apache)",
-   "uk": "🔏  Безкоштовний SSL-сертифікат (Certbot / Apache)",
-   "tr": "🔏  Ücretsiz SSL sertifikası (Certbot / Apache)",
-   "tl": "🔏  Libreng SSL certificate (Certbot / Apache)",
-   "id": "🔏  Sertifikat SSL gratis (Certbot / Apache)",
-   "ar": "🔏  شهادة SSL مجانية (Certbot / Apache)",
-   "fa": "🔏  گواهی SSL رایگان (Certbot / Apache)",
-   "hi": "🔏  मुफ़्त SSL प्रमाणपत्र (Certbot / Apache)",
-   "bn": "🔏  বিনামূল্যের SSL সার্টিফিকেট (Certbot / Apache)",
-   "vi": "🔏  Chứng chỉ SSL miễn phí (Certbot / Apache)",
-   "zh": "🔏  免费 SSL 证书（Certbot / Apache）",
-   "ja": "🔏  無料の SSL 証明書 (Certbot / Apache)",
-   "ko": "🔏  무료 SSL 인증서 (Certbot / Apache)"
-  },
-  "Free HTTPS certificate, only for your own domain without the tunnel": {
-   "en": "Free HTTPS certificate, only for your own domain without the tunnel",
-   "pt-BR": "Certificado HTTPS gratuito, só para domínio próprio sem o túnel",
-   "es": "Certificado HTTPS gratuito, solo para su propio dominio sin el túnel",
-   "fr": "Certificat HTTPS gratuit, seulement pour votre propre domaine sans le tunnel",
-   "it": "Certificato HTTPS gratuito, solo per il tuo dominio senza il tunnel",
-   "de": "Kostenloses HTTPS-Zertifikat, nur für Ihre eigene Domain ohne Tunnel",
-   "nl": "Gratis HTTPS-certificaat, alleen voor uw eigen domein zonder de tunnel",
-   "sv": "Kostnadsfritt HTTPS-certifikat, endast för egen domän utan tunneln",
-   "pl": "Bezpłatny certyfikat HTTPS, tylko dla własnej domeny bez tunelu",
-   "cs": "Bezplatný certifikát HTTPS, pouze pro vlastní doménu bez tunelu",
-   "ru": "Бесплатный сертификат HTTPS, только для своего домена без туннеля",
-   "uk": "Безкоштовний сертифікат HTTPS, лише для власного домену без тунелю",
-   "tr": "Ücretsiz HTTPS sertifikası, yalnızca tünel olmadan kendi alan adınız için",
-   "tl": "Libreng sertipikong HTTPS, para lamang sa sarili mong domain na walang tunnel",
-   "id": "Sertifikat HTTPS gratis, hanya untuk domain sendiri tanpa tunnel",
-   "ar": "شهادة HTTPS مجانية، لنطاقك الخاص فقط دون النفق",
-   "fa": "گواهی رایگان HTTPS، فقط برای دامنهٔ خودتان بدون تونل",
-   "hi": "मुफ़्त HTTPS प्रमाणपत्र, केवल अपने डोमेन के लिए बिना टनल",
-   "bn": "বিনামূল্যের HTTPS সনদ, শুধু টানেল ছাড়া নিজের ডোমেনের জন্য",
-   "vi": "Chứng chỉ HTTPS miễn phí, chỉ cho tên miền riêng không dùng đường hầm",
-   "zh": "免费 HTTPS 证书，仅用于不经过隧道的自有域名",
-   "ja": "トンネルを使わない独自ドメイン専用の無料 HTTPS 証明書",
-   "ko": "터널을 사용하지 않는 자체 도메인 전용 무료 HTTPS 인증서"
   },
   "🚨  Fail2ban status (intrusion attempts)": {
    "en": "🚨  Fail2ban status (intrusion attempts)",
@@ -18102,16 +18384,16 @@
   },
   "instance-add": {
    "en": {
-    "summary": "Add instance",
+    "summary": "Add system",
     "overview": [
-     "Choose Koha, Tainacan or DSpace and follow its existing driver. Installed applications are excluded to preserve existing data."
+     "Choose Koha, Tainacan or DSpace. An installed one opens its page instead of a second installation, preserving its data."
     ],
     "related": []
    },
    "pt-BR": {
-    "summary": "Adicionar instância",
+    "summary": "Adicionar sistema",
     "overview": [
-     "Escolha Koha, Tainacan ou DSpace e siga o driver existente. Aplicativos instalados não são oferecidos, preservando seus dados."
+     "Escolha Koha, Tainacan ou DSpace. Um instalado abre a sua página em vez de uma segunda instalação, preservando os dados."
     ]
    }
   },
@@ -18132,16 +18414,16 @@
   },
   "sec-instances": {
    "en": {
-    "summary": "Installations",
+    "summary": "Add system",
     "overview": [
-     "Use Add instance to choose an application that is not installed, or Remove instance to review an existing container installation. Additional copies of the same application are not enabled by these shortcuts."
+     "Lists Koha, Tainacan and DSpace. An installed system opens its page; a missing one shows what it is, what happens when installing and its requirements, before **Install…**. Each system is installed once per server; existing data are never installed over. **Remove instance** reviews an existing container installation."
     ],
     "related": []
    },
    "pt-BR": {
-    "summary": "Instalações",
+    "summary": "Adicionar sistema",
     "overview": [
-     "Use Adicionar instância para escolher um aplicativo ainda não instalado, ou Remover instância para revisar uma instalação em contêiner. Estes atalhos ainda não habilitam cópias adicionais do mesmo aplicativo."
+     "Lista Koha, Tainacan e DSpace. Um sistema instalado abre a sua página; um ausente mostra o que é, o que acontece ao instalar e os requisitos, antes de **Instalar…**. Cada sistema é instalado uma vez por servidor; nunca se instala por cima de dados existentes. **Remover instância** revisa uma instalação em contêiner."
     ]
    }
   },
@@ -18446,6 +18728,330 @@
      "O grupo **Koha (biblioteca)** na lateral reúne só as telas do Koha: backups, importação, ferramentas da biblioteca, Z39.50/SRU, IA, aparência, mensagens, busca, agendamentos, configurações, diagnóstico e segurança do Koha. → e ← expandem e recolhem o grupo; a linha dele abre este início.",
      "Sem o Koha, o início oferece **Instalar servidor Koha** e o grupo não tem telas. Com o Koha instalado e funcionando, mostra um cartão por tela do grupo e as credenciais de primeiro acesso. Quando MariaDB, Apache, Memcached ou Koha estão parados, diz quais e coloca primeiro o status, a verificação completa, o reparo dos serviços e o log do Apache.",
      "Estado, endereços e indicadores não se repetem aqui: **Estado e endereços** abre o Painel de Controle na aba Koha."
+    ]
+   }
+  },
+  "superlibrarian": {
+   "en": {
+    "summary": "Creates a staff account with every permission (super librarian), after Koha's Web Installer.",
+    "overview": [
+     "A super librarian has every permission in Koha. The routine creates the patron in a library and category that already exist, with a hashed password: the password is not stored anywhere, so keep it safe. If the user name or card number already exists, it says so and changes nothing."
+    ],
+    "steps": [
+     "Finish the Web Installer first: it creates the libraries and patron categories.",
+     "Open **Create super librarian** and type user name, card number, password (8+ characters), first name and surname.",
+     "Log in to the staff interface with it."
+    ],
+    "tips": [
+     "Create one account per person; give everyday staff accounts only the permissions they need."
+    ],
+    "warnings": [
+     "Do not share a super librarian account: each action in Koha's logs is tied to the account that made it."
+    ],
+    "related": [
+     "credentials",
+     "install"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Cria uma conta da equipe com todas as permissões (superbibliotecário), depois do Instalador Web do Koha.",
+    "overview": [
+     "Um superbibliotecário tem todas as permissões no Koha. A rotina cria o leitor numa biblioteca e numa categoria que já existem, com a senha cifrada: a senha não fica guardada em lugar nenhum, então guarde-a bem. Se o usuário ou o número da carteirinha já existir, ela avisa e não muda nada."
+    ],
+    "steps": [
+     "Conclua o Instalador Web antes: ele cria as bibliotecas e as categorias de leitores.",
+     "Abra **Criar superbibliotecário** e digite usuário, número da carteirinha, senha (8 ou mais caracteres), nome e sobrenome.",
+     "Entre na intranet com essa conta."
+    ],
+    "tips": [
+     "Crie uma conta por pessoa; dê às contas do dia a dia só as permissões de que elas precisam."
+    ],
+    "warnings": [
+     "Não compartilhe uma conta de superbibliotecário: cada ação nos logs do Koha fica ligada à conta que a fez."
+    ]
+   }
+  },
+  "sec-koha-admin": {
+   "en": {
+    "summary": "Koha's administrative access in one place: the superlibrarians, the first-access credentials and creating a superlibrarian. The same cards stay on Koha's home.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "O acesso administrativo do Koha num só lugar: os superbibliotecários, as credenciais do primeiro acesso e criar um superbibliotecário. Os mesmos cartões continuam na página do Koha."
+   }
+  },
+  "cloudflare": {
+   "en": {
+    "summary": "Publishes the OPAC (and, if you want, the staff interface) on the Internet through a Cloudflare Tunnel: HTTPS included and no port opened on the router.",
+    "overview": [
+     "A Cloudflare Tunnel is an outgoing connection from your server to Cloudflare: readers reach the catalogue through Cloudflare, with HTTPS, and nothing is opened on the router or the firewall. It works behind CGNAT, on 4G links and on networks you do not control.",
+     "The Cloudflare Tunnel screen shows the state at the top (online, paused, stopped or not published) and in the cards on the right, and runs a quick test of the public address when it opens. When Cloudflare asks you to authorise the server, the panel lets you choose a QR code to scan with your phone, the browser of this computer (the Windows browser under WSL) or a link to copy."
+    ],
+    "steps": [
+     "Open **Cloudflare Tunnel Manager (Recommended)** in the Security & access hub.",
+     "In **Set up & manage**, choose the free address or **Set up my own domain** and answer its questions.",
+     "Run **Test** to check every step, and press **Use the tunnel's addresses** if Koha still uses a local address.",
+     "Share the catalogue with **QR code** or **Copy** on the **Addresses** tab."
+    ],
+    "options": [
+     {
+      "name": "Addresses",
+      "text": "What the tunnel publishes and where it lands on this server, with Copy, Open in the browser and a QR code (on screen and as a PNG to print). Koha's own addresses (OPACBaseURL, staffClientBaseURL) are compared with the public ones and fixed with one button."
+     },
+     {
+      "name": "Set up & manage",
+      "text": "Free address (no domain needed): get or restore one, remote staff access, public list, recovery file, reconnect, renew the token, give it up. Your own domain: sign in to Cloudflare, create the tunnel and its addresses, change the domain, remove the tunnel."
+     },
+     {
+      "name": "Test",
+      "text": "Follows a reader's visit step by step (cloudflared, Apache on this server, the name in DNS, the public address, Koha's address) and says what to do at the first step that fails."
+     },
+     {
+      "name": "Log",
+      "text": "The last lines of the cloudflared service, tokens left out, with Copy."
+     },
+     {
+      "name": "Status card",
+      "text": "Running or stopped, whether it starts with the server, since when, the edge connections to Cloudflare and restarts, with Restart and Pause / Resume. The cloudflared card shows its version and updates it from Cloudflare's repository."
+     }
+    ],
+    "tips": [
+     "Publish the OPAC and keep the staff interface for the VPN; if you do publish it, keep the extra password at Cloudflare on."
+    ],
+    "warnings": [
+     "**Pause** and **Remove the tunnel** take the catalogue off the Internet at once: Koha stays reachable only on the local network. Pause keeps everything and **Resume** brings it back."
+    ],
+    "related": [
+     "dash-addresses",
+     "search-console",
+     "staff-firewall"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Publica o OPAC (e, se você quiser, a intranet) na Internet por um Túnel Cloudflare: HTTPS incluído e nenhuma porta aberta no roteador.",
+    "overview": [
+     "Um Túnel Cloudflare é uma conexão de saída do seu servidor até a Cloudflare: os leitores chegam ao catálogo pela Cloudflare, com HTTPS, e nada é aberto no roteador nem no firewall. Funciona atrás de CGNAT, em links 4G e em redes que você não controla.",
+     "A tela do Túnel Cloudflare mostra o estado no topo (no ar, pausado, parado ou não publicado) e nos cartões à direita, e faz um teste rápido do endereço público ao abrir. Quando a Cloudflare pede para autorizar o servidor, o painel deixa você escolher um QR code para escanear com o celular, o navegador deste computador (o navegador do Windows, no WSL) ou um link para copiar."
+    ],
+    "steps": [
+     "Abra o **Gerenciador do Túnel Cloudflare (recomendado)** na Central de Segurança & Acesso.",
+     "Em **Configurar e gerenciar**, escolha o endereço gratuito ou **Configurar meu próprio domínio** e responda às perguntas.",
+     "Rode o **Teste** para conferir cada etapa e aperte **Usar os endereços do túnel** se o Koha ainda usar um endereço local.",
+     "Divulgue o catálogo com **Código QR** ou **Copiar** na aba **Endereços**."
+    ],
+    "options": [
+     {
+      "name": "Endereços",
+      "text": "O que o túnel publica e onde chega neste servidor, com Copiar, Abrir no navegador e QR code (na tela e em PNG para imprimir). Os endereços do próprio Koha (OPACBaseURL, staffClientBaseURL) são comparados com os públicos e corrigidos com um botão."
+     },
+     {
+      "name": "Configurar e gerenciar",
+      "text": "Endereço gratuito (sem domínio): obter ou restaurar, acesso remoto da equipe, lista pública, arquivo de recuperação, reconectar, renovar o token, abrir mão. Domínio próprio: entrar na Cloudflare, criar o túnel e os endereços, trocar o domínio, remover o túnel."
+     },
+     {
+      "name": "Teste",
+      "text": "Segue a visita de um leitor passo a passo (cloudflared, Apache neste servidor, o nome no DNS, o endereço público, o endereço do Koha) e diz o que fazer na primeira etapa que falha."
+     },
+     {
+      "name": "Registro",
+      "text": "As últimas linhas do serviço cloudflared, sem os tokens, com Copiar."
+     },
+     {
+      "name": "Cartão Status",
+      "text": "Rodando ou parado, se inicia com o servidor, desde quando, as conexões com a Cloudflare e os reinícios, com Reiniciar e Pausar / Retomar. O cartão cloudflared mostra a versão e atualiza pelo repositório da Cloudflare."
+     }
+    ],
+    "tips": [
+     "Publique o OPAC e deixe a intranet para a VPN; se você publicar a intranet, mantenha ligada a senha extra na Cloudflare."
+    ],
+    "warnings": [
+     "**Pausar** e **Remover o túnel** tiram o catálogo da Internet na hora: o Koha fica acessível só na rede local. Pausar mantém tudo e **Retomar** traz de volta."
+    ]
+   }
+  },
+  "ssl": {
+   "en": {
+    "summary": "Gets a free HTTPS certificate from Let's Encrypt with Certbot and configures Apache, with automatic renewal.",
+    "overview": [
+     "Certbot asks Let's Encrypt for a free certificate for your domain, configures Apache to serve HTTPS and installs the automatic renewal. Let's Encrypt checks the domain over port 80, so the domain must point to this server's public IP and port 80 must be reachable from the Internet.",
+     "If anything goes wrong (Certbot fails, or Apache's configuration becomes invalid), Apache is not reloaded, so the site keeps working on HTTP."
+    ],
+    "steps": [
+     "Point a domain's A record to the server's public IP and make sure port 80 is reachable.",
+     "Open **Free SSL certificate (Certbot / Apache)** and type the domain and an e-mail for renewal notices.",
+     "Wait for *HTTPS configured successfully*."
+    ],
+    "tips": [
+     "Use the e-mail of a shared library mailbox: renewal warnings go there.",
+     "Test the address with `https://` from a phone on mobile data, outside the library's network."
+    ],
+    "warnings": [
+     "If you use a Cloudflare Tunnel, cancel: HTTPS already comes from it."
+    ],
+    "related": [
+     "cloudflare",
+     "search-console"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Emite um certificado HTTPS gratuito do Let's Encrypt com o Certbot e configura o Apache, com renovação automática.",
+    "overview": [
+     "O Certbot pede ao Let's Encrypt um certificado gratuito para o seu domínio, configura o Apache para servir HTTPS e instala a renovação automática. O Let's Encrypt verifica o domínio pela porta 80, então o domínio precisa apontar para o IP público deste servidor e a porta 80 precisa estar acessível pela Internet.",
+     "Se algo der errado (o Certbot falhar, ou a configuração do Apache ficar inválida), o Apache não é recarregado, e o site continua funcionando em HTTP."
+    ],
+    "steps": [
+     "Aponte o registro A de um domínio para o IP público do servidor e confira se a porta 80 está acessível.",
+     "Abra **Certificado SSL gratuito (Certbot / Apache)** e digite o domínio e um e-mail para os avisos de renovação.",
+     "Aguarde *HTTPS configurado com sucesso*."
+    ],
+    "tips": [
+     "Use o e-mail de uma caixa compartilhada da biblioteca: os avisos de renovação vão para lá.",
+     "Teste o endereço com `https://` num celular com dados móveis, fora da rede da biblioteca."
+    ],
+    "warnings": [
+     "Se você usa um Túnel Cloudflare, cancele: o HTTPS já vem dele."
+    ]
+   }
+  },
+  "staff-firewall": {
+   "en": {
+    "summary": "Blocks or opens the staff port 8080 to the Internet. Blocked, it stays reachable from the server itself and from the local network.",
+    "overview": [
+     "Koha's staff interface listens on port 8080. Port 80 (OPAC) must stay open to the public, but 8080 can be closed to the Internet when staff work only inside the library, through the WireGuard VPN or through a Cloudflare Tunnel. Blocked, it stays allowed from the server itself and from the local network."
+    ],
+    "steps": [
+     "Open **Staff firewall (restrict port 8080)**.",
+     "Answer whether to block direct external access to 8080.",
+     "Check the result: *allowed only from 127.0.0.1 and the local network*, or *open*."
+    ],
+    "tips": [
+     "Block it when the staff work only inside the library, through the VPN or through a Cloudflare Tunnel."
+    ],
+    "warnings": [
+     "If staff reach the staff interface from home by its public IP, blocking 8080 cuts them off: set up the VPN first."
+    ],
+    "related": [
+     "ufw",
+     "sec-vpn",
+     "cloudflare"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Bloqueia ou libera a porta 8080 da intranet para a Internet. Bloqueada, ela continua acessível pelo próprio servidor e pela rede local.",
+    "overview": [
+     "A intranet do Koha escuta na porta 8080. A porta 80 (OPAC) precisa ficar aberta ao público, mas a 8080 pode ser fechada para a Internet quando a equipe trabalha só dentro da biblioteca, pela VPN WireGuard ou por um Túnel Cloudflare. Bloqueada, ela continua liberada para o próprio servidor e para a rede local."
+    ],
+    "steps": [
+     "Abra **Firewall do Staff (restringir a porta 8080)**.",
+     "Responda se quer bloquear o acesso externo direto à 8080.",
+     "Confira o resultado: *liberada só para 127.0.0.1 e a rede local*, ou *aberta*."
+    ],
+    "tips": [
+     "Bloqueie quando a equipe trabalhar só dentro da biblioteca, pela VPN ou por um Túnel Cloudflare."
+    ],
+    "warnings": [
+     "Se a equipe acessa a intranet de casa pelo IP público, bloquear a 8080 a deixa de fora: configure a VPN primeiro."
+    ]
+   }
+  },
+  "sec-koha-addresses": {
+   "en": {
+    "summary": "How Koha is reached: the Cloudflare Tunnel, the free SSL certificate and the staff firewall. The same cards stay in the Security & access hub and in Koha security.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Como o Koha é acessado: o Cloudflare Tunnel, o certificado SSL gratuito e o firewall da equipe. Os mesmos cartões continuam na Central de Segurança & Acesso e em Segurança do Koha."
+   }
+  },
+  "sec-koha-backups": {
+   "en": {
+    "summary": "Opens the Backup center already showing Koha's backups.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Abre a Central de backups já mostrando os backups do Koha."
+   }
+  },
+  "db-maintenance": {
+   "en": {
+    "summary": "Repairs and optimises MariaDB's tables, cleans system logs older than seven days and old temporary files, then restarts Koha's services to free memory.",
+    "overview": [
+     "Over time MariaDB's tables fragment and the system journal grows. The routine repairs and optimises the tables, removes system journal entries older than seven days, clears old temporary files and restarts Koha's services to free memory. It shows a preview of what it will do and asks before starting."
+    ],
+    "steps": [
+     "Open **Deep database optimization & log cleanup** (Database tables or Diagnostics).",
+     "Read the list of what it will do and confirm.",
+     "Wait for the three steps: optimising the database, cleaning system logs, restarting Koha services.",
+     "Read the summary, then check the dashboard."
+    ],
+    "tips": [
+     "Run it once a month, or after a large import or deletion, at a quiet moment.",
+     "Make sure the nightly backup of that day finished before you start."
+    ],
+    "warnings": [
+     "Optimising large tables can take a while and Koha restarts at the end: users are disconnected for a moment."
+    ],
+    "related": [
+     "db-tables",
+     "repair-services",
+     "health"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Repara e otimiza as tabelas do MariaDB, limpa os logs do sistema com mais de sete dias e arquivos temporários antigos e depois reinicia os serviços do Koha para liberar memória.",
+    "overview": [
+     "Com o tempo, as tabelas do MariaDB se fragmentam e o diário do sistema cresce. A rotina repara e otimiza as tabelas, remove do diário do sistema as entradas com mais de sete dias, apaga arquivos temporários antigos e reinicia os serviços do Koha para liberar memória. Ela mostra uma prévia do que vai fazer e pergunta antes de começar."
+    ],
+    "steps": [
+     "Abra **Otimização profunda do banco e limpeza de logs** (em Tabelas do banco de dados ou em Diagnóstico).",
+     "Leia a lista do que será feito e confirme.",
+     "Aguarde as três etapas: otimização do banco, limpeza dos logs do sistema, reinício dos serviços do Koha.",
+     "Leia o resumo e depois confira o Painel de Controle."
+    ],
+    "tips": [
+     "Rode uma vez por mês, ou depois de uma grande importação ou exclusão, num momento tranquilo.",
+     "Confira se o backup noturno daquele dia terminou antes de começar."
+    ],
+    "warnings": [
+     "Otimizar tabelas grandes pode demorar e o Koha reinicia no final: os usuários são desconectados por um instante."
+    ]
+   }
+  },
+  "sec-diagnostics": {
+   "en": {
+    "summary": "Koha's diagnosis and upkeep: the full health check, live Apache logs, database maintenance, the database tables and service repair.",
+    "overview": [
+     "Koha diagnostics & maintenance is where you go when Koha is wrong, or to prevent it (the server's own status and report are in Server diagnostics). Start with **Full system health check**: it runs every check and points at the cause. **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns. **Database tables** opens the list of Koha's tables with their rows and size."
+    ],
+    "steps": [
+     "Run **Full system health check**.",
+     "Open **View latest validation report** (Server diagnostics) and read the failures first, then the warnings.",
+     "Fix what it points at (services, search index, disk), then run the check again."
+    ],
+    "tips": [
+     "Export the diagnostics (Server diagnostics) before asking for help: it saves a round of questions."
+    ],
+    "related": [
+     "status",
+     "health",
+     "validation-report",
+     "apache-log",
+     "repair-services",
+     "sec-database"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Diagnóstico e manutenção do Koha: a verificação completa, logs do Apache ao vivo, manutenção do banco, as tabelas do banco e o reparo dos serviços.",
+    "overview": [
+     "Diagnóstico e manutenção do Koha é para onde ir quando o Koha está com problema, ou para evitar que fique (o status e o relatório do servidor ficam em Diagnóstico do servidor). Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns. **Tabelas do banco de dados** abre a lista das tabelas do Koha com linhas e tamanho."
+    ],
+    "steps": [
+     "Rode a **Verificação completa do sistema**.",
+     "Abra **Ver o último relatório de validação** (Diagnóstico do servidor) e leia primeiro as falhas, depois os avisos.",
+     "Corrija o que ele apontar (serviços, índice de busca, disco) e rode a verificação de novo."
+    ],
+    "tips": [
+     "Exporte o diagnóstico (Diagnóstico do servidor) antes de pedir ajuda: isso poupa uma rodada de perguntas."
     ]
    }
   },
@@ -19815,46 +20421,6 @@
     ]
    }
   },
-  "superlibrarian": {
-   "en": {
-    "summary": "Creates a staff account with every permission (super librarian), after Koha's Web Installer.",
-    "overview": [
-     "A super librarian has every permission in Koha. The routine creates the patron in a library and category that already exist, with a hashed password: the password is not stored anywhere, so keep it safe. If the user name or card number already exists, it says so and changes nothing."
-    ],
-    "steps": [
-     "Finish the Web Installer first: it creates the libraries and patron categories.",
-     "Open **Create super librarian** and type user name, card number, password (8+ characters), first name and surname.",
-     "Log in to the staff interface with it."
-    ],
-    "tips": [
-     "Create one account per person; give everyday staff accounts only the permissions they need."
-    ],
-    "warnings": [
-     "Do not share a super librarian account: each action in Koha's logs is tied to the account that made it."
-    ],
-    "related": [
-     "credentials",
-     "install"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Cria uma conta da equipe com todas as permissões (superbibliotecário), depois do Instalador Web do Koha.",
-    "overview": [
-     "Um superbibliotecário tem todas as permissões no Koha. A rotina cria o leitor numa biblioteca e numa categoria que já existem, com a senha cifrada: a senha não fica guardada em lugar nenhum, então guarde-a bem. Se o usuário ou o número da carteirinha já existir, ela avisa e não muda nada."
-    ],
-    "steps": [
-     "Conclua o Instalador Web antes: ele cria as bibliotecas e as categorias de leitores.",
-     "Abra **Criar superbibliotecário** e digite usuário, número da carteirinha, senha (8 ou mais caracteres), nome e sobrenome.",
-     "Entre na intranet com essa conta."
-    ],
-    "tips": [
-     "Crie uma conta por pessoa; dê às contas do dia a dia só as permissões de que elas precisam."
-    ],
-    "warnings": [
-     "Não compartilhe uma conta de superbibliotecário: cada ação nos logs do Koha fica ligada à conta que a fez."
-    ]
-   }
-  },
   "sec-settings": {
    "en": {
     "summary": "Basic Koha parameters: server sizing and the first super librarian.",
@@ -19878,89 +20444,6 @@
     "steps": [
      "Rode o **Dimensionamento do servidor** logo depois da instalação.",
      "Crie o seu **superbibliotecário** depois do Instalador Web."
-    ]
-   }
-  },
-  "db-maintenance": {
-   "en": {
-    "summary": "Repairs and optimises MariaDB's tables, cleans system logs older than seven days and old temporary files, then restarts Koha's services to free memory.",
-    "overview": [
-     "Over time MariaDB's tables fragment and the system journal grows. The routine repairs and optimises the tables, removes system journal entries older than seven days, clears old temporary files and restarts Koha's services to free memory. It shows a preview of what it will do and asks before starting."
-    ],
-    "steps": [
-     "Open **Deep database optimization & log cleanup** (Database tables or Diagnostics).",
-     "Read the list of what it will do and confirm.",
-     "Wait for the three steps: optimising the database, cleaning system logs, restarting Koha services.",
-     "Read the summary, then check the dashboard."
-    ],
-    "tips": [
-     "Run it once a month, or after a large import or deletion, at a quiet moment.",
-     "Make sure the nightly backup of that day finished before you start."
-    ],
-    "warnings": [
-     "Optimising large tables can take a while and Koha restarts at the end: users are disconnected for a moment."
-    ],
-    "related": [
-     "db-tables",
-     "repair-services",
-     "health"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Repara e otimiza as tabelas do MariaDB, limpa os logs do sistema com mais de sete dias e arquivos temporários antigos e depois reinicia os serviços do Koha para liberar memória.",
-    "overview": [
-     "Com o tempo, as tabelas do MariaDB se fragmentam e o diário do sistema cresce. A rotina repara e otimiza as tabelas, remove do diário do sistema as entradas com mais de sete dias, apaga arquivos temporários antigos e reinicia os serviços do Koha para liberar memória. Ela mostra uma prévia do que vai fazer e pergunta antes de começar."
-    ],
-    "steps": [
-     "Abra **Otimização profunda do banco e limpeza de logs** (em Tabelas do banco de dados ou em Diagnóstico).",
-     "Leia a lista do que será feito e confirme.",
-     "Aguarde as três etapas: otimização do banco, limpeza dos logs do sistema, reinício dos serviços do Koha.",
-     "Leia o resumo e depois confira o Painel de Controle."
-    ],
-    "tips": [
-     "Rode uma vez por mês, ou depois de uma grande importação ou exclusão, num momento tranquilo.",
-     "Confira se o backup noturno daquele dia terminou antes de começar."
-    ],
-    "warnings": [
-     "Otimizar tabelas grandes pode demorar e o Koha reinicia no final: os usuários são desconectados por um instante."
-    ]
-   }
-  },
-  "sec-diagnostics": {
-   "en": {
-    "summary": "Koha's diagnosis and upkeep: the full health check, live Apache logs, database maintenance, the database tables and service repair.",
-    "overview": [
-     "Koha diagnostics & maintenance is where you go when Koha is wrong, or to prevent it (the server's own status and report are in Server diagnostics). Start with **Full system health check**: it runs every check and points at the cause. **Real-time Apache log auditing** shows errors as they happen; **Deep database optimization & log cleanup** and **Restart / repair Koha services** fix the most common slowdowns. **Database tables** opens the list of Koha's tables with their rows and size."
-    ],
-    "steps": [
-     "Run **Full system health check**.",
-     "Open **View latest validation report** (Server diagnostics) and read the failures first, then the warnings.",
-     "Fix what it points at (services, search index, disk), then run the check again."
-    ],
-    "tips": [
-     "Export the diagnostics (Server diagnostics) before asking for help: it saves a round of questions."
-    ],
-    "related": [
-     "status",
-     "health",
-     "validation-report",
-     "apache-log",
-     "repair-services",
-     "sec-database"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Diagnóstico e manutenção do Koha: a verificação completa, logs do Apache ao vivo, manutenção do banco, as tabelas do banco e o reparo dos serviços.",
-    "overview": [
-     "Diagnóstico e manutenção do Koha é para onde ir quando o Koha está com problema, ou para evitar que fique (o status e o relatório do servidor ficam em Diagnóstico do servidor). Comece pela **Verificação completa do sistema**: ela roda todas as verificações e aponta a causa. **Auditoria de logs do Apache em tempo real** mostra os erros enquanto acontecem; **Otimização profunda do banco e limpeza de logs** e **Reiniciar / reparar os serviços do Koha** resolvem as lentidões mais comuns. **Tabelas do banco de dados** abre a lista das tabelas do Koha com linhas e tamanho."
-    ],
-    "steps": [
-     "Rode a **Verificação completa do sistema**.",
-     "Abra **Ver o último relatório de validação** (Diagnóstico do servidor) e leia primeiro as falhas, depois os avisos.",
-     "Corrija o que ele apontar (serviços, índice de busca, disco) e rode a verificação de novo."
-    ],
-    "tips": [
-     "Exporte o diagnóstico (Diagnóstico do servidor) antes de pedir ajuda: isso poupa uma rodada de perguntas."
     ]
    }
   },
@@ -19991,47 +20474,6 @@
     "tips": [
      "Rode a manutenção depois de grandes limpezas (anonimizar histórico, excluir leitores): o espaço só volta ao MariaDB depois da otimização.",
      "Abra esta tela antes de uma migração para estimar quanto tempo um backup e uma restauração vão levar."
-    ]
-   }
-  },
-  "staff-firewall": {
-   "en": {
-    "summary": "Blocks or opens the staff port 8080 to the Internet. Blocked, it stays reachable from the server itself and from the local network.",
-    "overview": [
-     "Koha's staff interface listens on port 8080. Port 80 (OPAC) must stay open to the public, but 8080 can be closed to the Internet when staff work only inside the library, through the WireGuard VPN or through a Cloudflare Tunnel. Blocked, it stays allowed from the server itself and from the local network."
-    ],
-    "steps": [
-     "Open **Staff firewall (restrict port 8080)**.",
-     "Answer whether to block direct external access to 8080.",
-     "Check the result: *allowed only from 127.0.0.1 and the local network*, or *open*."
-    ],
-    "tips": [
-     "Block it when the staff work only inside the library, through the VPN or through a Cloudflare Tunnel."
-    ],
-    "warnings": [
-     "If staff reach the staff interface from home by its public IP, blocking 8080 cuts them off: set up the VPN first."
-    ],
-    "related": [
-     "ufw",
-     "sec-vpn",
-     "cloudflare"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Bloqueia ou libera a porta 8080 da intranet para a Internet. Bloqueada, ela continua acessível pelo próprio servidor e pela rede local.",
-    "overview": [
-     "A intranet do Koha escuta na porta 8080. A porta 80 (OPAC) precisa ficar aberta ao público, mas a 8080 pode ser fechada para a Internet quando a equipe trabalha só dentro da biblioteca, pela VPN WireGuard ou por um Túnel Cloudflare. Bloqueada, ela continua liberada para o próprio servidor e para a rede local."
-    ],
-    "steps": [
-     "Abra **Firewall do Staff (restringir a porta 8080)**.",
-     "Responda se quer bloquear o acesso externo direto à 8080.",
-     "Confira o resultado: *liberada só para 127.0.0.1 e a rede local*, ou *aberta*."
-    ],
-    "tips": [
-     "Bloqueie quando a equipe trabalhar só dentro da biblioteca, pela VPN ou por um Túnel Cloudflare."
-    ],
-    "warnings": [
-     "Se a equipe acessa a intranet de casa pelo IP público, bloquear a 8080 a deixa de fora: configure a VPN primeiro."
     ]
    }
   },
@@ -20290,6 +20732,24 @@
     "summary": "O endereço da administração do WordPress e a conta do administrador do Tainacan. As contas do Koha, inclusive o superlibrarian, não são contas do WordPress."
    }
   },
+  "sec-tainacan-admin": {
+   "en": {
+    "summary": "Tainacan's administrative access: your own password for the initial account, other administrators and the WordPress administrator.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "O acesso administrativo do Tainacan: sua própria senha para a conta inicial, outros administradores e o administrador do WordPress."
+   }
+  },
+  "sec-tainacan-backups": {
+   "en": {
+    "summary": "Opens the Backup center already showing Tainacan's backups.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Abre a Central de backups já mostrando os backups do Tainacan."
+   }
+  },
   "tainacan-site-undo": {
    "en": {
     "summary": "Puts back the home page and the Tainacan settings that were there before the home page was prepared. The page of the collection goes to the trash only if nobody edited it.",
@@ -20476,6 +20936,24 @@
      "Confere se o IP pertence ao servidor ou à configuração de rede do Windows. Salva a configuração privada para desfazer e verifica API, configuração do navegador e login.",
      "Preserva banco, arquivos, imagens, credenciais e agendamentos. Domínios, HTTPS e mudanças de porta continuam no assistente de endereços."
     ]
+   }
+  },
+  "sec-dspace-addresses": {
+   "en": {
+    "summary": "The repository address and HTTPS, and the repair of web access without reinstalling.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "O endereço e o HTTPS do repositório, e o reparo do acesso web sem reinstalar."
+   }
+  },
+  "sec-dspace-backups": {
+   "en": {
+    "summary": "Opens the Backup center already showing DSpace's backups.",
+    "related": []
+   },
+   "pt-BR": {
+    "summary": "Abre a Central de backups já mostrando os backups do DSpace."
    }
   },
   "dspace-stop": {
@@ -21243,95 +21721,6 @@
     ]
    }
   },
-  "cloudflare": {
-   "en": {
-    "summary": "Publishes the OPAC (and, if you want, the staff interface) on the Internet through a Cloudflare Tunnel: HTTPS included and no port opened on the router.",
-    "overview": [
-     "A Cloudflare Tunnel is an outgoing connection from your server to Cloudflare: readers reach the catalogue through Cloudflare, with HTTPS, and nothing is opened on the router or the firewall. It works behind CGNAT, on 4G links and on networks you do not control.",
-     "The Cloudflare Tunnel screen shows the state at the top (online, paused, stopped or not published) and in the cards on the right, and runs a quick test of the public address when it opens. When Cloudflare asks you to authorise the server, the panel lets you choose a QR code to scan with your phone, the browser of this computer (the Windows browser under WSL) or a link to copy."
-    ],
-    "steps": [
-     "Open **Cloudflare Tunnel Manager (Recommended)** in the Security & access hub.",
-     "In **Set up & manage**, choose the free address or **Set up my own domain** and answer its questions.",
-     "Run **Test** to check every step, and press **Use the tunnel's addresses** if Koha still uses a local address.",
-     "Share the catalogue with **QR code** or **Copy** on the **Addresses** tab."
-    ],
-    "options": [
-     {
-      "name": "Addresses",
-      "text": "What the tunnel publishes and where it lands on this server, with Copy, Open in the browser and a QR code (on screen and as a PNG to print). Koha's own addresses (OPACBaseURL, staffClientBaseURL) are compared with the public ones and fixed with one button."
-     },
-     {
-      "name": "Set up & manage",
-      "text": "Free address (no domain needed): get or restore one, remote staff access, public list, recovery file, reconnect, renew the token, give it up. Your own domain: sign in to Cloudflare, create the tunnel and its addresses, change the domain, remove the tunnel."
-     },
-     {
-      "name": "Test",
-      "text": "Follows a reader's visit step by step (cloudflared, Apache on this server, the name in DNS, the public address, Koha's address) and says what to do at the first step that fails."
-     },
-     {
-      "name": "Log",
-      "text": "The last lines of the cloudflared service, tokens left out, with Copy."
-     },
-     {
-      "name": "Status card",
-      "text": "Running or stopped, whether it starts with the server, since when, the edge connections to Cloudflare and restarts, with Restart and Pause / Resume. The cloudflared card shows its version and updates it from Cloudflare's repository."
-     }
-    ],
-    "tips": [
-     "Publish the OPAC and keep the staff interface for the VPN; if you do publish it, keep the extra password at Cloudflare on."
-    ],
-    "warnings": [
-     "**Pause** and **Remove the tunnel** take the catalogue off the Internet at once: Koha stays reachable only on the local network. Pause keeps everything and **Resume** brings it back."
-    ],
-    "related": [
-     "dash-addresses",
-     "search-console",
-     "staff-firewall"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Publica o OPAC (e, se você quiser, a intranet) na Internet por um Túnel Cloudflare: HTTPS incluído e nenhuma porta aberta no roteador.",
-    "overview": [
-     "Um Túnel Cloudflare é uma conexão de saída do seu servidor até a Cloudflare: os leitores chegam ao catálogo pela Cloudflare, com HTTPS, e nada é aberto no roteador nem no firewall. Funciona atrás de CGNAT, em links 4G e em redes que você não controla.",
-     "A tela do Túnel Cloudflare mostra o estado no topo (no ar, pausado, parado ou não publicado) e nos cartões à direita, e faz um teste rápido do endereço público ao abrir. Quando a Cloudflare pede para autorizar o servidor, o painel deixa você escolher um QR code para escanear com o celular, o navegador deste computador (o navegador do Windows, no WSL) ou um link para copiar."
-    ],
-    "steps": [
-     "Abra o **Gerenciador do Túnel Cloudflare (recomendado)** na Central de Segurança & Acesso.",
-     "Em **Configurar e gerenciar**, escolha o endereço gratuito ou **Configurar meu próprio domínio** e responda às perguntas.",
-     "Rode o **Teste** para conferir cada etapa e aperte **Usar os endereços do túnel** se o Koha ainda usar um endereço local.",
-     "Divulgue o catálogo com **Código QR** ou **Copiar** na aba **Endereços**."
-    ],
-    "options": [
-     {
-      "name": "Endereços",
-      "text": "O que o túnel publica e onde chega neste servidor, com Copiar, Abrir no navegador e QR code (na tela e em PNG para imprimir). Os endereços do próprio Koha (OPACBaseURL, staffClientBaseURL) são comparados com os públicos e corrigidos com um botão."
-     },
-     {
-      "name": "Configurar e gerenciar",
-      "text": "Endereço gratuito (sem domínio): obter ou restaurar, acesso remoto da equipe, lista pública, arquivo de recuperação, reconectar, renovar o token, abrir mão. Domínio próprio: entrar na Cloudflare, criar o túnel e os endereços, trocar o domínio, remover o túnel."
-     },
-     {
-      "name": "Teste",
-      "text": "Segue a visita de um leitor passo a passo (cloudflared, Apache neste servidor, o nome no DNS, o endereço público, o endereço do Koha) e diz o que fazer na primeira etapa que falha."
-     },
-     {
-      "name": "Registro",
-      "text": "As últimas linhas do serviço cloudflared, sem os tokens, com Copiar."
-     },
-     {
-      "name": "Cartão Status",
-      "text": "Rodando ou parado, se inicia com o servidor, desde quando, as conexões com a Cloudflare e os reinícios, com Reiniciar e Pausar / Retomar. O cartão cloudflared mostra a versão e atualiza pelo repositório da Cloudflare."
-     }
-    ],
-    "tips": [
-     "Publique o OPAC e deixe a intranet para a VPN; se você publicar a intranet, mantenha ligada a senha extra na Cloudflare."
-    ],
-    "warnings": [
-     "**Pausar** e **Remover o túnel** tiram o catálogo da Internet na hora: o Koha fica acessível só na rede local. Pausar mantém tudo e **Retomar** traz de volta."
-    ]
-   }
-  },
   "ufw": {
    "en": {
     "summary": "Lists the firewall (UFW) rules active on this server: which ports are open and to whom.",
@@ -21369,50 +21758,6 @@
     ],
     "warnings": [
      "Mudar as regras do UFW à mão, fora do painel, pode trancar você fora do SSH. Se for preciso, libere sempre o SSH antes de ativar ou recarregar o firewall."
-    ]
-   }
-  },
-  "ssl": {
-   "en": {
-    "summary": "Gets a free HTTPS certificate from Let's Encrypt with Certbot and configures Apache, with automatic renewal.",
-    "overview": [
-     "Certbot asks Let's Encrypt for a free certificate for your domain, configures Apache to serve HTTPS and installs the automatic renewal. Let's Encrypt checks the domain over port 80, so the domain must point to this server's public IP and port 80 must be reachable from the Internet.",
-     "If anything goes wrong (Certbot fails, or Apache's configuration becomes invalid), Apache is not reloaded, so the site keeps working on HTTP."
-    ],
-    "steps": [
-     "Point a domain's A record to the server's public IP and make sure port 80 is reachable.",
-     "Open **Free SSL certificate (Certbot / Apache)** and type the domain and an e-mail for renewal notices.",
-     "Wait for *HTTPS configured successfully*."
-    ],
-    "tips": [
-     "Use the e-mail of a shared library mailbox: renewal warnings go there.",
-     "Test the address with `https://` from a phone on mobile data, outside the library's network."
-    ],
-    "warnings": [
-     "If you use a Cloudflare Tunnel, cancel: HTTPS already comes from it."
-    ],
-    "related": [
-     "cloudflare",
-     "search-console"
-    ]
-   },
-   "pt-BR": {
-    "summary": "Emite um certificado HTTPS gratuito do Let's Encrypt com o Certbot e configura o Apache, com renovação automática.",
-    "overview": [
-     "O Certbot pede ao Let's Encrypt um certificado gratuito para o seu domínio, configura o Apache para servir HTTPS e instala a renovação automática. O Let's Encrypt verifica o domínio pela porta 80, então o domínio precisa apontar para o IP público deste servidor e a porta 80 precisa estar acessível pela Internet.",
-     "Se algo der errado (o Certbot falhar, ou a configuração do Apache ficar inválida), o Apache não é recarregado, e o site continua funcionando em HTTP."
-    ],
-    "steps": [
-     "Aponte o registro A de um domínio para o IP público do servidor e confira se a porta 80 está acessível.",
-     "Abra **Certificado SSL gratuito (Certbot / Apache)** e digite o domínio e um e-mail para os avisos de renovação.",
-     "Aguarde *HTTPS configurado com sucesso*."
-    ],
-    "tips": [
-     "Use o e-mail de uma caixa compartilhada da biblioteca: os avisos de renovação vão para lá.",
-     "Teste o endereço com `https://` num celular com dados móveis, fora da rede da biblioteca."
-    ],
-    "warnings": [
-     "Se você usa um Túnel Cloudflare, cancele: o HTTPS já vem dele."
     ]
    }
   },
@@ -24173,165 +24518,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 183,
-   "manual_total": 183,
+   "manual": 190,
+   "manual_total": 190,
    "manual_outdated": [],
-   "strings": 541,
-   "strings_total": 541
+   "strings": 543,
+   "strings_total": 543
   },
   "pt-BR": {
-   "manual": 183,
-   "manual_total": 183,
+   "manual": 190,
+   "manual_total": 190,
    "manual_outdated": [],
-   "strings": 535,
-   "strings_total": 541
+   "strings": 537,
+   "strings_total": 543
   },
   "es": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 541
+   "strings_total": 543
   },
   "fr": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 541
+   "strings_total": 543
   },
   "it": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 541
+   "strings_total": 543
   },
   "de": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 397,
-   "strings_total": 541
+   "strings_total": 543
   },
   "nl": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "sv": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "pl": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "cs": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "ru": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "uk": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "tr": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "tl": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "id": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "ar": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "fa": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "hi": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "bn": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "vi": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "zh": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "ja": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   },
   "ko": {
    "manual": 0,
-   "manual_total": 183,
+   "manual_total": 190,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 541
+   "strings_total": 543
   }
  }
 }

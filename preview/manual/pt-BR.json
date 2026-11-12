@@ -2687,15 +2687,15 @@
    "summary": "Executa um plano explícito agora. Cifra o pacote inteiro e confere a cópia na nuvem; capturas parciais e falhas de envio não eliminam backups válidos."
   },
   "sec-instances": {
-   "summary": "Instalações",
+   "summary": "Adicionar sistema",
    "overview": [
-    "Use Adicionar instância para escolher um aplicativo ainda não instalado, ou Remover instância para revisar uma instalação em contêiner. Estes atalhos ainda não habilitam cópias adicionais do mesmo aplicativo."
+    "Lista Koha, Tainacan e DSpace. Um sistema instalado abre a sua página; um ausente mostra o que é, o que acontece ao instalar e os requisitos, antes de **Instalar…**. Cada sistema é instalado uma vez por servidor; nunca se instala por cima de dados existentes. **Remover instância** revisa uma instalação em contêiner."
    ]
   },
   "instance-add": {
-   "summary": "Adicionar instância",
+   "summary": "Adicionar sistema",
    "overview": [
-    "Escolha Koha, Tainacan ou DSpace e siga o driver existente. Aplicativos instalados não são oferecidos, preservando seus dados."
+    "Escolha Koha, Tainacan ou DSpace. Um instalado abre a sua página em vez de uma segunda instalação, preservando os dados."
    ]
   },
   "instance-remove": {
@@ -2795,6 +2795,27 @@
    "warnings": [
     "O envelope .nexus também inclui uma exportação protegida da chave; a frase não é gravada em nenhum dos arquivos."
    ]
+  },
+  "sec-koha-admin": {
+   "summary": "O acesso administrativo do Koha num só lugar: os superbibliotecários, as credenciais do primeiro acesso e criar um superbibliotecário. Os mesmos cartões continuam na página do Koha."
+  },
+  "sec-koha-addresses": {
+   "summary": "Como o Koha é acessado: o Cloudflare Tunnel, o certificado SSL gratuito e o firewall da equipe. Os mesmos cartões continuam na Central de Segurança & Acesso e em Segurança do Koha."
+  },
+  "sec-koha-backups": {
+   "summary": "Abre a Central de backups já mostrando os backups do Koha."
+  },
+  "sec-tainacan-admin": {
+   "summary": "O acesso administrativo do Tainacan: sua própria senha para a conta inicial, outros administradores e o administrador do WordPress."
+  },
+  "sec-tainacan-backups": {
+   "summary": "Abre a Central de backups já mostrando os backups do Tainacan."
+  },
+  "sec-dspace-addresses": {
+   "summary": "O endereço e o HTTPS do repositório, e o reparo do acesso web sem reinstalar."
+  },
+  "sec-dspace-backups": {
+   "summary": "Abre a Central de backups já mostrando os backups do DSpace."
   }
  }
 }

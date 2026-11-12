@@ -99,6 +99,7 @@ class MainScreen(Screen):
         plain = self.app.env.plain
         options: list[Option] = []
         server = False
+        tools: set[str] = set()     # the groups whose "tools" divider is drawn
         for s in SECTIONS:
             if not s.sidebar:
                 continue
@@ -110,6 +111,11 @@ class MainScreen(Screen):
                 options.append(Option(f"{arrow} {sidebar_prompt(s.label, plain, s.icon).lstrip()}", id=s.id))
             elif s.group:
                 if s.group in self.expanded and self.app.platform_ready(s.requires):
+                    if s.tool and s.group not in tools:
+                        tools.add(s.group)
+                        rule = "-" if plain else "─"
+                        options.append(Option(f"   {rule * 2} {t('tools')} {rule * 2}", id=f"sidebar-tools-{s.group}",
+                                              disabled=True))
                     options.append(Option("   " + sidebar_prompt(s.label, plain, s.icon), id=s.id))
             else:
                 if not server and s.id not in ("dashboard", "instances"):
@@ -142,7 +148,7 @@ class MainScreen(Screen):
     def set_group(self, option_id: str, expand: bool) -> None:
         """→ / ←: expand or collapse the group of the highlighted row (the
         group's own row, or one of its screens). The screen does not change."""
-        if not option_id or option_id == "sidebar-server":
+        if not option_id or option_id.startswith("sidebar-"):
             return
         group = option_id if option_id in GROUPS else group_of(option_id)
         if not group or (group in self.expanded) == expand:
@@ -156,6 +162,14 @@ class MainScreen(Screen):
     def action_show(self, section_id: str, from_sidebar: bool = False, scope: str = "") -> None:
         switcher = self.query_one("#views", ContentSwitcher)
         sec = section(section_id)
+        # A row that stands for another screen, filtered by its system
+        # ("Backups and schedules" of a group = the Backup center for it).
+        if sec.opens:
+            ready = self.app.platform_ready(sec.requires)
+            self.action_show(sec.opens if ready else sec.group, from_sidebar=True,
+                             scope=sec.group if ready else "")
+            self.highlight(section_id)
+            return
         # A card can open a shared screen already filtered (the Backup
         # center from a platform group: menus.Entry.scope).
         if scope and section_id == "backups":
