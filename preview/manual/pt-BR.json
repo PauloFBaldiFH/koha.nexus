@@ -2698,6 +2698,14 @@
     "Escolha Koha, Tainacan ou DSpace. Um instalado abre a sua página em vez de uma segunda instalação, preservando os dados."
    ]
   },
+  "instance-names": {
+   "summary": "Dar nomes às instalações",
+   "overview": [
+    "Dê a cada sistema instalado o nome pelo qual as pessoas o conhecem, como Biblioteca Central. O painel passa a mostrá-lo na lateral, nas abas do painel, em Adicionar sistema, nas centrais de backups e de agendamentos e nas confirmações de remoção.",
+    "Só o nome muda: bancos, arquivos, serviços e endereços continuam como estão. Abrir só lê; o nome é salvo depois do OK."
+   ],
+   "_en": "90266d129a"
+  },
   "instance-remove": {
    "summary": "Remover instância",
    "overview": [

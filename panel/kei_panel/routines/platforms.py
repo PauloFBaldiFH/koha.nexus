@@ -519,9 +519,13 @@ async def backup_incomplete(app) -> None:
 
 async def tainacan_uninstall(app) -> None:
     from .common import run_task, show_done
-    from ..screens.dialogs import ChoiceScreen, ConfirmScreen
+    from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen
+    from .. import names
 
-    title = t("Uninstall Tainacan")
+    # Its visible name (U6): the removal says which one, and deleting its
+    # data asks for that name to be typed.
+    name = names.custom(names.of(app), "tainacan")
+    title = t("Uninstall “${name}” (Tainacan)", name=name) if name else t("Uninstall Tainacan")
     choice = await app.push_screen_wait(ChoiceScreen(title, t("What happens to its data?"), [
         ("keep", t("Keep the data (installing it again uses it)")),
         ("delete", t("Delete the data (a last backup is made first)"))]))
@@ -532,6 +536,11 @@ async def tainacan_uninstall(app) -> None:
           "and kept; nothing is deleted if it fails.")
     if not await app.push_screen_wait(ConfirmScreen(title, text, danger=choice == "delete")):
         return
+    if choice == "delete" and name:
+        typed = await app.push_screen_wait(InputScreen(title, t(
+            "Type the name “${name}” to confirm deleting its data.", name=name), t("Confirmation:")))
+        if (typed or "").strip() != name:
+            return
     result = await run_task(app, title, "tainacan-uninstall", choice)
     await show_done(app, title, result)
 

@@ -14,7 +14,7 @@ from textual.binding import Binding
 from .bridge import Bridge, BridgeError
 from .env import PanelEnv, log_error
 from .i18n import Translator, install, t
-from . import platforms
+from . import names, platforms
 from .menus import Entry, requires_of
 from .screens.dialogs import ConfirmScreen, ResultScreen
 from .screens.main import MainScreen
@@ -50,6 +50,8 @@ class KohaPanelApp(App):
         # Tainacan too: its state file says "installed" (no Docker call).
         self.tainacan_installed = platforms.tainacan_detected(env)
         self.dspace_installed = platforms.dspace_detected(env)
+        # The visible names of the installations (U6), from --status-json.
+        self.instance_names: dict[str, str] = {}
 
     def _handle_exception(self, error: Exception) -> None:
         # Textual shows the traceback on the terminal after it exits; config.sh
@@ -213,6 +215,7 @@ class KohaPanelApp(App):
 
     def platforms_seen(self, status: dict | None) -> None:
         """What --status-json said (dashboard, Platforms screen)."""
+        self.names_seen(status)
         if self.env.demo or not isinstance(status, dict):
             return
         for state in platforms.from_status(status):
@@ -224,6 +227,17 @@ class KohaPanelApp(App):
         tainacan = platforms.tainacan_from_status(status)
         if tainacan.known:
             self._set_tainacan(platforms.tainacan_installed(tainacan))
+
+    def names_seen(self, status: dict | None) -> None:
+        """The names in --status-json (an older installer has none: kept)."""
+        if not isinstance(status, dict) or "names" not in status:
+            return
+        seen = names.from_status(status)
+        if seen != self.instance_names:
+            self.instance_names = seen
+            for screen in self.screen_stack:
+                if isinstance(screen, MainScreen):
+                    screen.names_changed()
 
     def _set_dspace(self, installed: bool) -> None:
         if installed != self.dspace_installed:

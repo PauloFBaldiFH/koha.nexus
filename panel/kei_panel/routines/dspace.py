@@ -553,12 +553,21 @@ async def upgrade(app):
 
 
 async def remove(app):
-    choice=await app.push_screen_wait(ChoiceScreen(TITLE,t('Remove only DSpace. Shared Docker, Apache, tunnel and cloud connections remain.'),[('keep',t('Keep all repository data (recommended)')),('purge',t('Erase owned repository volumes after a verified safety backup'))]))
+    from .. import names
+    # Its visible name (U6): said in the title and typed to erase its data.
+    name=names.custom(names.of(app),'dspace')
+    title=t('Remove “${name}” (DSpace)',name=name) if name else TITLE
+    choice=await app.push_screen_wait(ChoiceScreen(title,t('Remove only DSpace. Shared Docker, Apache, tunnel and cloud connections remain.'),[('keep',t('Keep all repository data (recommended)')),('purge',t('Erase owned repository volumes after a verified safety backup'))]))
     if not choice:return
     request={'purge':choice=='purge'}
     if choice=='purge':
-        erase=await app.push_screen_wait(InputScreen(TITLE,t('Type DSpace to confirm permanent removal of its data.'),t('Confirmation:')))
-        if erase!='DSpace':return
+        if name:
+            typed=await app.push_screen_wait(InputScreen(title,t('Type the name “${name}” to confirm permanent removal of its data.',name=name),t('Confirmation:')))
+            if (typed or '').strip()!=name:return
+            erase='DSpace'        # the installer's own confirmation word, unchanged
+        else:
+            erase=await app.push_screen_wait(InputScreen(TITLE,t('Type DSpace to confirm permanent removal of its data.'),t('Confirmation:')))
+            if erase!='DSpace':return
         request['erase']=erase
     await operation(app,'remove',request,True)
 

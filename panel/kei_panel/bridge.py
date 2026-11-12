@@ -572,7 +572,8 @@ class Bridge:
                 status = status | {"platforms": [{"id": "dspace", "supported": True, "detected": True,
                                       "services": "active" if state == "installed" else "inactive",
                                       "health": "unknown", "detail": detail} if p["id"] == "dspace" else p for p in status["platforms"]]}
-            return status | {"generated_at": int(time.time())}
+            from .demo import demo_names
+            return status | {"generated_at": int(time.time()), "names": demo_names()}
         proc = await asyncio.create_subprocess_exec(
             *self._argv("--status-json"), stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,

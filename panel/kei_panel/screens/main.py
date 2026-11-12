@@ -27,7 +27,7 @@ from textual.screen import Screen
 from textual.widgets import ContentSwitcher, Footer, Header, OptionList
 from textual.widgets.option_list import Option
 
-from .. import platforms
+from .. import names, platforms
 from ..glyphs import split_icon
 from ..i18n import t
 from ..menus import GROUPS, SECTIONS, group_of, section
@@ -108,7 +108,14 @@ class MainScreen(Screen):
                 arrow = ("-" if open_ else "+") if plain else ("▾" if open_ else "▸")
                 if not self.app.platform_ready(s.id):
                     arrow = " "             # not installed: nothing under it to open
-                options.append(Option(f"{arrow} {sidebar_prompt(s.label, plain, s.icon).lstrip()}", id=s.id))
+                prompt = sidebar_prompt(s.label, plain, s.icon).lstrip()
+                name = names.custom(names.of(self.app), s.id)
+                if name and self.app.platform_ready(s.id):
+                    # Its visible name (U6): "📚 Biblioteca Central · Koha".
+                    icon = split_icon(t(s.label))[0]
+                    prompt = sidebar_prompt(f"{icon}  {names.label(names.of(self.app), s.id)}" if icon else
+                                            names.label(names.of(self.app), s.id), plain, s.icon).lstrip()
+                options.append(Option(f"{arrow} {prompt}", id=s.id))
             elif s.group:
                 if s.group in self.expanded and self.app.platform_ready(s.requires):
                     if s.tool and s.group not in tools:
@@ -198,6 +205,14 @@ class MainScreen(Screen):
             self.redraw_sidebar(highlight=sec.parent or section_id)
         elif not from_sidebar:
             self.highlight(sec.parent or section_id)
+
+    def names_changed(self) -> None:
+        """A name was given or changed: the sidebar and the screens that
+        show names are drawn again (nothing is read again for it)."""
+        self.redraw_sidebar()
+        for view in self.query_one("#views", ContentSwitcher).children:
+            if hasattr(view, "names_changed"):
+                view.names_changed()
 
     def platforms_changed(self) -> None:
         """Koha was installed (or removed) while the panel was open: the

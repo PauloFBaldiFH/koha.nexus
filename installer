@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.201"
+PANEL_VERSION=" 1.5.202"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2372,6 +2372,30 @@ _kei_addr_url() {   # SCHEME HOST PORT -> URL (the scheme's own port left out)
     else
         printf '%s://%s:%s' "$1" "$2" "$3"
     fi
+}
+# The visible names of the installations (study 12, U6): kept only in the
+# instance registry (/var/lib/koha-nexus/instances), read and written by the
+# panel's kei_panel/instance_names.py (the same registry code as nexus_core).
+# A name never moves or renames a database, volume, directory or address.
+#   kei_instance_names read          system=APP|named|NAME or APP|proposed|NAME
+#   kei_instance_names json          {"koha":"..."} for --status-json ({} if unknown)
+#   kei_instance_names set APP NAME  adopts (first time) or renames
+kei_instance_names() {
+    local mode="${1:-}" py="${KEI_PANEL_VENV}/bin/python"
+    [ -x "$py" ] || py=python3
+    if [ ! -f "${KEI_PANEL_SRC}/kei_panel/instance_names.py" ]; then
+        [ "$mode" = json ] && { printf '{}'; return 0; }
+        msg_error "" "$(t "The panel is not installed here; the names cannot be read.")"
+        return 1
+    fi
+    # From / (python -m also searches the current directory before 3.11).
+    case "$mode" in
+        read|json) ( cd / && PYTHONPATH="$KEI_PANEL_SRC" PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 \
+                       "$py" -m kei_panel.instance_names "$mode" "$INSTANCE" ) ;;
+        set) ( cd / && PYTHONPATH="$KEI_PANEL_SRC" PYTHONDONTWRITEBYTECODE=1 PYTHONSAFEPATH=1 \
+                 "$py" -m kei_panel.instance_names set "${2:-}" "$INSTANCE" "${3:-}" ) ;;
+        *) msg_error "" "instance-names | instance-name APP NAME"; return 2 ;;
+    esac
 }
 kei_addresses() {
     local platform="${1:-}" mode="${2:-}" url kind scheme host port ifc a item code
@@ -17976,7 +18000,9 @@ kei_status_json() {
     # know "platforms", "proxy" or "docker" ignore them.
     printf '"platforms":%s,' "$(kei_platforms_json "${svc_states[@]}")"
     printf '"proxy":%s,' "$(kei_proxy_json)"
-    printf '"docker":%s}\n' "$(kei_docker_json)"
+    printf '"docker":%s,' "$(kei_docker_json)"
+    # The visible names (U6): only the installations named in the registry.
+    printf '"names":%s}\n' "$(kei_instance_names json 2>/dev/null || printf '{}')"
 }
 
 # Removes secrets from text on stdin: key=value / key: value pairs whose key
@@ -46992,6 +47018,8 @@ kei_task() {
             return 0 ;;
         tainacan-language)  _kei_docker_task kei_tainacan_language "${1:-}" ;;
         addresses)          kei_addresses "${1:-}" "${2:-}" ;;
+        instance-names)     kei_instance_names read ;;
+        instance-name)      kei_instance_names set "${1:-}" "${2:-}" ;;
         koha-languages)
             # Read only (the Language center): the Koha languages installed
             # here and the OPAC and staff lists (first = the active one).

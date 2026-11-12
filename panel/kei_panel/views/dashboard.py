@@ -29,7 +29,7 @@ from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal
 from textual.widgets import Button, Label, Static, TabbedContent, TabPane
 
-from .. import health, platforms
+from .. import health, names, platforms
 from ..i18n import t
 from ..widgets.cards import LinkCard, StatusCard
 from ..widgets.pacman import PacmanLoader
@@ -374,7 +374,22 @@ class DashboardView(SectionView):
         self._last_status_at = 0
         self.query_one("#status-error").display = False
         self.koha_layout()
+        self.names_changed()
         self.refresh_data()
+
+    def names_changed(self) -> None:
+        """The visible names (U6): a system's tab is called by its name and
+        its card on General says "name · system"."""
+        known = names.of(self.app)
+        tabs = self.query_one("#dash-tabs", TabbedContent)
+        for key in names.SYSTEMS:
+            try:
+                tabs.get_tab(f"dash-tab-{key}").label = names.short(known, key)
+            except Exception:  # noqa: BLE001 - no such tab
+                pass
+            for card in self.query(f"#dash-platform-{key}"):
+                for title in card.query(".card-title"):
+                    title.update(names.label(known, key))
 
     def koha_layout(self) -> None:
         """Buttons and blocks that only mean something with Koha installed."""
