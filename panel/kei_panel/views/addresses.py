@@ -103,6 +103,9 @@ class AddressesView(SectionView):
         data = self.data
         box = self.query_one("#addr-configured", Vertical)
         alts = self.query_one("#addr-alternatives", Vertical)
+        # "…" while drawing: the on_mount and on_show reads can overlap, and
+        # the last line is set only once the cards above it are all there.
+        self.query_one("#addr-internet", Label).update("…")
         await box.remove_children()
         await alts.remove_children()
         if data is None:
