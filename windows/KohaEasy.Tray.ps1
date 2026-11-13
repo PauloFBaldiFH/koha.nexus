@@ -309,9 +309,18 @@ function Start-Check {
             if ($WithAccess -and $status.State -eq 'running') {
                 try { Test-KohaWindowsAccess | Out-Null } catch { Write-KohaLog ('windows access test failed: ' + $_.Exception.Message) }
             }
+            # A system installed on a port the library network does not reach
+            # yet (U9 part 2): only once the network was opened at all.
+            $missing = @()
+            if ($WithAccess -and $status.State -eq 'running' -and [bool](Get-KohaState).lanAccess) {
+                try {
+                    $now = Read-KohaInstalledWebPorts
+                    if ($null -ne $now) { $missing = @(Get-KohaMissingWebPorts -Wanted $now -Open (Get-KohaWebPorts)) }
+                } catch { Write-KohaLog ('web ports not read: ' + $_.Exception.Message) }
+            }
             $disk = $null
             if ($WithDisk) { $disk = Get-KohaDiskHealth -Linux $status.Linux }
-            return [pscustomobject]@{ Status = $status; Disk = $disk }
+            return [pscustomobject]@{ Status = $status; Disk = $disk; Missing = $missing }
         }).AddArgument($langDir).AddArgument($WithDisk).AddArgument($graceUntil).AddArgument($WithAccess)
     return @{ PS = $ps; Handle = $ps.BeginInvoke() }
 }
@@ -367,6 +376,11 @@ $timer.add_Tick({
                     $n = Get-KohaNotifications -Previous ([string]$state.lastState) -Status $r.Status -Disk $r.Disk -State $state
                     foreach ($x in $n.Notifications) { Show-KohaNotification -Title $x.Title -Text $x.Text -Level $x.Level | Out-Null }
                     if ($null -eq $r.Disk) { $n.Changes.Remove('lastDiskLevel') }
+                    $ports = Get-KohaWebPortsNotice -Missing @($r.Missing) -Notified ([string]$state.webPortsNotified)
+                    if ($null -ne $ports) {
+                        Show-KohaNotification -Title $ports.Title -Text $ports.Text -Level warning | Out-Null
+                        $n.Changes['webPortsNotified'] = $ports.Key
+                    }
                     Set-KohaState $n.Changes | Out-Null
                 }
             } catch {

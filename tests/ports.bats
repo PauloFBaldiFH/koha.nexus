@@ -85,3 +85,18 @@ kei_tainacan_plan http://192.168.0.20:8091'
     grep -q $'^plan\trefuse' <<< "$output"
     grep -q 'Port 8091 is already in use (other:nginx)' <<< "$output"
 }
+
+@test "web ports: the installed systems' ports, for Windows (U9 part 2)" {
+    run lib 'is_koha_installed() { OPACPORT=80 INTRAPORT=8080; return 0; }; kei_web_ports'
+    [ "$status" -eq 0 ]
+    [ "$output" = $'@@result port=80\n@@result port=8080\n@@result port=8090\n@@result port=8100' ]
+    # Koha absent, Tainacan without a local-network port, DSpace on an https name: nothing.
+    run lib '_kei_tn_get() { :; }; kei_dspace_runtime() { echo "{\"url\": \"https://repo.example.org\"}"; }; kei_web_ports'
+    [ "$status" -eq 0 ] && [ -z "$output" ]
+    # Own ports, a broken DSpace answer and duplicates.
+    run lib 'is_koha_installed() { OPACPORT=8000 INTRAPORT=8001; return 0; }; _kei_tn_get() { [ "$1" = lan_port ] && echo 8001; }; kei_dspace_runtime() { echo "{not json"; }; kei_web_ports'
+    [ "$output" = $'@@result port=8000\n@@result port=8001' ]
+    # The DSpace port still names its owner.
+    run lib 'kei_port_owner 8100'
+    [ "$output" = dspace ]
+}

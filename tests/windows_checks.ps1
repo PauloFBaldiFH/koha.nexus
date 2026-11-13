@@ -182,6 +182,22 @@ $fw = Format-KohaWindowsChecks @([pscustomobject]@{ Url = 'http://h:8090'; Code 
 Check 'windows access: one tab-separated line per address for stdin' ($fw -eq ("http://h:8090`t302`thttp://h:8090/x`nhttp://h`t000`t-`n")) $fw
 $probe = Invoke-KohaHttpProbe -Url 'http://127.0.0.1:1' -TimeoutMs 3000
 Check 'windows access: no answer is 000' ($probe.Code -eq '000' -and $probe.Redirect -eq '-') ($probe.Code + ' ' + $probe.Redirect)
+# U9 part 2: the ports Windows opens are the fixed ones plus the systems' own.
+$wp = Resolve-KohaWebPorts -Output "@@result port=8091`n@@result port=8080`r`n@@result port=0`n@@result port=70000`n@@result port=x`nnoise"
+Check 'web ports: fixed ports plus the systems, sorted, each once' (($wp -join ',') -eq '80,8080,8091,8100') ($wp -join ',')
+$wp = Resolve-KohaWebPorts -Output ''
+Check 'web ports: nothing read keeps 80, 8080 and 8100' (($wp -join ',') -eq '80,8080,8100') ($wp -join ',')
+$many = (1..60 | ForEach-Object { '@@result port=' + (9000 + $_) }) -join "`n"
+Check 'web ports: at most 32' (@(Resolve-KohaWebPorts -Output $many).Count -eq 32) ''
+$miss = Get-KohaMissingWebPorts -Wanted @(80, 8080, 8091, 8100) -Open @(80, 8080, 8100)
+Check 'web ports: the port not opened yet' (($miss -join ',') -eq '8091') ($miss -join ',')
+Check 'web ports: nothing missing' (@(Get-KohaMissingWebPorts -Wanted @(80, 8080) -Open @(80, 8080, 8100)).Count -eq 0) ''
+$wn = Get-KohaWebPortsNotice -Missing @(8091, 8095)
+Check 'web ports: one notice naming the ports' ($null -ne $wn -and $wn.Key -eq '8091,8095' -and $wn.Text -match '8091, 8095') ''
+Check 'web ports: no second notice for the same ports' ($null -eq (Get-KohaWebPortsNotice -Missing @(8095, 8091) -Notified '8091,8095')) ''
+Check 'web ports: no notice when nothing is missing' ($null -eq (Get-KohaWebPortsNotice -Missing @())) ''
+$pc = @(Get-KohaPortProxyCommands -WslIp '172.20.0.2' -Ports @(80, 8091))
+Check 'web ports: forwarding for each port given' ($pc.Count -eq 4 -and ($pc[3] -join ' ') -eq 'interface portproxy add v4tov4 listenport=8091 listenaddress=0.0.0.0 connectport=8091 connectaddress=172.20.0.2') ($pc[3] -join ' ')
 $old = ConvertFrom-KohaStatusOutput -Output '{"schema":1,"state":"ok"}'
 $i = Resolve-KohaIndicator -State 'running' -Linux $old -Now $now
 Check 'indicator: an older installer keeps the old tray' ($i.Colour -eq 'green' -and $i.Text -eq 'Koha is running') $i.Text
