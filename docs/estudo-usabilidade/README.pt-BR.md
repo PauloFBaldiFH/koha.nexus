@@ -1916,3 +1916,68 @@ Testes:
   formato da entrada padrão e endereço sem resposta = `000`.
 
 Isto fecha o U7. O próximo é o U8 (texto do backup completo).
+
+## 26. U8: backup completo e Central de backups
+
+**Backup completo (Nexus completo).** O parágrafo longo virou uma linha
+(“Um arquivo cifrado com todos os sistemas deste servidor.”) e a tabela da
+seção 7.6, aberta desde o início, em “O que este backup traz de volta”:
+
+| Parte | O que a recuperação faz |
+|---|---|
+| Volta automaticamente | Os dados de Koha, Tainacan e DSpace, cada um com as próprias verificações de restauração e backup de segurança. Também volta a chave de backup, a aparência e o idioma do painel, e os planos de backup, que ficam desligados até você definir o horário |
+| Carregado durante a recuperação | As imagens dos contêineres, incluídas no arquivo |
+| Guardado para revisão, não ativado | As agendas do servidor de origem, as conexões de nuvem, os arquivos do túnel Cloudflare, as configurações do Docker, os arquivos do painel e os nomes das instalações. O destino mantém os próprios endereços |
+| Precisa estar pronto no destino | A mesma versão do sistema operacional e a mesma arquitetura. Cada sistema precisa estar instalado e vazio, com o mesmo pacote do Koha e as mesmas imagens de contêiner. O DSpace precisa ter a mesma versão e o mesmo endereço |
+| Não incluído | O sistema operacional, o Windows e o WSL, os pacotes de backup antigos e os arquivos guardados fora desses sistemas |
+
+A tabela foi conferida com o código. A recuperação
+(`platforms/nexus/recovery.py`, `settings_changes`) aplica só o tema, o
+idioma do painel e os planos de backup, estes sem horário. Ela importa a
+chave e carrega as imagens. Todo o resto vira referência para revisão. Um
+teste confere esses pontos no código.
+
+Correção 7.6: a tabela do estudo citava “regras de firewall” e “imagens
+importadas sob pedido”. O pacote não guarda regras de firewall, e as imagens
+são carregadas em toda recuperação. O texto novo segue o código.
+
+**Central de backups.**
+
+- **Chave única.** A chave de backup e o kit de recuperação ficam num só
+  quadro, “Chave de backup e kit de recuperação”, com o estado da chave e a
+  frase “Usada pelos backups cifrados do Tainacan, do DSpace e pelo backup
+  completo do Nexus”. O quadro aparece no Tainacan, no DSpace, nos conjuntos e
+  no Nexus completo; só o Koha não usa essa chave. Os cartões “Configurar a
+  chave do DSpace”, “Chave compartilhada”, “Configurar backups cifrados” e
+  “Kit de recuperação” de cada sistema saíram da Central. O quadro mostra
+  “Configurar backups cifrados” enquanto não há chave e “Kit de recuperação”
+  depois. Os dois rodam a mesma rotina de antes.
+- **Seções recolhidas.** A compactação de cada sistema fica recolhida, com o
+  valor atual no título (“▶ Compactação: Gzip”). Os textos fixos do DSpace
+  (“O que estes backups contêm”) e o texto “O que é cifrado” também ficam
+  recolhidos. Enter ou um clique abre cada seção.
+- **Correção.** Os cartões de estado do Nexus completo e do DSpace (último
+  backup, tamanho, sessões) não tinham altura e não apareciam na tela. Agora
+  aparecem.
+
+Abrir a Central continua só lendo. O estado da chave passou a ser lido
+também no DSpace e no Nexus completo.
+
+Capturas (modo demonstração, 80x24 e 160x48), em `capturas/u8/`:
+`u8-1-backup-nexus` (a tabela), `u8-2-backup-tainacan` (o quadro da chave)
+e `u8-3-backup-koha` (compactação recolhida).
+
+Testes: `panel/tests/test_u8_backups.py`, com 10 testes:
+
+- as cinco linhas da tabela, conferidas com o código de recuperação;
+- o quadro da chave em cada escopo, sem cartão de chave por sistema e sem
+  quadro só no Koha;
+- a tela do backup completo, com os cartões de estado visíveis;
+- a compactação recolhida com o valor no título;
+- as traduções.
+
+`test_backup_center.py`, `test_platforms.py` e `test_dspace_panel.py` foram
+ajustados para a nova lista de cartões. Nenhuma verificação foi retirada.
+
+Próximos: U9 (campo de porta com verificação), U10 (Koha com uma ou duas
+portas) e U11 (remoção do Koha).

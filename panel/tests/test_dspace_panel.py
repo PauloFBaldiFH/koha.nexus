@@ -259,7 +259,9 @@ def test_dspace_only_backup_center_has_its_own_actions_without_writes(monkeypatc
             view=app.screen.query_one('#view-backups')
             assert view.scope=='dspace'
             cards={c.entry.action for c in view.query(ActionCard) if c.display}
-            assert {'dspace-backup-create','dspace-backup-test','dspace-backup-restore','dspace-backup-key'} <= cards
+            # U8: the DSpace key card became the shared key box (set up or kit).
+            assert {'dspace-backup-create','dspace-backup-test','dspace-backup-restore'} <= cards
+            assert 'dspace-backup-key' not in cards and len(cards & {'pbackup-setup','pbackup-kit'}) == 1
             assert not cards & {'backup-manual','tainacan-backup','set-backup','restore-assisted'}
             assert all(not (name=='dspace-panel' and args and args[0].startswith('backup-') and args[0]!='backup-list') for name,args in calls)
     asyncio.run(exercise())

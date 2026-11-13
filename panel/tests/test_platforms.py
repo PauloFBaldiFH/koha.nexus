@@ -249,7 +249,9 @@ def test_without_koha_a_key_shows_the_reason_and_loads_nothing(no_koha):
     assert current == "view-database-off" and real_views == []
     assert "Koha is not installed" in reason
     assert after == "view-backups" and not none and not koha  # Full Nexus recovery is available before installing apps.
-    assert set(shown) == {"cloud-connections", "nexus-backup-create", "nexus-backup-verify", "nexus-backup-restore", "nexus-backup-sessions", "nexus-backup-key", "nexus-backup-kit"}
+    # U8: the shared key is one box (set up, or its kit once a key exists).
+    key = set(shown) & {"pbackup-setup", "pbackup-kit"}
+    assert set(shown) - key == {"cloud-connections", "nexus-backup-create", "nexus-backup-verify", "nexus-backup-restore", "nexus-backup-sessions"} and len(key) == 1
 
 
 def test_without_koha_routines_are_refused_with_a_reason(no_koha, tmp_path):
@@ -704,9 +706,10 @@ def test_restore_passes_the_recovery_phrase_in_the_environment_only(no_koha):
     card, shown, asked, ran = asyncio.run(main())
     assert card and asked
     # Only Tainacan here: the center shows its cards, then the shared cloud connections.
+    # U8: the shared key's kit is in the key box, after the cards.
     assert shown == ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
-                     "pbackup-configure", "pbackup-verify", "pbackup-incomplete", "pbackup-kit",
-                     "restore-assisted", "cloud-connections"]
+                     "pbackup-configure", "pbackup-verify", "pbackup-incomplete",
+                     "restore-assisted", "cloud-connections", "pbackup-kit"]
     assert ran == [("tainacan-restore", ("knx-tainacan-20261105-020000",),
                     {"KEI_BACKUP_PHRASE": "MY-SECRET-RECOVERY-PHRASE"})]
     assert all("MY-SECRET" not in " ".join(r[1]) for r in ran)

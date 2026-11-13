@@ -884,7 +884,7 @@ App.-plain #picker-drop {
 
 /* Backup center (views/backups.py): the blocks of the platform shown and
    one block per automatic backup. */
-#bk-koha, #bk-tainacan, #bk-plans, #bk-scopes { height: auto; }
+#bk-koha, #bk-tainacan, #bk-dspace, #bk-nexus, #bk-key, #bk-key-cards, #bk-plans, #bk-scopes { height: auto; }
 #bk-scopes Label { padding-top: 1; }
 /* A small terminal: the three choices fit without the label. */
 .-narrow #bk-scopes Label { display: none; }
@@ -975,3 +975,10 @@ App.-plain #picker-drop {
 .addr-value { width: 1fr; }
 .addr-buttons { height: auto; margin-bottom: 1; }
 .addr-buttons Button { margin-right: 2; width: auto; }
+
+/* Backup center (U8): collapsible details and the one key box. */
+.bk-more { margin-bottom: 1; }
+#bk-key { margin-bottom: 1; }
+#bk-key-state { text-style: bold; }
+#bk-key-state.-ok { color: $success; }
+#bk-key-state.-warn { color: $warning; }

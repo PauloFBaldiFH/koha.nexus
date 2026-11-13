@@ -15,6 +15,26 @@ NOTE = ('One encrypted file with all installed applications, their data and secr
         'Gzip, Bzip2, XZ or no compression. The recovery key is included protected by your recovery phrase. '
         'Keep that phrase separately. This is an application recovery package, not an operating-system disk image. '
         'Applications are captured in turn, not at the same instant.')
+# The Backup center's full backup, in one line (study 7.6, U8); what it
+# brings back is the table below, not a paragraph.
+SHORT_NOTE = 'One encrypted file with all the systems of this server.'
+# What a recovery does with each part of the package (platforms/nexus/
+# recovery.py: restore, settings_changes; the capture: installer's
+# nexus-full inventory). Kept true to the code: a test checks the roles.
+BRINGS_BACK = (
+    ('Comes back automatically',
+     'the data of Koha, Tainacan and DSpace, each with its own restore checks and safety backup; the backup key; '
+     "the panel's look and language; the backup plans, turned off until you set their time"),
+    ('Loaded during recovery', 'the container images, included in the file'),
+    ('Kept for review, not turned on',
+     "the source server's schedules, cloud connections, Cloudflare tunnel files, Docker settings, panel files "
+     'and installation names; the destination keeps its own addresses'),
+    ('Must be ready on the destination',
+     'the same operating system release and architecture; each system installed and empty, with the same Koha '
+     'package and the same container images; DSpace with the same release and address'),
+    ('Not included', 'the operating system, Windows and WSL, older backup packages, and files kept outside '
+     'these systems'),
+)
 RESTORE_NOTE = ('Prepare compatible empty applications on the destination before restoring: the same OS release and architecture, '
                 'the same Koha package, and matching container images. DSpace also requires the same release and repository address. '
                 'Each application uses its existing restore checks and safety backup. Recovery is sequential; completed applications '

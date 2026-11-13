@@ -24,7 +24,9 @@ READS = {"platform-backup-status", "info", "cloud-status", "cloud-list", "set-sc
 KOHA_CARDS = ["backup-download", "backup-manual", "backup-marc", "restore", "backup-cloud", "backup-test"]
 SHARED = ["restore-assisted", "cloud-connections"]
 TAINACAN_CARDS = ["tainacan-backup", "tainacan-restore-test", "tainacan-restore", "pbackup-schedule",
-                  "pbackup-configure", "pbackup-verify", "pbackup-incomplete", "pbackup-kit"]
+                  "pbackup-configure", "pbackup-verify", "pbackup-incomplete"]
+# U8: the shared key is one box after the cards (its kit here: the key is set).
+KEY = ["pbackup-kit"]
 
 
 # ----------------------------------------------------------------------
@@ -232,13 +234,15 @@ def test_the_center_follows_what_is_installed_and_only_reads(server):
         assert names[2:] == ["Cloud backup gdrive (SQL + MARC21)", "Cloud backup wasabi-weekly (SQL)"]
     elif tainacan:
         assert st["scope"] == "tainacan" and st["tainacan"] and not st["koha"]
-        assert st["cards"] == TAINACAN_CARDS + SHARED
+        assert st["cards"] == TAINACAN_CARDS + SHARED + KEY
         assert [r[0] for r in st["rows"]] == ["Tainacan backup"]
     else:
-        assert st["scope"] == "nexus" and set(st["cards"]) == {"cloud-connections", "nexus-backup-create", "nexus-backup-verify", "nexus-backup-restore", "nexus-backup-sessions", "nexus-backup-key", "nexus-backup-kit"} and st["rows"] == []
+        key = set(st["cards"]) & {"pbackup-setup", "pbackup-kit"}
+        assert st["scope"] == "nexus" and set(st["cards"]) - key == {"cloud-connections", "nexus-backup-create", "nexus-backup-verify", "nexus-backup-restore", "nexus-backup-sessions"} and len(key) == 1 and st["rows"] == []
     assert {name for name, _a in ran} <= READS
-    # The engine's state is read only where Tainacan is (the dashboard reads it too).
-    assert ("platform-backup-status" in {n for n, _a in ran}) is tainacan
+    # The engine's state is read only where the shared key is used (U8: the
+    # full backup too) or Tainacan is (the dashboard reads it too).
+    assert ("platform-backup-status" in {n for n, _a in ran}) is (tainacan or server == "none")
 
 
 @pytest.mark.parametrize("server", ["both"], indirect=True)
@@ -272,7 +276,7 @@ def test_the_platform_groups_open_the_center_already_filtered(server):
 
     from_tainacan, from_koha, chosen = asyncio.run(main())
     assert from_tainacan["scope"] == "tainacan" and from_tainacan["buttons"] == ["koha", "tainacan", "both", "nexus"]
-    assert from_tainacan["cards"] == TAINACAN_CARDS + SHARED
+    assert from_tainacan["cards"] == TAINACAN_CARDS + SHARED + KEY
     assert from_koha["scope"] == "koha" and from_koha["cards"] == KOHA_CARDS + SHARED
     assert chosen["scope"] == "tainacan" and chosen["rows"][0][0] == "Tainacan backup"
 
@@ -324,7 +328,7 @@ def test_koha_and_tainacan_as_a_set_offer_the_joint_backup_and_both_plans(server
     st, note, ran = asyncio.run(main())
     assert st["scope"] == "both" and note and not st["koha"] and not st["tainacan"]
     # The platform cards stay in each platform's view; the set has its own.
-    assert st["cards"] == ["set-backup", "set-schedule", "restore-assisted", "cloud-connections"]
+    assert st["cards"] == ["set-backup", "set-schedule", "restore-assisted", "cloud-connections"] + KEY
     assert [r[0] for r in st["rows"]] == ["Database backup (SQL)", "MARC21 package",
                                           "Cloud backup gdrive (SQL + MARC21)", "Cloud backup wasabi-weekly (SQL)",
                                           "Tainacan backup", "Joint backup (Koha + Tainacan)"]
