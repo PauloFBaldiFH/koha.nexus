@@ -24,11 +24,12 @@ import time
 from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
 from rich.text import Text
-from textual.widgets import Label, Select, Static
+from textual.widgets import Collapsible, Label, Select, Static
 
 from .. import backup_center, cloud, cron, names, platforms
 from ..backup_center import DSPACE_CODECS, TAINACAN_CODECS
 from ..i18n import t
+from ..menus import Entry
 from ..widgets.cards import ActionCard, StatusCard
 from .backup import CODEC_NOTE, CODECS, RESULTS
 from .base import ZONE_ORDER, zone_id
@@ -39,6 +40,15 @@ from .platform import ENCRYPTION_NOTE, PlatformSectionView
 READING = "Reading the backup state… The actions below can already be used; each one checks the server first."
 READ_FAILED = ("Part of the backup state could not be read (${what}). The actions stay available: each one checks "
                "the server again before doing anything. Use Refresh to read again.")
+
+# One place for the backup key and its recovery kit (study 7.5, U8): the key
+# is shared by the encrypted backups of Tainacan, DSpace and the full Nexus
+# backup, so the center shows it once instead of a card per system.
+KEY_NOTE = "Shared by the encrypted backups of Tainacan, DSpace and the full Nexus backup."
+KEY_ENTRIES = (Entry("🔐  Set up encrypted backups", "pbackup-setup", kind="native"),
+               Entry("🧰  Recovery kit", "pbackup-kit", kind="native"))
+# The cards of each system that did the same: inside the key box instead.
+KEY_ACTIONS = frozenset({"dspace-backup-key", "pbackup-setup", "pbackup-kit", "nexus-backup-key", "nexus-backup-kit"})
 
 MARKS = {"ok": ("✅", "green"), "warn": ("⚠", "yellow"), "bad": ("⚠", "red"), "": ("·", "")}
 
@@ -53,6 +63,19 @@ def plan_text(row: backup_center.PlanRow) -> Text:
                        (t("Encryption"), row.encrypted), (t("Last run"), row.last)):
         text.append(f"\n  {key}: ", style="dim")
         text.append(value, style=colour if key == t("Last run") else "")
+    return text
+
+
+def brings_back_text() -> Text:
+    """The table of the full backup (study 7.6): each part and what a
+    recovery does with it, a bold title over its wrapped text."""
+    from ..routines.nexus_backup import BRINGS_BACK
+    text = Text()
+    for n, (title, what) in enumerate(BRINGS_BACK):
+        if n:
+            text.append("\n")
+        text.append(t(title), style="bold")
+        text.append("\n  " + t(what))
     return text
 
 
@@ -98,12 +121,13 @@ class BackupCenterView(PlatformSectionView):
                 yield StatusCard(t("Last backup"), id="bk-age")
                 yield StatusCard(t("Size"), id="bk-size")
                 yield StatusCard(t("Result"), id="bk-result")
-            with Vertical(id="bk-codec-box", classes="hub-box"):
-                with Horizontal(classes="form-row"):
-                    yield Label(t("Compression"), classes="form-label")
-                    yield Select([(t(v), k) for k, v in CODECS.items()], value="gz", allow_blank=False,
-                                 id="bk-codec", disabled=True)
-                yield Label(t(CODEC_NOTE), id="bk-codec-note", classes="ai-note")
+            with Collapsible(title=t("Compression"), id="bk-codec-more", classes="bk-more"):
+                with Vertical(id="bk-codec-box", classes="hub-box"):
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Compression"), classes="form-label")
+                        yield Select([(t(v), k) for k, v in CODECS.items()], value="gz", allow_blank=False,
+                                     id="bk-codec", disabled=True)
+                    yield Label(t(CODEC_NOTE), id="bk-codec-note", classes="ai-note")
         yield Static(t("The selected platforms as a set: the joint backup makes one file with their data, each "
                        "captured in turn with its own consistent copy (not at the same instant), and the assisted "
                        "restore brings back one or several of them. The automatic backups of each are below."),
@@ -113,40 +137,55 @@ class BackupCenterView(PlatformSectionView):
                 yield StatusCard(t("Last backup"), id="bk-ds-age")
                 yield StatusCard(t("Size"), id="bk-ds-size")
                 yield StatusCard(t("Recovery packages"), id="bk-ds-count")
-            yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Schedules, cloud copies and explicit platform sets are managed here."), classes="view-prompt", markup=False)
-            yield Static(t("Container images are not included in these individual packages. Keep the matching images available for recovery on another server."), classes="view-prompt", markup=False)
-            with Vertical(classes="hub-box", id="bk-ds-codec-box"):
-                with Horizontal(classes="form-row"):
-                    yield Label(t("Compression"), classes="form-label")
-                    yield Select([(t(label), key) for key, label in DSPACE_CODECS.items()], value="gz",
-                                 allow_blank=False, id="bk-ds-codec", disabled=True)
-                yield Label(t("Used for new manual, scheduled and safety backups of DSpace. Compression runs after services resume; every package remains encrypted. Existing packages keep their format."), classes="ai-note")
+            with Collapsible(title=t("What these backups contain"), id="bk-ds-about", classes="bk-more"):
+                yield Static(t("DSpace packages encrypt the database, private configuration, documents and all Solr cores. Schedules, cloud copies and explicit platform sets are managed here."), classes="view-prompt", markup=False)
+                yield Static(t("Container images are not included in these individual packages. Keep the matching images available for recovery on another server."), classes="view-prompt", markup=False)
+            with Collapsible(title=t("Compression"), id="bk-ds-codec-more", classes="bk-more"):
+                with Vertical(classes="hub-box", id="bk-ds-codec-box"):
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Compression"), classes="form-label")
+                        yield Select([(t(label), key) for key, label in DSPACE_CODECS.items()], value="gz",
+                                     allow_blank=False, id="bk-ds-codec", disabled=True)
+                    yield Label(t("Used for new manual, scheduled and safety backups of DSpace. Compression runs after services resume; every package remains encrypted. Existing packages keep their format."), classes="ai-note")
         with Vertical(id="bk-tainacan"):
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Last backup"), id="bk-tn-age")
                 yield StatusCard(t("Size"), id="bk-tn-size")
                 yield StatusCard(t("Recovery packages"), id="pstatus-backups")
-                yield StatusCard(t("Backup key"), id="pstatus-vault")
-            with Vertical(id="bk-tn-codec-box", classes="hub-box"):
-                with Horizontal(classes="form-row"):
-                    yield Label(t("Compression"), classes="form-label")
-                    yield Select([(t(label), key) for key, label in TAINACAN_CODECS.items()], value="gz",
-                                 allow_blank=False, id="bk-tn-codec", disabled=True)
-                yield Label(t("Used for new Tainacan manual, scheduled and safety backups. Additional compression runs after WordPress resumes. Existing backups keep their format. Restic controls compression inside its own repository."), classes="ai-note")
-            yield Static(t(ENCRYPTION_NOTE), classes="view-prompt", id="encryption-note", markup=False)
+            with Collapsible(title=t("Compression"), id="bk-tn-codec-more", classes="bk-more"):
+                with Vertical(id="bk-tn-codec-box", classes="hub-box"):
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Compression"), classes="form-label")
+                        yield Select([(t(label), key) for key, label in TAINACAN_CODECS.items()], value="gz",
+                                     allow_blank=False, id="bk-tn-codec", disabled=True)
+                    yield Label(t("Used for new Tainacan manual, scheduled and safety backups. Additional compression runs after WordPress resumes. Existing backups keep their format. Restic controls compression inside its own repository."), classes="ai-note")
         with Vertical(id="bk-nexus"):
-            from ..routines.nexus_backup import NOTE
-            yield Static(t(NOTE), classes="view-prompt", markup=False)
+            from ..routines.nexus_backup import SHORT_NOTE
+            yield Static(t(SHORT_NOTE), classes="view-prompt", markup=False)
             with Grid(classes="status-grid"):
                 yield StatusCard(t("Last full backup"), id="bk-nexus-age")
                 yield StatusCard(t("Size"), id="bk-nexus-size")
                 yield StatusCard(t("Recovery sessions"), id="bk-nexus-sessions")
-            with Vertical(classes="hub-box"):
-                with Horizontal(classes="form-row"):
-                    yield Label(t("Compression"), classes="form-label")
-                    yield Select([(t(label), key) for key, label in DSPACE_CODECS.items()], value="gz",
-                                 allow_blank=False, id="bk-nexus-codec", disabled=True)
-            yield Static(t('Restore on compatible prepared applications. Review the recovery plan before applying it; source addresses and schedules require review.'), classes="view-prompt", markup=False)
+            # What a recovery does with each part, open from the start (study 7.6).
+            with Collapsible(title=t("What this backup brings back"), id="bk-nexus-back", collapsed=False,
+                             classes="bk-more"):
+                yield Static(brings_back_text(), id="bk-nexus-table", markup=False)
+            with Collapsible(title=t("Compression"), id="bk-nexus-codec-more", classes="bk-more"):
+                with Vertical(classes="hub-box"):
+                    with Horizontal(classes="form-row"):
+                        yield Label(t("Compression"), classes="form-label")
+                        yield Select([(t(label), key) for key, label in DSPACE_CODECS.items()], value="gz",
+                                     allow_blank=False, id="bk-nexus-codec", disabled=True)
+        with Vertical(id="bk-key", classes="hub-box"):
+            yield Label("", id="bk-key-state", markup=False)
+            yield Static(t(KEY_NOTE), classes="view-prompt", markup=False)
+            with Grid(classes="card-grid", id="bk-key-cards"):
+                for entry in KEY_ENTRIES:
+                    card = ActionCard(entry)
+                    card.add_class("bk-key-card")
+                    yield card
+            with Collapsible(title=t("What is encrypted"), id="bk-key-more", classes="bk-more"):
+                yield Static(t(ENCRYPTION_NOTE), classes="view-prompt", id="encryption-note", markup=False)
         yield Label(t("Automatic backups"), classes="view-prompt", id="bk-plans-title")
         # One block per automatic backup (it wraps on a small terminal,
         # where a six-column table would not fit).
@@ -156,6 +195,7 @@ class BackupCenterView(PlatformSectionView):
         return ""        # the platform is chosen above: no "Koha" tag on each card
 
     def on_mount(self) -> None:
+        self.query_one("#bk-key").border_title = t("Backup key and recovery kit")
         self.query_one("#bk-codec-box").border_title = t("Backup compression type")
         self.query_one("#bk-tn-codec-box").border_title = t("Backup compression type")
         self.query_one("#bk-ds-codec-box").border_title = t("Backup compression type")
@@ -224,6 +264,7 @@ class BackupCenterView(PlatformSectionView):
         self.query_one("#bk-tainacan").display = self.scope == backup_center.TAINACAN
         self.query_one("#bk-dspace").display = self.scope == backup_center.DSPACE
         self.query_one("#bk-nexus").display = self.scope == backup_center.NEXUS
+        self.query_one("#bk-key").display = self.needs_backups()
         self.query_one("#bk-both").display = len(backup_center.MEMBERS.get(self.scope, ())) > 1
         self.query_one("#bk-details-title").display = bool(self.scope)
         self.query_one("#bk-plans-title").display = bool(self.scope) and self.scope != backup_center.NEXUS
@@ -235,12 +276,17 @@ class BackupCenterView(PlatformSectionView):
         self.set_scope(scope)
 
     def needs_backups(self) -> bool:
-        return self.scope in (backup_center.TAINACAN, backup_center.BOTH)
+        """The shared key's state is read where a system uses it."""
+        members = backup_center.MEMBERS.get(self.scope, ())
+        return self.scope == backup_center.NEXUS or "tainacan" in members or "dspace" in members
 
     # --- which cards ----------------------------------------------------------
     def card_shown(self, entry, facts: platforms.Facts) -> bool:
         # A platform's cards in its view; the set's in "both"; the assisted
         # restore wherever a platform is; the cloud connections always.
+        # The key's cards are in the key box only.
+        if entry.action in KEY_ACTIONS:
+            return False
         if self.scope == backup_center.NEXUS:
             return entry.scope == 'nexus' or entry.action == 'cloud-connections'
         if entry.action in ('dspace-plan','dspace-plan-run'):
@@ -260,8 +306,11 @@ class BackupCenterView(PlatformSectionView):
         self.query_one("#platform-problem").display = False
         visible: dict[str, bool] = {}
         for card in self.query(ActionCard):
+            if card.has_class("bk-key-card"):
+                continue
             card.display = self.card_shown(card.entry, facts)
             visible[card.entry.zone] = visible.get(card.entry.zone, False) or card.display
+        self._show_key(facts.backups)
         zones = [z for z in ZONE_ORDER if visible.get(z)]
         for z in ZONE_ORDER:
             for title in self.query(f"#zone-{zone_id(z)}-title"):
@@ -273,10 +322,18 @@ class BackupCenterView(PlatformSectionView):
             tested = backup.verified.split()
             note = t('last restore test passed') if tested[-1:] == ['ok'] else t('last restore test failed') if tested else t('no restore test yet')
             self.query_one("#pstatus-backups", StatusCard).set(str(backup.count) if backup.known else '-', note, 'ok' if tested[-1:] == ['ok'] else 'warn')
-            value, detail, state = platforms.describe_vault(backup)
-            card = self.query_one("#pstatus-vault", StatusCard)
-            card.set(value, t('recovery kit saved') if backup.kit else t('recovery kit not saved yet'), state)
-            card.tooltip = detail
+
+    def _show_key(self, backup: platforms.BackupState) -> None:
+        """The key box: its state, then set it up (no key yet) or save the
+        kit (a key exists). Unread: setting up is offered, it checks first."""
+        value, detail, state = platforms.describe_vault(backup)
+        line = self.query_one("#bk-key-state", Label)
+        line.update(f"{t('Backup key')}: {value} · {detail}")
+        line.set_class(state == "ok", "-ok")
+        line.set_class(state == "warn", "-warn")
+        boxed = self.needs_backups()
+        for card in self.query(".bk-key-card"):
+            card.display = boxed and (bool(backup.key) if card.entry.action == "pbackup-kit" else not backup.key)
 
     # --- loading ------------------------------------------------------------------
     async def _load(self) -> None:
@@ -521,7 +578,11 @@ class BackupCenterView(PlatformSectionView):
             for key in ('age', 'size', 'sessions'):
                 self.query_one('#bk-nexus-' + key, StatusCard).set(t('Unavailable'), t('Refresh or check the task log.'), 'warn')
 
+    def _codec_title(self, box: str, name: str) -> None:
+        self.query_one(box, Collapsible).title = f"{t('Compression')}: {t(name).split(' · ')[0]}"
+
     def _show_nexus_codec(self, codec: str) -> None:
+        self._codec_title("#bk-nexus-codec-more", DSPACE_CODECS[codec])
         self.nexus_codec = codec
         self.app.nexus_backup_codec = codec
         select = self.query_one('#bk-nexus-codec', Select)
@@ -536,6 +597,7 @@ class BackupCenterView(PlatformSectionView):
         self._show_nexus_codec(codec if result and result.get('compression') == codec else previous)
 
     def _show_tainacan_codec(self, codec: str) -> None:
+        self._codec_title("#bk-tn-codec-more", TAINACAN_CODECS[codec])
         self.tainacan_codec = codec
         select = self.query_one('#bk-tn-codec', Select)
         select.value = codec
@@ -554,6 +616,7 @@ class BackupCenterView(PlatformSectionView):
         self.app.notify(t('New backups: ${name}', name=t(TAINACAN_CODECS[codec])))
 
     def _show_dspace_codec(self, codec: str) -> None:
+        self._codec_title("#bk-ds-codec-more", DSPACE_CODECS[codec])
         self.dspace_codec = codec
         select = self.query_one('#bk-ds-codec', Select)
         select.value = codec
@@ -583,6 +646,7 @@ class BackupCenterView(PlatformSectionView):
 
     def _show_codec(self, codec: str, used: str = "") -> None:
         self.codec = codec if codec in CODECS else "gz"
+        self._codec_title("#bk-codec-more", CODECS[self.codec])
         select = self.query_one("#bk-codec", Select)
         select.value = self.codec
         select.disabled = False
