@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.208",
+ "panel_version": "1.5.209",
  "languages": [
   {
    "code": "en",
@@ -286,7 +286,8 @@
     "sec-schedules",
     "sec-settings",
     "sec-diagnostics",
-    "sec-koha-security"
+    "sec-koha-security",
+    "koha-remove"
    ],
    "features": [],
    "media": [],
@@ -1312,6 +1313,16 @@
    "section": "koha",
    "label": "🔐  Administrative access",
    "description": "Superlibrarians: the web installer, a new one, a new password",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "koha-remove": {
+   "id": "koha-remove",
+   "type": "entry",
+   "section": "koha",
+   "label": "🗑  Remove Koha",
+   "description": "A checked package of Koha first; the packages, the other systems and the backups stay",
    "kind": "native",
    "status": "available",
    "media": []
@@ -5294,6 +5305,56 @@
   "Superlibrarians: the web installer, a new one, a new password": {
    "en": "Superlibrarians: the web installer, a new one, a new password",
    "pt-BR": "Superbibliotecários: o instalador da web, um novo, uma nova senha",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "🗑  Remove Koha": {
+   "en": "🗑  Remove Koha",
+   "pt-BR": "🗑  Remover o Koha",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "A checked package of Koha first; the packages, the other systems and the backups stay": {
+   "en": "A checked package of Koha first; the packages, the other systems and the backups stay",
+   "pt-BR": "Primeiro um pacote do Koha conferido; os pacotes, os outros sistemas e os backups ficam",
    "es": null,
    "fr": null,
    "it": null,
@@ -18993,6 +19054,44 @@
     ]
    }
   },
+  "koha-remove": {
+   "en": {
+    "summary": "Removes Koha from this server as its own step: a checked package of Koha first, then the instance, its database, its site and its scheduled tasks. The packages, the other systems and the backups stay.",
+    "overview": [
+     "Before anything goes, the joint package of Koha alone (the whole database, Koha's files and, with the backup key, its secrets) is written to the backup folder and every file is read back against its checksum. Without a complete package that passed its check, nothing is removed. The scheduled tasks are moved aside, not deleted. The packages (koha-common, MariaDB, Apache, Elasticsearch), Tainacan and DSpace, the firewall, the tunnel, the backups already made and the instance's files under /var/lib/koha stay."
+    ],
+    "steps": [
+     "Open **Remove Koha** (also in **Remove instance**).",
+     "Without a backup key, choose: set up the key first (recommended), or a package without Koha's secrets.",
+     "Read the review: what goes, what stays, where the package goes and how to bring Koha back. Nothing has changed yet.",
+     "Press **Remove Koha** and confirm. The package is made, checked, and only then Koha is removed."
+    ],
+    "tips": [
+     "To bring Koha back: install Koha again, the same major version, then Backup center > Assisted restore with the package.",
+     "If the removal stops part way, the package is kept and the message says what was left."
+    ],
+    "related": [
+     "set-backup",
+     "restore-assisted"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Remove o Koha deste servidor como um passo próprio: primeiro um pacote do Koha conferido, depois a instância, o banco de dados, o site e as tarefas agendadas. Os pacotes, os outros sistemas e os backups ficam.",
+    "overview": [
+     "Antes de qualquer remoção, o pacote conjunto só do Koha (o banco de dados inteiro, os arquivos do Koha e, com a chave de backup, os seus segredos) é gravado na pasta de backups e cada arquivo é lido de volta e comparado com a sua soma de verificação. Sem um pacote completo que passou na conferência, nada é removido. As tarefas agendadas são guardadas à parte, não apagadas. Os pacotes (koha-common, MariaDB, Apache, Elasticsearch), o Tainacan e o DSpace, o firewall, o túnel, os backups já feitos e os arquivos da instância em /var/lib/koha ficam."
+    ],
+    "steps": [
+     "Abra **Remover o Koha** (também em **Remover instância**).",
+     "Sem chave de backup, escolha: configurar a chave primeiro (recomendado), ou um pacote sem os segredos do Koha.",
+     "Leia a revisão: o que sai, o que fica, para onde vai o pacote e como trazer o Koha de volta. Nada foi alterado ainda.",
+     "Pressione **Remover o Koha** e confirme. O pacote é feito, conferido, e só então o Koha é removido."
+    ],
+    "tips": [
+     "Para trazer o Koha de volta: instale o Koha de novo, na mesma versão principal, e depois Central de backups > Restauração assistida com o pacote.",
+     "Se a remoção parar no meio, o pacote fica guardado e a mensagem diz o que restou."
+    ]
+   }
+  },
   "sec-koha": {
    "en": {
     "summary": "Koha's home (key k): installing it when it is absent, its tools once it is installed, and diagnosis and recovery first when its services are stopped.",
@@ -24916,165 +25015,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 194,
-   "manual_total": 194,
+   "manual": 195,
+   "manual_total": 195,
    "manual_outdated": [],
-   "strings": 552,
-   "strings_total": 552
+   "strings": 554,
+   "strings_total": 554
   },
   "pt-BR": {
-   "manual": 194,
-   "manual_total": 194,
+   "manual": 195,
+   "manual_total": 195,
    "manual_outdated": [],
-   "strings": 546,
-   "strings_total": 552
+   "strings": 548,
+   "strings_total": 554
   },
   "es": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 552
+   "strings_total": 554
   },
   "fr": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 552
+   "strings_total": 554
   },
   "it": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 552
+   "strings_total": 554
   },
   "de": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 397,
-   "strings_total": 552
+   "strings_total": 554
   },
   "nl": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "sv": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "pl": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "cs": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "ru": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "uk": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "tr": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "tl": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "id": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "ar": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "fa": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "hi": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "bn": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "vi": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "zh": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "ja": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   },
   "ko": {
    "manual": 0,
-   "manual_total": 194,
+   "manual_total": 195,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 552
+   "strings_total": 554
   }
  }
 }

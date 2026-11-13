@@ -2140,4 +2140,71 @@ Testes:
 - `test_u5_addresses.py` e `test_u5_navigation.py` ajustados: a tela do
   Koha ganhou o botão e o cartão novos.
 
-Próximo: U11 (remoção do Koha).
+Próximo: U11 (remoção do Koha), na seção 30.
+
+## 30. U11: remoção do Koha guardando os dados
+
+Remover o Koha é agora um passo próprio, nunca uma desinstalação de
+pacotes. Ele aparece em **Koha > Remover o Koha** e em **Remover
+instância**, que antes dizia que a remoção do Koha ainda não existia. Um
+instalador mais antigo continua dizendo isso.
+
+- **Plano antes de tudo, só leitura.** A revisão mostra o que sai: a
+  instância (`koha-remove`), o banco de dados e o usuário dele, o site da
+  instância, o site da equipe por nome (U10), se houver, e as tarefas
+  agendadas do Koha. Mostra também o que fica: os pacotes (koha-common,
+  MariaDB, Apache, Elasticsearch), os outros sistemas, o firewall, o túnel,
+  os backups já feitos e os arquivos da instância em `/var/lib/koha`. Diz
+  ainda para onde vai o pacote de segurança e como trazer o Koha de volta:
+  instalar a mesma versão principal e usar Central de backups >
+  Restauração assistida.
+- **Dois sins.** É preciso o botão vermelho da revisão e depois a
+  confirmação. A execução não pode ser cancelada no meio.
+- **Sem chave de backup**, a pessoa escolhe: configurar a chave primeiro
+  (recomendado, e nada é removido nessa volta) ou um pacote sem os segredos
+  do Koha. O painel diz isso, nunca em silêncio.
+
+Como foi feito (instalador, `kei_task koha-remove plan | apply keep confirm
+[no-secrets]`):
+
+1. O pacote conjunto só do Koha (`kei_set_backup`): o banco inteiro, os
+   arquivos do Koha e, com a chave, os segredos.
+2. A conferência (`kei_set_inspect`): cada arquivo é lido de volta e
+   comparado com a soma de verificação. É preciso `integrity=ok`,
+   `complete=yes` e o Koha no pacote. **Sem as duas coisas, nada é
+   removido.**
+3. A remoção, com backups e restaurações bloqueados: as tarefas agendadas
+   são **guardadas à parte** em `koha-removed/<data>/cron` (não apagadas),
+   o site da equipe por nome sai pela rotina segura do U10, e então a
+   instância e o banco saem (`install_task_remove_previous`, a mesma rotina
+   da reinstalação). Um registro `removed` fica ao lado, com a versão e o
+   pacote.
+
+Se parar no meio, o pacote fica guardado e a mensagem diz o que restou:
+`koha-remove` falhou e o banco não foi tocado, ou o banco ou o usuário não
+saíram por completo.
+
+Fica para a decisão do Paulo: apagar também os backups antigos do Koha, ou
+remover sem pacote. Esta versão só faz “remover e guardar”, que cabe em
+qualquer uma das respostas.
+
+Capturas (modo demonstração, 80x24 e 160x48), em `capturas/u11/`:
+`u11-1-revisao`, `u11-2-confirmacao` e `u11-3-concluido`.
+
+Testes:
+
+- `tests/koha_remove.bats` (7): o plano que só lê, os argumentos e o Koha
+  ausente recusados, a ordem pacote > conferência > trava > remoção, as
+  tarefas guardadas à parte, nada removido sem pacote ou com pacote
+  reprovado, a falta da chave e a opção sem segredos, a remoção que para no
+  meio, e o site da equipe por nome indo junto;
+- `tests/koha_set_system.bats`, com Koha e Tainacan reais na CI: o Koha sai
+  guardando os dados, o Tainacan fica igual, e o Koha volta do pacote
+  (contagens, segredo TOTP e arquivos iguais);
+- `panel/tests/test_u11_koha_remove.py` (7): revisão e remoção com dois
+  sins, nada sem eles, a escolha sem chave, a falha do plano, Remover
+  instância com e sem o passo, a entrada no menu e as traduções;
+- `test_tainacan_view.py` ajustado: a tela do Koha ganhou o cartão
+  “Remover o Koha” na zona de remoção.
+
+Com isso, U1 a U11 estão feitos.

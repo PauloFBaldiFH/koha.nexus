@@ -1080,6 +1080,23 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
             state = "named" if key in DEMO_NAMES else "proposed"
             out.feed(f"@@result system={key}|{state}|{DEMO_NAMES.get(key, system)}", reporter, on_result)
         return out
+    if name == "koha-remove":
+        # Removing Koha (routines/koha_remove.py): the plan; apply makes the
+        # package, checks it and says where it is. Nothing is removed in the demo.
+        lines = ["@@result instance=library", "@@result database=koha_library", "@@result version=24.05.06",
+                 "@@result go=instance|/etc/koha/sites/library", "@@result go=database|koha_library",
+                 "@@result go=apache-site|/etc/apache2/sites-available/library.conf",
+                 "@@result go=cron|/etc/cron.d/koha_tasks", "@@result go=cron|/etc/cron.d/koha_sitemap",
+                 *[f"@@result keep={k}" for k in ("packages", "firewall", "tunnel", "backups", "files")],
+                 "@@result others=tainacan", "@@result dest=/var/backups/koha-nexus", "@@result secrets=with"]
+        if args and args[0] == "apply":
+            lines += ["@@stage [1/3] Safety package of Koha\tThe whole database, Koha's files and its secrets.",
+                      "@@result package=/var/backups/koha-nexus/koha-nexus-set-20261113-101500.tar",
+                      "@@result removed=yes", "@@result aside=/var/backups/koha-nexus/koha-removed/20261113-101530"]
+        await asyncio.sleep(0.2)
+        for line in lines:
+            out.feed(line, reporter, on_result)
+        return out
     if name == "koha-access":
         # One port or two (routines/koha_access.py): two ports now; a plan
         # for biblioteca.org.br has the catalog name here, the staff name not yet.

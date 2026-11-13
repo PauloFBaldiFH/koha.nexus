@@ -120,6 +120,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🔧  Koha settings & parameters", "settings", kind="view"),
         Entry("🩺  Koha diagnostics & maintenance", "diagnostics", kind="view"),
         Entry("🛡  Koha security", "koha-security", kind="view"),
+        Entry("🗑  Remove Koha", "koha-remove", kind="native", zone="removal", requires="koha"),
     ), view="platform-home", key="k", group="koha"),
     # The standard items of every platform group (study 17.1), first and in
     # the same order; each one gathers cards that also stay where they were.
@@ -445,7 +446,7 @@ PLATFORM_TASKS: dict[str, str] = {
     "set-backup": "set-backup", "restore-assisted": "set-inspect", "set-schedule": "set-schedule",
     "tainacan-address": "tainacan-address", "tainacan-language": "tainacan-language", "admin-koha": "admin-status", "admin-tainacan": "admin-status",
     "setup-koha": "setup-status", "setup-tainacan": "setup-status",
-    "koha-access": "koha-access",
+    "koha-access": "koha-access", "koha-remove": "koha-remove",
 }
 
 # Panel routines with no installer routine of their own (routines/).
@@ -550,6 +551,7 @@ DESCRIPTIONS: dict[str, str] = {
     "cloudflare": "Publishes the OPAC and the staff site through Cloudflare",
     "ufw": "Lists the firewall rules active on this server",
     "staff-firewall": "Blocks or opens the staff port 8080 to the internet",
+    "koha-remove": "A checked package of Koha first; the packages, the other systems and the backups stay",
     "koha-access": "Catalog and staff on two ports by IP, or on one port with names (admin.your-domain)",
     "ssl": "Free HTTPS certificate, only for your own domain without the tunnel",
     "fail2ban": "Shows the banned IPs and the intrusion attempts",

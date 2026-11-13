@@ -3322,6 +3322,26 @@
     "staff-firewall",
     "cloudflare"
    ]
+  },
+  "koha-remove": {
+   "summary": "Removes Koha from this server as its own step: a checked package of Koha first, then the instance, its database, its site and its scheduled tasks. The packages, the other systems and the backups stay.",
+   "overview": [
+    "Before anything goes, the joint package of Koha alone (the whole database, Koha's files and, with the backup key, its secrets) is written to the backup folder and every file is read back against its checksum. Without a complete package that passed its check, nothing is removed. The scheduled tasks are moved aside, not deleted. The packages (koha-common, MariaDB, Apache, Elasticsearch), Tainacan and DSpace, the firewall, the tunnel, the backups already made and the instance's files under /var/lib/koha stay."
+   ],
+   "steps": [
+    "Open **Remove Koha** (also in **Remove instance**).",
+    "Without a backup key, choose: set up the key first (recommended), or a package without Koha's secrets.",
+    "Read the review: what goes, what stays, where the package goes and how to bring Koha back. Nothing has changed yet.",
+    "Press **Remove Koha** and confirm. The package is made, checked, and only then Koha is removed."
+   ],
+   "tips": [
+    "To bring Koha back: install Koha again, the same major version, then Backup center > Assisted restore with the package.",
+    "If the removal stops part way, the package is kept and the message says what was left."
+   ],
+   "related": [
+    "set-backup",
+    "restore-assisted"
+   ]
   }
  }
 }

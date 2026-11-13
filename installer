@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.208"
+PANEL_VERSION=" 1.5.209"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2684,6 +2684,121 @@ kei_koha_access() {
     tmp=$(mktemp "$KEI_KOHA_ACCESS_FILE.XXXXXX") || return 1
     { printf 'mode=%s\ndomain=%s\n' "$mode" "$domain" > "$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$KEI_KOHA_ACCESS_FILE"; } || { rm -f "$tmp"; return 1; }
     log "koha access: $mode${domain:+ ($domain)}"
+    return 0
+}
+
+# ----------------------------------------------------------------------
+# Removing Koha (U11, study 17.3)
+# ----------------------------------------------------------------------
+# A step of its own, with a plan, never a package uninstall. Before
+# anything goes, the joint package of Koha alone (kei_set_backup: the
+# whole database, Koha's files and, with the backup key, its secrets) is
+# written to the backup folder and checked (kei_set_inspect reads every
+# member's checksum back from the archive). Without a complete, verified
+# package nothing is removed. Then: the instance (koha-remove), its
+# database and database user, Koha.Nexus's staff-by-name site (U10) and
+# Koha's scheduled tasks, which are moved aside, not deleted. What stays:
+# the packages (koha-common, MariaDB, Apache, Elasticsearch), the other
+# systems, the firewall and the tunnel, the backups already made and the
+# instance's files under /var/lib/koha. The package comes back with a new
+# Koha installation of the same major version (Backup center, assisted
+# restore). The tasks moved aside and a note go to
+# $KEI_BK_ROOT/koha-removed/<date>/.
+
+# Koha.Nexus's own scheduled tasks that only make sense with Koha.
+_kei_koha_crons() {
+    local f
+    for f in "$CRON_TASKS" "$CRON_ZEBRA" "$CRON_ES" "$CRON_BROKER" "$CRON_SITEMAP" "$CRON_MSG" "$CRON_OPAC"; do
+        [ -n "$f" ] && [ -f "$f" ] && printf '%s\n' "$f"
+    done
+    return 0
+}
+
+# kei_koha_remove plan | apply keep confirm [no-secrets]. Results of the
+# plan (only reads): instance, database, version, go=WHAT|WHERE (repeats),
+# keep=WHAT (repeats), others (the other systems installed), dest (where
+# the package goes), secrets=with|needs-choice. Apply adds package= and
+# removed=yes. Returns 2 bad arguments, 3 Koha not installed, 4 no
+# "confirm", 6 the package failed or did not pass its check (nothing
+# removed), 7 no backup key and no "no-secrets" (nothing done), 8 the
+# removal stopped part way (the package is kept; what is left is said).
+kei_koha_remove() {
+    local action="${1:-plan}" mode="${2:-}" ans="${3:-}" secrets="${4:-}" f others ver out rc pkg check ts aside
+    case "$action" in plan|apply) ;; *) msg_error "" "koha-remove plan | apply keep confirm [no-secrets]"; return 2 ;; esac
+    if [ "$action" = apply ]; then
+        [ "$mode" = keep ] || { msg_error "" "koha-remove apply keep confirm [no-secrets]"; return 2; }
+        case "$secrets" in ""|no-secrets) ;; *) return 2 ;; esac
+    fi
+    is_koha_installed || { msg_error "" "$(t "Koha is not installed.")"; return 3; }
+    ver=$(dpkg-query -W -f '${Version}' koha-common 2>/dev/null | sed 's/-.*//')
+    others=$(kei_set_platforms | tr ' ' '\n' | grep -vx koha | tr '\n' ' ')
+    [ -n "$(_kei_dspace_port 2>/dev/null)" ] && others="${others}dspace "
+    kei_result instance "$INSTANCE"
+    kei_result database "$DB_NAME"
+    [ -n "$ver" ] && kei_result version "$ver"
+    kei_result go "instance|/etc/koha/sites/${INSTANCE}"
+    kei_result go "database|${DB_NAME}"
+    kei_result go "apache-site|${KEI_APACHE_DIR:-/etc/apache2}/sites-available/${INSTANCE}.conf"
+    _kei_koha_staff_ours 2>/dev/null && kei_result go "apache-site|${KEI_APACHE_DIR:-/etc/apache2}/sites-available/$(kei_proxy_site_name "$KEI_KOHA_STAFF_SITE_ID")"
+    while IFS= read -r f; do kei_result go "cron|$f"; done < <(_kei_koha_crons)
+    for f in packages firewall tunnel backups files; do kei_result keep "$f"; done
+    [ -n "${others// /}" ] && kei_result others "${others% }"
+    kei_result dest "$KEI_BK_ROOT"
+    if kei_set_needs_choice koha >/dev/null 2>&1; then kei_result secrets needs-choice; else kei_result secrets with; fi
+    [ "$action" = apply ] || return 0
+    [ "$ans" = confirm ] || { echo "$(t "Nothing was changed: the plan needs a yes (confirm).")" >&2; return 4; }
+
+    # 1. The package, then its check: nothing goes without both.
+    declare -F kei_emit >/dev/null && [ -n "${KEI_TASK:-}" ] && printf '@@stage [1/3] %s\t%s\n' "$(t "Safety package of Koha")" "$(t "The whole database, Koha's files and its secrets.")" >&2
+    mkdir -p "$KEI_BK_ROOT" && chmod 700 "$KEI_BK_ROOT" || return 1
+    out=$(kei_set_backup "$KEI_BK_ROOT" koha "$secrets" 2>&1); rc=$?
+    if [ "$rc" = 7 ]; then
+        echo "$(t "There is no backup key: set it up first, or choose a package without Koha's secrets. Nothing was removed.")" >&2
+        return 7
+    fi
+    pkg=$(sed -n 's/^file=//p' <<< "$out" | tail -n 1)
+    if [ "$rc" != 0 ] || [ -z "$pkg" ] || [ ! -f "$pkg" ] || ! grep -qx 'complete=yes' <<< "$out"; then
+        printf '%s\n' "$(grep -v '^[a-z_]*=' <<< "$out" | grep -v '^[[:space:]]*$' | tail -n 2)" >&2
+        echo "$(t "The safety package of Koha could not be made. Nothing was removed.")" >&2
+        return 6
+    fi
+    declare -F kei_emit >/dev/null && [ -n "${KEI_TASK:-}" ] && printf '@@stage [2/3] %s\t%s\n' "$(t "Checking the package")" "$(t "Every file is read back and compared with its checksum.")" >&2
+    check=$(kei_set_inspect "$pkg" 2>/dev/null)
+    if ! grep -qx 'integrity=ok' <<< "$check" || ! grep -qx 'complete=yes' <<< "$check" \
+       || ! grep -qE '^platforms=(.* )?koha( .*)?$' <<< "$check"; then
+        echo "$(t "The safety package did not pass its check. Nothing was removed.")" >&2
+        return 6
+    fi
+    kei_result package "$pkg"
+
+    # 2. The removal, with the backups and restores locked out.
+    declare -F kei_emit >/dev/null && [ -n "${KEI_TASK:-}" ] && printf '@@stage [3/3] %s\t%s\n' "$(t "Removing Koha")" "$(t "The instance, its database and its scheduled tasks. Packages and the other systems stay.")" >&2
+    backup_lock_acquire || { echo "$(t "Another backup or restore is already running. Nothing was removed; the package is kept.")" >&2; return 8; }
+    ts=$(date '+%Y%m%d-%H%M%S')
+    aside="${KEI_KOHA_REMOVED_DIR:-$KEI_BK_ROOT/koha-removed}/$ts"
+    mkdir -p "$aside/cron" && chmod 700 "${aside%/*}" "$aside" || { backup_lock_release; return 1; }
+    # The scheduled tasks first: nothing of Koha's runs while it goes.
+    while IFS= read -r f; do mv -f "$f" "$aside/cron/" || { backup_lock_release; echo "$(t "A scheduled task of Koha could not be moved aside. Koha was not removed; the package is kept.")" >&2; return 8; }; done < <(_kei_koha_crons)
+    if _kei_koha_staff_ours 2>/dev/null; then
+        kei_koha_access apply two confirm >/dev/null 2>&1 \
+            || { backup_lock_release; echo "$(t "The staff site by name could not be removed. Koha was not removed; the package is kept.")" >&2; return 8; }
+    fi
+    install_task_remove_previous; rc=$?
+    backup_lock_release
+    if [ "$rc" != 0 ]; then
+        if [ "$rc" = 2 ]; then
+            echo "$(t "koha-remove could not remove the instance. The database was not touched; the package is kept.")" >&2
+        else
+            echo "$(t "The instance was removed, but its database or database user could not be removed completely. The package is kept.")" >&2
+        fi
+        return 8
+    fi
+    printf 'removed=%s\ninstance=%s\npackage=%s\nversion=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$INSTANCE" "$pkg" "$ver" > "$aside/removed"
+    chmod 600 "$aside/removed"
+    rm -f "$KEI_KOHA_ACCESS_FILE"
+    log "Koha removed (instance $INSTANCE); package $pkg; scheduled tasks kept in $aside/cron"
+    kei_result removed yes
+    kei_result aside "$aside"
     return 0
 }
 
@@ -47351,6 +47466,7 @@ kei_task() {
         port-check)         kei_port_check "$@" ;;
         web-ports)          kei_web_ports ;;
         koha-access)        kei_koha_access "$@" ;;
+        koha-remove)        kei_koha_remove "$@" ;;
         instance-names)     kei_instance_names read ;;
         instance-name)      kei_instance_names set "${1:-}" "${2:-}" ;;
         koha-languages)
