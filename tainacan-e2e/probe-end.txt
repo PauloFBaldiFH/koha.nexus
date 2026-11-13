@@ -33,5 +33,5 @@ public.rewrite_tainacan=itens/?$,index.php?tainacan_repository_archive=1,other i
 public.block_templates=
 public.tainacan_blocks=
 public.home_text=Tainacan Pular para o conteúdo Tainacan Acervo Sample Page Acervo Pesquise o acervo ou navegue pelas coleções. Coleções Todos os itens Tainacan Blog Sobre Perguntas frequentes Autores Eventos Loja Padrões Temas Twenty Twenty-Five Criado com WordPress
-public.collections_api_anonymous=[{"status":"publish","id":13,"name":"Acervo E2E P\u00fablico","author_id":"1","creation_date":"novembro 12, 2026","modification_date":"novembro 12, 2026","order":null,"parent":0,"description":"Cole\u00e7\u00e3o de teste (publish)","slug":"acervo-e2e-publico","default_orderby":"date","default_order":
+public.collections_api_anonymous=[{"status":"publish","id":13,"name":"Acervo E2E P\u00fablico","author_id":"1","creation_date":"novembro 13, 2026","modification_date":"novembro 13, 2026","order":null,"parent":0,"description":"Cole\u00e7\u00e3o de teste (publish)","slug":"acervo-e2e-publico","default_orderby":"date","default_order":
 health.panel=ok 1
