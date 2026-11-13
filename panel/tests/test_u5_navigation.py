@@ -57,11 +57,15 @@ def test_backups_and_schedules_opens_the_center_for_its_system():
 
 def test_the_standard_items_gather_existing_cards_only():
     # Shortcuts to routines that already exist: no new routine, nothing moved out.
+    # Later PRs of the plan add their own routine here, named below.
     from kei_panel import routines
+    added_later = {'koha-access': 'U10, One port or two (study 16.1)'}
     for sid in ('koha-admin', 'koha-addresses', 'tainacan-admin', 'tainacan-addresses', 'dspace-admin-access',
                 'dspace-addresses'):
         for entry in section(sid).entries:
             assert routines.has(entry.action), entry.action
+            if entry.action in added_later:
+                continue
             others = [s.id for s in SECTIONS if s.id != sid and entry.action in {e.action for e in s.entries}]
             assert others, f'{entry.action} lives only in {sid}'
 

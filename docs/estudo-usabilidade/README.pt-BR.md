@@ -2077,3 +2077,67 @@ Testes:
 
 Próximos: U10 (Koha com uma ou duas portas) e U11 (remoção do Koha).
 
+
+## 29. U10: Koha com uma porta ou duas
+
+Em **Endereços e acesso** do Koha há agora **Uma porta ou duas…** (botão e
+cartão). Quem já tem o Koha continua em duas portas: nada muda sem escolha.
+
+- **Duas portas (recomendado, o padrão).** Catálogo na 80 e equipe na 8080,
+  as duas pelo IP do servidor, sem configurar nomes.
+- **Uma porta, com nomes.** O painel pede o domínio da instituição
+  (`biblioteca.org.br`, sem `http://` e sem caminho). O catálogo abre no
+  domínio e a equipe em `admin.biblioteca.org.br`, os dois na porta 80.
+  Pelo IP abre só o catálogo.
+- **Revisão antes de mudar.** Mostra os endereços, a equipe neste servidor
+  (`http://127.0.0.1:8080`), quem pode abrir a equipe pelo nome e se cada
+  nome já aponta para cá. Um nome que ainda não aponta é só um aviso, porque
+  passa a funcionar quando o DNS ou o túnel o apontar. Nada muda sem
+  “Aplicar”, e escolher o que já está valendo não muda nada.
+
+Como foi feito (instalador, `kei_task koha-access`):
+
+- O site do próprio Koha (`koha-create`, `koha-sites.conf`) **nunca é
+  alterado**. Nada de `INTRAPORT=""` (seção 10.2).
+- Uma porta = um site do Koha.Nexus na porta 80
+  (`zz-koha-nexus-koha-staff.conf`, `ServerName admin.<domínio>`) que
+  entrega o pedido ao site da equipe em `127.0.0.1:8080`, como o túnel já
+  faz. Passa pela mesma rotina segura dos outros sistemas: `configtest`,
+  os outros sites respondendo igual, volta atrás se algo mudar, e registro
+  em `owned.tsv`. Os módulos `proxy` e `proxy_http` são contados para o
+  Koha e voltam ao que eram quando o site sai.
+- Quem pode abrir a equipe pelo nome segue o firewall da equipe: com a
+  8080 fechada à internet, só as redes locais (`Require ip`); senão, todos.
+- Voltar para duas portas remove só esse site.
+- A 8080 continua funcionando, limitada como antes pelo firewall da equipe.
+  **Diferença em relação à seção 16.1:** a 8080 não passa a ouvir só em
+  127.0.0.1. Isso exigiria mudar o site do próprio Koha e poderia deixar a
+  equipe sem entrada; fechar a 8080 à internet continua sendo o “Firewall
+  da equipe”.
+- Endereços e acesso lista `http://admin.<domínio>` entre os endereços da
+  equipe e o testa em “Testar acesso”.
+
+Ficam para depois: a escolha durante a instalação do Koha (hoje é feita
+depois, nesta tela) e as preferências `OPACBaseURL` e `staffClientBaseURL`,
+que não são mudadas por esta ação.
+
+Capturas (modo demonstração, 80x24 e 160x48), em `capturas/u10/`:
+`u10-1-uma-ou-duas`, `u10-2-dominio` e `u10-3-revisao`.
+
+Testes:
+
+- `tests/koha_access.bats` (8): estado padrão em duas portas, domínio
+  conferido, plano que só lê, “confirm” obrigatório, o site gerado, a rede
+  limitada pelo firewall da equipe, recusa do Apache sem deixar nada
+  ligado, volta para duas portas e a linha em Endereços e acesso;
+- `tests/proxy_system.bats`, com Apache real na CI: a equipe abre por
+  `admin.kei.test` na 80, o catálogo continua pelo IP e pelo domínio, a
+  8080 continua, o site do Koha fica idêntico (sha256), e a volta para duas
+  portas desfaz tudo;
+- `panel/tests/test_u10_koha_access.py` (7): domínio, plano e aplicação com
+  confirm, nada sem o Sim, escolha já valendo, volta para duas portas, o
+  cartão e o botão na tela, e as traduções;
+- `test_u5_addresses.py` e `test_u5_navigation.py` ajustados: a tela do
+  Koha ganhou o botão e o cartão novos.
+
+Próximo: U11 (remoção do Koha).

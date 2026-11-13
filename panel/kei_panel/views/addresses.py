@@ -24,8 +24,9 @@ from .base import SectionView
 # The routines behind the buttons, by system: Tainacan's and DSpace's own
 # address routine changes the address and publishes it (a domain, HTTPS,
 # the free address); Koha is published through the Cloudflare tunnel, which
-# also sets its OPACBaseURL and staffClientBaseURL.
-CHANGE = {"tainacan": "tainacan-address", "dspace": "dspace-address"}
+# also sets its OPACBaseURL and staffClientBaseURL. Koha's own button
+# chooses one port (names) or two (U10).
+CHANGE = {"tainacan": "tainacan-address", "dspace": "dspace-address", "koha": "koha-access"}
 PUBLISH = {"koha": "cloudflare"}
 
 
@@ -50,8 +51,9 @@ class AddressesView(SectionView):
             if self.platform in PUBLISH:
                 yield Button(t("Publish…"), id="addr-publish", classes="small", compact=True)
         with Horizontal(classes="addr-buttons"):
-            if self.platform in CHANGE:
-                yield Button(t("Change or publish the address…"), id="addr-change", classes="small")
+            if self.platform in CHANGE and (self.platform != "koha" or self.app.bridge.has_task("koha-access")):
+                label = t("One port or two…") if self.platform == "koha" else t("Change or publish the address…")
+                yield Button(label, id="addr-change", classes="small")
             yield Button(t("Test access"), id="addr-test", classes="small")
         yield from self.cards()
 

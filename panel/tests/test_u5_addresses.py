@@ -31,7 +31,8 @@ def outcome(*lines):
 
 
 def test_the_screens_and_their_cards():
-    for sid, cards in (('koha-addresses', {'cloudflare', 'ssl', 'staff-firewall'}),
+    # U10 added Koha's "One port or two" (koha-access).
+    for sid, cards in (('koha-addresses', {'cloudflare', 'ssl', 'staff-firewall', 'koha-access'}),
                        ('tainacan-addresses', {'tainacan-address'}),
                        ('dspace-addresses', {'dspace-address', 'dspace-repair-web'})):
         sec = section(sid)
@@ -137,7 +138,8 @@ def test_koha_screen_publishes_through_the_tunnel(monkeypatch):
     texts, buttons, _calls = run_screen(monkeypatch, 'koha-addresses')
     assert 'http://192.168.0.20' in texts and 'http://192.168.0.20:8080' in texts
     assert 'https://biblioteca.koha.nexus' in texts
-    assert 'addr-publish' in buttons and 'addr-change' not in buttons
+    # U10: Koha's change button is "One port or two…" (routines/koha_access.py).
+    assert 'addr-publish' in buttons and 'addr-change' in buttons
 
 
 def test_the_installer_task_only_reads():

@@ -132,6 +132,7 @@ SECTIONS: tuple[Section, ...] = (
         Entry("🌉  Cloudflare Tunnel Manager (Recommended)", "cloudflare", kind="native"),
         Entry("🔏  Free SSL certificate (Certbot / Apache)", "ssl", kind="native"),
         Entry("🚧  Staff firewall (restrict port 8080)", "staff-firewall", kind="native"),
+        Entry("🔀  One port or two", "koha-access", kind="native"),
     ), view="addresses", requires="koha", group="koha"),
     Section("koha-backups", "💾  Backups and schedules", requires="koha", group="koha", opens="backups"),
     # Koha's diagnosis and maintenance (the server's own: Server diagnostics).
@@ -444,6 +445,7 @@ PLATFORM_TASKS: dict[str, str] = {
     "set-backup": "set-backup", "restore-assisted": "set-inspect", "set-schedule": "set-schedule",
     "tainacan-address": "tainacan-address", "tainacan-language": "tainacan-language", "admin-koha": "admin-status", "admin-tainacan": "admin-status",
     "setup-koha": "setup-status", "setup-tainacan": "setup-status",
+    "koha-access": "koha-access",
 }
 
 # Panel routines with no installer routine of their own (routines/).
@@ -548,6 +550,7 @@ DESCRIPTIONS: dict[str, str] = {
     "cloudflare": "Publishes the OPAC and the staff site through Cloudflare",
     "ufw": "Lists the firewall rules active on this server",
     "staff-firewall": "Blocks or opens the staff port 8080 to the internet",
+    "koha-access": "Catalog and staff on two ports by IP, or on one port with names (admin.your-domain)",
     "ssl": "Free HTTPS certificate, only for your own domain without the tunnel",
     "fail2ban": "Shows the banned IPs and the intrusion attempts",
     "rotate-db-password": "Makes a new MariaDB password for Koha",
