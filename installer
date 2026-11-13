@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.205"
+PANEL_VERSION=" 1.5.206"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2465,6 +2465,67 @@ kei_windows_check() {
     for url in "${lines[@]}"; do printf '%s|%s\n' "$url" "$now" >> "$tmp"; n=$((n + 1)); done
     chmod 644 "$tmp" && mv -f "$tmp" "$KEI_WINDOWS_CHECKS" || { rm -f "$tmp"; return 1; }
     kei_result recorded "$n"
+    return 0
+}
+
+# The port of a new site (U9, study 16.2): who already uses a port, read
+# only. kei_port_owner PORT prints "" when free, else one word:
+#   koha | tainacan | dspace    a system of this server (its own site)
+#   reserved                    an internal port of Tainacan or DSpace
+#   apache | docker | other:NAME  another site or program (NAME from ss)
+# What it reads: the systems' own addresses, the real listeners (ss), the
+# Apache Listen lines and the registry of opened ports.
+kei_port_owner() {
+    local p="${1:-}" url line proc owner
+    [[ "$p" =~ ^[0-9]{1,5}$ ]] && [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || return 2
+    if is_koha_installed && { [ "$p" = "${OPACPORT:-80}" ] || [ "$p" = "${INTRAPORT:-8080}" ]; }; then echo koha; return 0; fi
+    if [ "$(_kei_tn_get status 2>/dev/null)" = installed ] || [ -n "$(_kei_tn_get lan_port 2>/dev/null)" ]; then
+        [ "$(_kei_tn_get lan_port 2>/dev/null)" = "$p" ] && { echo tainacan; return 0; }
+    fi
+    url=$(kei_dspace_runtime status 2>/dev/null | python3 -c 'import json,sys
+from urllib.parse import urlsplit
+try:
+    d=json.load(sys.stdin); u=urlsplit(d.get("url","") if isinstance(d,dict) else "")
+    print(u.port or (443 if u.scheme=="https" else 80 if u.scheme=="http" else ""))
+except Exception: print("")' 2>/dev/null)
+    [ -n "$url" ] && [ "$url" = "$p" ] && { echo dspace; return 0; }
+    case " $KEI_TAINACAN_LOCAL_PORTS 18100 18101 18102 " in *" $p "*) echo reserved; return 0 ;; esac
+    line=$(ss -Hltnp 2>/dev/null | awk -v p="$p" '{ n = split($4, a, ":"); if (a[n] == p) { print; exit } }')
+    if [ -n "$line" ]; then
+        proc=$(printf '%s' "$line" | sed -n 's/.*users:(("\([^"]*\)".*/\1/p')
+        case "$proc" in
+            apache2|httpd) echo apache ;;
+            docker-proxy|dockerd) echo docker ;;
+            "") echo other: ;;
+            *) echo "other:${proc:0:40}" ;;
+        esac
+        return 0
+    fi
+    grep -rqsE "^[[:space:]]*Listen[[:space:]]+([0-9.]+:)?$p([[:space:]]|$)" "$KEI_APACHE_DIR"/ports.conf "$KEI_APACHE_DIR"/sites-enabled/ 2>/dev/null && { echo apache; return 0; }
+    owner=$(kei_owned_users ufw-port "$p" 2>/dev/null | head -n 1)
+    [ -n "$owner" ] && { case "$owner" in koha|tainacan|dspace) echo "$owner" ;; *) echo apache ;; esac; return 0; }
+    return 0
+}
+
+# kei_port_check PORT [SYSTEM]: the PortField of the panel. Results:
+# state=free|used|mine (mine: SYSTEM's own port), owner=, suggest= (the
+# next free port after PORT, when used), lan= (this server's address on the
+# local network, for the address shown). Read only.
+kei_port_check() {
+    local p="${1:-}" system="${2:-}" owner n ip _i
+    owner=$(kei_port_owner "$p") || { msg_error "" "Invalid port: use a number from 1 to 65535."; return 2; }
+    if [ -z "$owner" ]; then kei_result state free
+    elif [ -n "$system" ] && [ "$owner" = "$system" ]; then kei_result state mine
+    else
+        kei_result state used
+        kei_result owner "$owner"
+        for n in $(seq $((p + 1)) $((p + 50))); do
+            [ "$n" -le 65535 ] || break
+            [ -z "$(kei_port_owner "$n")" ] && { kei_result suggest "$n"; break; }
+        done
+    fi
+    read -r ip _i < <(kei_lan_address)
+    [ -n "$ip" ] && kei_result lan "$ip"
     return 0
 }
 
@@ -13601,6 +13662,19 @@ kei_tainacan_plan() {
         printf 'note\t%s\n' "$(u="$url"; t "Invalid address: \${u}. Use http://name or https://name, with no path.")"
         return 3
     fi
+    # A port of its own on the local network: nobody else may use it (U9).
+    # The install runs this plan again right before it applies anything.
+    case "$access" in
+        lan|none-lan)
+            local owner
+            read -r _s _s port < <(kei_tainacan_parse_url "$url")
+            owner=$(kei_port_owner "$port")
+            if [ -n "$owner" ] && [ "$owner" != tainacan ]; then
+                printf 'plan\trefuse\n'
+                printf 'note\t%s\n' "$(p="$port"; o="$owner"; t "Port \${p} is already in use (\${o}). Choose another port.")"
+                return 3
+            fi ;;
+    esac
     read -r mode _s < <(kei_proxy_detect)
     printf 'plan\tinstall\n'
     printf 'address\t%s\n' "$url"
@@ -47111,6 +47185,7 @@ kei_task() {
         addresses)          kei_addresses "${1:-}" "${2:-}" ;;
         windows-addresses)  kei_windows_addresses ;;
         windows-check)      kei_windows_check "$@" ;;
+        port-check)         kei_port_check "$@" ;;
         instance-names)     kei_instance_names read ;;
         instance-name)      kei_instance_names set "${1:-}" "${2:-}" ;;
         koha-languages)

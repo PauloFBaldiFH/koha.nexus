@@ -237,6 +237,12 @@ async def tainacan_install(app) -> None:
             if address is None:
                 continue
         break
+    if mode in ("local", "later"):
+        # The port of its own on the local network: shown, editable and
+        # checked (U9). The proposal keeps an earlier installation's address.
+        address = await tainacan_port(app, title)
+        if address is None:
+            return
     plan = await app.bridge.task("tainacan-plan", *([address] if address else []))
     if plan.get("plan") != "install":
         await app.push_screen_wait(MessageScreen(
@@ -259,6 +265,27 @@ async def tainacan_install(app) -> None:
         await _setup_done(app, "tainacan", "public")
     elif mode == "free":
         await tainacan_free(app, True)
+
+
+async def tainacan_port(app, title: str) -> str | None:
+    """The local address with the port chosen on the PortField, "" to let
+    the installer choose (no proposal could be read), None if cancelled."""
+    from urllib.parse import urlsplit
+
+    from ..screens.port_field import PortScreen, address
+
+    proposal = await app.bridge.task("tainacan-plan")
+    try:
+        parts = urlsplit(proposal.get("address") or "")
+        host, port = parts.hostname or "", parts.port or 0
+    except ValueError:
+        host, port = "", 0
+    if not host or not port:
+        return ""
+    chosen = await app.push_screen_wait(PortScreen(title, t(
+        "The collection answers on this server's address, on a port of its own. The suggested port is free; "
+        "you can type another."), "tainacan", port, host=host))
+    return None if chosen is None else address(chosen, "http", host)
 
 
 async def tainacan_backup(app) -> None:

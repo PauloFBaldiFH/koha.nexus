@@ -24,6 +24,7 @@ from kei_panel.bridge import TaskOutcome, stage_parts
 from kei_panel.i18n import Translator, install
 from kei_panel.routines import dspace, platforms as tn
 from kei_panel.screens.dialogs import MessageScreen, TextScreen
+from kei_panel.screens.port_field import PortState
 from kei_panel.screens.install_flow import CheckReportScreen, CompletionScreen, PlanSummaryScreen
 from kei_panel.tasks import TaskResult
 
@@ -291,7 +292,8 @@ GOOD = ['ok|Docker running on this server|29.1.3', 'ok|Free memory (768 MB neede
 
 
 def test_tainacan_installs_through_diagnosis_summary_and_report(monkeypatch):
-    app, ran = run_tainacan(monkeypatch, [True, 'local', True], GOOD)
+    # U9: the port field keeps the proposed port.
+    app, ran = run_tainacan(monkeypatch, [True, 'local', PortState(8090, 'free', lan='192.168.0.10'), True], GOOD)
     kinds = [type(s).__name__ for s in app.screens]
     assert kinds[0] == 'CheckReportScreen' and 'PlanSummaryScreen' in kinds
     assert ran == ['tainacan-install']

@@ -1080,6 +1080,23 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
             state = "named" if key in DEMO_NAMES else "proposed"
             out.feed(f"@@result system={key}|{state}|{DEMO_NAMES.get(key, system)}", reporter, on_result)
         return out
+    if name == "port-check":
+        # The PortField (screens/port_field.py): 8090 is taken by another
+        # program in the demo, so the suggestion can be seen.
+        port = args[0] if args else ""
+        used = {"80": "apache", "8080": "koha", "8090": "other:nginx", "18100": "reserved"}
+        lines = []
+        if not port.isdigit() or not 1 <= int(port) <= 65535:
+            lines = ["@@msg error Error\tInvalid port: use a number from 1 to 65535."]
+        elif port in used:
+            lines = ["@@result state=used", f"@@result owner={used[port]}", f"@@result suggest={int(port) + 1}"]
+        else:
+            lines = ["@@result state=free"]
+        lines.append("@@result lan=192.168.0.10")
+        await asyncio.sleep(0.2)
+        for line in lines:
+            out.feed(line, reporter, on_result)
+        return out
     if name == "addresses":
         # The Addresses and access screen (views/addresses.py).
         import time

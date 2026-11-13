@@ -982,3 +982,9 @@ App.-plain #picker-drop {
 #bk-key-state { text-style: bold; }
 #bk-key-state.-ok { color: $success; }
 #bk-key-state.-warn { color: $warning; }
+
+/* The port of a new site (U9). */
+.port-row { height: auto; }
+.port-row Input { width: 13; }
+.port-state.-ok { color: $success; }
+.port-state.-bad { color: $error; }

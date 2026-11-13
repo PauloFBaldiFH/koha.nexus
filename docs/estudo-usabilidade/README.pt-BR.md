@@ -1981,3 +1981,54 @@ ajustados para a nova lista de cartões. Nenhuma verificação foi retirada.
 
 Próximos: U9 (campo de porta com verificação), U10 (Koha com uma ou duas
 portas) e U11 (remoção do Koha).
+
+## 27. U9: porta conferida e editável na instalação (parte 1)
+
+Antes, a instalação do Tainacan e a do DSpace usavam uma porta fixa (8090 e
+8100) sem conferir se ela já estava ocupada. Agora as duas abrem o mesmo
+campo de porta:
+
+- **Porta sugerida, editável.** O campo já vem com a porta padrão e aceita
+  só números de 1 a 65535.
+- **Conferência na hora.** Ao digitar, o painel pergunta ao instalador
+  (`kei_task port-check PORTA SISTEMA`) quem está na porta. A resposta diz
+  se está livre, se já é do próprio sistema, ou quem a usa, com o nome
+  visível do U6 (Koha, Tainacan, DSpace, Apache, Docker, porta reservada
+  ou o nome do programa).
+- **Sugestão.** Quando a porta está ocupada, aparece o botão “Usar N”, com
+  a próxima porta livre.
+- **Endereço final.** O campo mostra o endereço que o sistema vai ter
+  (por exemplo `http://192.168.0.10:8091`). Continuar só fica disponível com
+  uma porta livre ou do próprio sistema.
+- **O instalador também confere.** O plano do Tainacan recusa uma porta de
+  outro dono (“Port N is already in use (dono). Choose another port.”),
+  mesmo quando a porta vem de fora do painel. A instalação refaz o plano
+  antes de aplicar.
+
+Nada muda em instalações existentes: a conferência só lê (`ss`, Apache,
+registro de portas) e roda apenas ao instalar.
+
+Fica para o **U9 parte 2**: no Windows, as portas abertas no firewall e no
+encaminhamento ainda são as fixas (80, 8080, 8100). A parte 2 vai lê-las dos
+sistemas instalados.
+
+Capturas (modo demonstração, 80x24 e 160x48), em `capturas/u9/`:
+`u9-1-porta-em-uso` (8090 ocupada pelo nginx, com sugestão) e
+`u9-2-porta-livre` (endereço final e Continuar habilitado).
+
+Testes:
+
+- `tests/ports.bats` (4): quem usa cada porta (sistemas, reservadas,
+  programas, Apache), as portas do Koha instalado, a conferência (livre, do
+  próprio sistema, ocupada com sugestão, inválida) e o plano do Tainacan
+  recusando porta ocupada;
+- `panel/tests/test_u9_ports.py` (5): validação e leitura da resposta, nomes
+  dos donos, o campo com sugestão e Continuar só com porta livre, o DSpace
+  pedindo porta em vez de endereço, e as traduções;
+- `tests/test_tainacan_free.py`, `test_platforms.py`, `test_u3_install.py` e
+  `test_dspace_panel.py` ajustados para responder ao campo de porta (e, no
+  Tainacan, para a segunda leitura do plano com a porta escolhida). Nenhuma
+  verificação foi retirada.
+
+Próximos: U9 parte 2 (portas do Windows), U10 (Koha com uma ou duas
+portas) e U11 (remoção do Koha).

@@ -523,6 +523,11 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
             asked = isinstance(app.screen, ChoiceScreen) and [v for v, _l in app.screen._options]
             app.screen.dismiss("local")           # the server's own address
             await pilot.pause(1.0)
+            # U9: the proposed port, shown and checked; it is kept.
+            from kei_panel.screens.port_field import PortScreen, PortState
+            assert isinstance(app.screen, PortScreen)
+            app.screen.dismiss(PortState(8090, "free", lan="192.168.0.10"))
+            await pilot.pause(1.0)
             preview = isinstance(app.screen, PlanSummaryScreen) and "wordpress.org" in str(app.screen._rows)
             await pilot.click(f"#{answer}")
             await pilot.pause(2.0)
@@ -532,10 +537,13 @@ def test_tainacan_is_installed_only_after_the_plan_and_a_yes(no_koha):
     shown, seen, ran = asyncio.run(main("back"))
     # Absent: its home offers the installation and nothing that needs it.
     assert (shown, seen) == (["tainacan-install"], (True, ["local", "domain", "free", "later"], True, False))
-    assert ran == [("tainacan-preflight", ()), ("tainacan-free-status", ()), ("tainacan-plan", ())]   # Back: nothing installed
+    # Back: nothing installed. The plan is read for the proposed port, then for the chosen address (U9).
+    assert ran == [("tainacan-preflight", ()), ("tainacan-free-status", ()), ("tainacan-plan", ()),
+                   ("tainacan-plan", ("http://192.168.0.10:8090",))]
     _shown_, seen, ran = asyncio.run(main("install"))
     assert seen[-1] is True                                  # the completion, with the final diagnosis
     assert ran == [("tainacan-preflight", ()), ("tainacan-free-status", ()), ("tainacan-plan", ()),
+                   ("tainacan-plan", ("http://192.168.0.10:8090",)),
                    ("tainacan-install", ("confirm", "http://192.168.0.10:8090")), ("tainacan-status", ())]
 
 
