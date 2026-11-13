@@ -15,6 +15,7 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Input, Label, Select, Static, Switch
+from textual.css.query import NoMatches
 
 from .. import cloud, cron, names, platforms, schedules
 from ..schedule_controls import controls, EditError
@@ -81,6 +82,21 @@ def day_value(freq, current):
     return current if isinstance(current, int) and current in allowed else allowed[0]
 
 
+
+class RowSelect(Select):
+    """A Select of a schedule row. The rows are drawn again whenever a filter
+    or a name changes; a row removed right after it was mounted still gets
+    its Mount, when its own parts are already gone (CI: NoMatches '#label'
+    on SelectCurrent). Textual ignores the same case for its overlay
+    (_watch_expanded); here the late Mount is ignored too."""
+
+    def _on_mount(self, event) -> None:
+        event.prevent_default()
+        try:
+            super()._on_mount(event)
+        except NoMatches:
+            pass
+
 class SchedulesView(SectionView):
     def __init__(self, section):
         super().__init__(section)
@@ -141,7 +157,13 @@ class SchedulesView(SectionView):
         """A name was given (U6): the filter and the rows say it."""
         if self.is_mounted:
             self._platform_choices()
-            if self.rows:
+            # During the first load the rows are being mounted: a second
+            # render then removed Selects whose own first value was still
+            # pending (CI: NoMatches '#label' on SelectCurrent). The load
+            # draws again once it ends instead.
+            if not self.ready:
+                self._names_pending = True
+            elif self.rows:
                 self._draw()
 
     def set_scope(self, scope: str) -> None:
@@ -204,6 +226,9 @@ class SchedulesView(SectionView):
         self.query_one("#sc-tz", Static).update(t("Times in ${zone} (the server's time zone).", zone=zone))
         await self._render_rows()
         self.ready = True
+        if getattr(self, "_names_pending", False):
+            self._names_pending = False
+            self._draw()
 
     async def _last_runs(self, koha: bool, tainacan: bool) -> dict[str, tuple[str, str]]:
         """Only what a record says: the backup logs, the newest package."""
@@ -313,8 +338,8 @@ class SchedulesView(SectionView):
             await block.mount(toolbar)
             await toolbar.mount(Label(t("Active"), classes="sc-switch-label"),
                 Switch(values['enabled'], id=f"sc-on-{i}", disabled=not control.available),
-                Select([(t(cron.FREQS[f]), f) for f in control.frequencies], value=values['freq'], allow_blank=False, id=f"sc-freq-{i}"),
-                Select(day_options(values['freq'], day_value(values['freq'], values['day'])), value=day_value(values['freq'], values['day']), allow_blank=False, id=f"sc-day-{i}"),
+                RowSelect([(t(cron.FREQS[f]), f) for f in control.frequencies], value=values['freq'], allow_blank=False, id=f"sc-freq-{i}"),
+                RowSelect(day_options(values['freq'], day_value(values['freq'], values['day'])), value=day_value(values['freq'], values['day']), allow_blank=False, id=f"sc-day-{i}"),
                 Input(values['time'], id=f"sc-time-{i}", placeholder="HH:MM", max_length=5),
                 Input(values['raw'], id=f"sc-raw-{i}", placeholder=t("Cron expression")),
                 Button(t("Save"), id=f"sc-save-{i}", disabled=not control.available))
