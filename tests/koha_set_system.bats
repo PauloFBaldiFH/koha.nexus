@@ -5,7 +5,9 @@
 # is readable again on a recreated instance only after the encryption key
 # comes back from the package, and nothing else of the target's
 # koha-conf.xml changes; an uploaded file and a plugin come back; Koha is
-# restored alone from the set, Tainacan on its own.
+# restored alone from the set, Tainacan on its own. Last (U11): Koha is
+# removed keeping its data, Tainacan stays the same, and Koha comes back
+# from the package on a new installation.
 #
 # The recreated instance is a new installation of the same library: a new
 # koha-conf.xml with another encryption key and another database password
@@ -317,4 +319,39 @@ PY
     [ "$(decrypt)" = "$TOTP" ]
     [ "$(cat "$(cat "$S/upload_path")/kn/sample.pdf")" = "scanned page" ]
     [ "$(counts)" = "$(cat "$S/tn_counts")" ]
+}
+
+
+@test "U11: Koha removed keeping its data; Tainacan the same; Koha back from the package" {
+    [ -f "$CONF" ]
+    tn_before=$(counts)
+    run config.sh --task koha-remove plan </dev/null 3>&-
+    [ "$status" -eq 0 ] && [[ "$output" == *"@@result secrets=with"* ]]
+    run config.sh --task koha-remove apply keep confirm </dev/null 3>&-
+    echo "$output" | grep -E '@@(msg|result)' | tail -n 6 >&3
+    [ "$status" -eq 0 ]
+    PKG=$(sed -n 's/^@@result package=//p' <<<"$output")
+    [ -f "$PKG" ]
+    # Koha is gone: instance, database and its user; its scheduled tasks moved aside.
+    [ ! -f "$CONF" ] && [ ! -d "/etc/koha/sites/$INST" ]
+    [ -z "$(mysql -N -e "SHOW DATABASES LIKE 'koha_$INST'")" ]
+    [ -z "$(mysql -N -e "SELECT User FROM mysql.user WHERE User = 'koha_$INST'")" ]
+    [ ! -e /etc/cron.d/koha_tasks ]
+    # The package passes its check; Tainacan did not change and still answers.
+    run lib "kei_set_inspect '$PKG'"
+    grep -qx 'integrity=ok' <<<"$output" && grep -qx 'platforms=koha' <<<"$output"
+    [ "$(counts)" = "$tn_before" ]
+    # A new installation of the library, then the package: the data and the key are back.
+    rm -rf "$(cat "$S/upload_path")" "$(cat "$S/plugins")"
+    koha_instance
+    run lib "kei_set_unpack '$PKG'"
+    [ "$status" -eq 0 ]
+    STAGE=$(field stage "$output"); KOHA_FILE=$(field koha "$output")
+    run config.sh --task restore "$KOHA_FILE" </dev/null 3>&-
+    [ "$status" -eq 0 ]
+    run env KEI_BACKUP_PHRASE="$PHRASE" config.sh --task set-koha-extras apply "$STAGE" confirm </dev/null 3>&-
+    [ "$status" -eq 0 ]
+    [ "$(decrypt)" = "$TOTP" ]
+    [ "$(cat "$(cat "$S/upload_path")/kn/sample.pdf")" = "scanned page" ]
+    [ "$(counts)" = "$tn_before" ]
 }

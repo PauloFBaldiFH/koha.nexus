@@ -167,7 +167,9 @@ def test_each_platform_home_follows_its_state(server):
         # The Schedules center's card sits where the editor was, after indexing.
         cards = KOHA_CARDS[:KOHA_CARDS.index("search") + 1] + ["schedules"] + \
             KOHA_CARDS[KOHA_CARDS.index("search") + 1:]
-        assert kcards == ["credentials", "admin-koha", "backups"] + cards and kproblem == "" and kdash
+        # Removing Koha (U11) closes it, in the removal zone, like Tainacan's.
+        assert kcards == ["credentials", "admin-koha", "backups"] + cards + ["koha-remove"] and kproblem == "" \
+            and kdash
     else:
         assert kcards == ["install"] and "not installed" in kproblem and not kdash
     tid, tcards, tproblem, tdash = homes["g"]

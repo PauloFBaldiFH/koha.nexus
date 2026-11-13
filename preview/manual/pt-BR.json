@@ -2875,6 +2875,23 @@
     "Voltar para duas portas remove só o site que o Koha.Nexus acrescentou."
    ],
    "_en": "cd126c2fe0"
+  },
+  "koha-remove": {
+   "summary": "Remove o Koha deste servidor como um passo próprio: primeiro um pacote do Koha conferido, depois a instância, o banco de dados, o site e as tarefas agendadas. Os pacotes, os outros sistemas e os backups ficam.",
+   "overview": [
+    "Antes de qualquer remoção, o pacote conjunto só do Koha (o banco de dados inteiro, os arquivos do Koha e, com a chave de backup, os seus segredos) é gravado na pasta de backups e cada arquivo é lido de volta e comparado com a sua soma de verificação. Sem um pacote completo que passou na conferência, nada é removido. As tarefas agendadas são guardadas à parte, não apagadas. Os pacotes (koha-common, MariaDB, Apache, Elasticsearch), o Tainacan e o DSpace, o firewall, o túnel, os backups já feitos e os arquivos da instância em /var/lib/koha ficam."
+   ],
+   "steps": [
+    "Abra **Remover o Koha** (também em **Remover instância**).",
+    "Sem chave de backup, escolha: configurar a chave primeiro (recomendado), ou um pacote sem os segredos do Koha.",
+    "Leia a revisão: o que sai, o que fica, para onde vai o pacote e como trazer o Koha de volta. Nada foi alterado ainda.",
+    "Pressione **Remover o Koha** e confirme. O pacote é feito, conferido, e só então o Koha é removido."
+   ],
+   "tips": [
+    "Para trazer o Koha de volta: instale o Koha de novo, na mesma versão principal, e depois Central de backups > Restauração assistida com o pacote.",
+    "Se a remoção parar no meio, o pacote fica guardado e a mensagem diz o que restou."
+   ],
+   "_en": "ce4c13b7d3"
   }
  }
 }

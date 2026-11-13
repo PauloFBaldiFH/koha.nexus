@@ -68,11 +68,14 @@ KOHA_REMOVAL = ("Koha: removal is not available in the panel yet. It will be its
 
 
 async def remove(app):
-    # Native Koha removal is not a package uninstall. Its dedicated driver
-    # must be implemented before offering destructive server-wide operations.
-    available = [key for key in ('tainacan', 'dspace') if app.platform_ready(key)]
-    # Said, never just left out (study 17.3): Koha removal is a later step.
-    koha = t(KOHA_REMOVAL) if app.platform_ready('koha') else ''
+    # Koha's removal is its own step (U11, routines/koha_remove.py): a
+    # verified package first, the packages and the other systems stay. An
+    # installer older than that step keeps saying it is not available.
+    bridge = getattr(app, 'bridge', None)
+    koha_step = app.platform_ready('koha') and bridge is not None and bridge.has_task('koha-remove')
+    available = (['koha'] if koha_step else []) + [key for key in ('tainacan', 'dspace') if app.platform_ready(key)]
+    # Said, never just left out (study 17.3).
+    koha = t(KOHA_REMOVAL) if app.platform_ready('koha') and not koha_step else ''
     if not available:
         await app.push_screen_wait(MessageScreen(t('Remove instance'), '\n\n'.join(filter(None, (t(
             'No removable container installation was detected. Open the application diagnosis if its state cannot be read.'), koha)))))
@@ -83,7 +86,7 @@ async def remove(app):
     if selected not in available:
         return
     from . import ROUTINES
-    await ROUTINES[{'tainacan': 'tainacan-uninstall', 'dspace': 'dspace-remove'}[selected]](app)
+    await ROUTINES[{'koha': 'koha-remove', 'tainacan': 'tainacan-uninstall', 'dspace': 'dspace-remove'}[selected]](app)
 
 
 # "Name the installations" (study 12, U6). The name lives only in the
