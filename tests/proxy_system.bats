@@ -76,6 +76,28 @@ kei_proxy_apply_site tainacan acervo '$W/site.conf'"
     [ "$(curl -s --resolve acervo.kei.test:80:127.0.0.1 http://acervo.kei.test/)" = OPAC ]
 }
 
+@test "Koha with one port (U10): the staff by name on 80, back to two ports; Koha's site untouched" {
+    koha_apache
+    sha=$(sha256sum /etc/apache2/sites-available/library.conf)
+    run lib 'is_koha_installed() { INTRAPORT=8080; return 0; }
+kei_result() { :; }
+kei_koha_access apply one kei.test confirm'
+    [ "$status" -eq 0 ]
+    [ "$(curl -s --resolve admin.kei.test:80:127.0.0.1 http://admin.kei.test/)" = STAFF ]
+    [ "$(curl -s http://127.0.0.1/)" = OPAC ]
+    [ "$(curl -s --resolve kei.test:80:127.0.0.1 http://kei.test/)" = OPAC ]
+    [ "$(curl -s http://127.0.0.1:8080/)" = STAFF ]
+    [ "$(sha256sum /etc/apache2/sites-available/library.conf)" = "$sha" ]
+    run lib 'is_koha_installed() { INTRAPORT=8080; return 0; }
+kei_result() { :; }
+kei_koha_access apply two confirm'
+    [ "$status" -eq 0 ]
+    [ ! -e /etc/apache2/sites-available/zz-koha-nexus-koha-staff.conf ]
+    [ "$(curl -s --resolve admin.kei.test:80:127.0.0.1 http://admin.kei.test/)" = OPAC ]
+    [ "$(curl -s http://127.0.0.1:8080/)" = STAFF ]
+    [ "$(sha256sum /etc/apache2/sites-available/library.conf)" = "$sha" ]
+}
+
 @test "UFW active: a port opened for a platform closes again; one that existed stays" {
     command -v ufw >/dev/null || skip "needs ufw"
     ufw --force reset >/dev/null

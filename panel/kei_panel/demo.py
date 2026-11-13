@@ -1080,6 +1080,24 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
             state = "named" if key in DEMO_NAMES else "proposed"
             out.feed(f"@@result system={key}|{state}|{DEMO_NAMES.get(key, system)}", reporter, on_result)
         return out
+    if name == "koha-access":
+        # One port or two (routines/koha_access.py): two ports now; a plan
+        # for biblioteca.org.br has the catalog name here, the staff name not yet.
+        action = args[0] if args else "status"
+        mode = args[1] if len(args) > 1 else "two"
+        domain = args[2] if len(args) > 2 and args[2] != "confirm" else ""
+        if action == "status" or mode == "two":
+            lines = ["@@result mode=two", "@@result opac=http://192.168.0.20",
+                     "@@result staff=http://192.168.0.20:8080"]
+        else:
+            lines = ["@@result mode=one", f"@@result domain={domain}", f"@@result opac=http://{domain}",
+                     f"@@result staff=http://admin.{domain}", "@@result recovery=http://127.0.0.1:8080",
+                     "@@result staff_net=local", f"@@result points={domain}|here",
+                     f"@@result points=admin.{domain}|none"]
+        await asyncio.sleep(0.2)
+        for line in lines:
+            out.feed(line, reporter, on_result)
+        return out
     if name == "port-check":
         # The PortField (screens/port_field.py): 8090 is taken by another
         # program in the demo, so the suggestion can be seen.

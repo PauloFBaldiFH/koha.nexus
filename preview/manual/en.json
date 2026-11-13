@@ -3302,6 +3302,26 @@
    "overview": [
     "Collections, items and accounts do not change. If the translation cannot be downloaded, WordPress stays in the language it had and the message says so."
    ]
+  },
+  "koha-access": {
+   "summary": "Chooses how people open Koha: two ports by this server's IP (the default), or one port with names, the staff at admin.your-domain.",
+   "overview": [
+    "With two ports the catalog answers on 80 and the staff on 8080, both by the server's IP, with no names to set up. With one port the staff also answers by name on port 80 (admin. followed by the institution's domain). Both names must point to this server (DNS or tunnel); by IP only the catalog opens. Koha's own site is never changed and port 8080 keeps working as the way in from the server."
+   ],
+   "steps": [
+    "Open **One port or two** (also the button in Addresses and access).",
+    "Choose two ports, or one port and type the institution's domain.",
+    "Read the review: addresses, who may open the staff by name and whether each name already points here. Nothing has changed yet.",
+    "Apply, then use **Test access** to check each address."
+   ],
+   "tips": [
+    "A name that does not point here yet is only a warning: it starts working once the DNS or the tunnel points it to this server.",
+    "Going back to two ports removes only the site Koha.Nexus added."
+   ],
+   "related": [
+    "staff-firewall",
+    "cloudflare"
+   ]
   }
  }
 }

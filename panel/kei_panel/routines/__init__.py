@@ -13,13 +13,14 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import (dspace, instances, admin_access, backup, backup_set, nexus_backup, database, diagnostics, install, platforms, search, security, setup,
+from . import (dspace, instances, koha_access, admin_access, backup, backup_set, nexus_backup, database, diagnostics, install, platforms, search, security, setup,
                settings, tools)
 
 Routine = Callable[[object], Awaitable[None]]
 
 ROUTINES: dict[str, Routine] = {
     "instance-add": instances.add,
+    "koha-access": koha_access.koha_access,         # Addresses and access, Koha (U10)
     "instance-remove": instances.remove,
     "instance-names": instances.name_instances,
     **{"dspace-" + name: getattr(dspace, name) for name in ("install", "start", "stop", "diagnose", "logs", "admin", "help")},

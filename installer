@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.207"
+PANEL_VERSION=" 1.5.208"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2553,6 +2553,140 @@ kei_web_ports() {
     return 0
 }
 
+# ----------------------------------------------------------------------
+# Koha with one port or two (U10, study 16.1)
+# ----------------------------------------------------------------------
+# Two ports (the default, every existing install): catalog on 80, staff on
+# 8080, both by IP. One port: the staff also answers by name on 80
+# (admin.DOMAIN), through an Apache site of Koha.Nexus that hands the
+# request to the staff site on 127.0.0.1:8080. Koha's own site files are
+# never changed: 8080 keeps answering as the recovery way in, limited as
+# before by the staff firewall. The site goes through kei_proxy_apply_site
+# (configtest, the other sites unchanged, rollback, owned.tsv).
+KEI_KOHA_ACCESS_FILE="${KEI_KOHA_ACCESS_FILE:-${KEI_OWNED_DIR:-/var/lib/koha-nexus}/koha-access}"
+KEI_KOHA_STAFF_SITE_ID="koha-staff"
+KEI_KOHA_STAFF_PREFIX="admin."
+
+_kei_koha_access_get() { [ -f "$KEI_KOHA_ACCESS_FILE" ] && sed -n "s/^$1=//p" "$KEI_KOHA_ACCESS_FILE" | head -n 1; }
+
+# kei_koha_domain_valid NAME: a lower-case DNS name with at least one dot,
+# not an IP address, not already starting with admin.
+kei_koha_domain_valid() {
+    local d="${1:-}"
+    [ "${#d}" -le 190 ] || return 1
+    [[ "$d" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || return 1
+    [[ "$d" == "$KEI_KOHA_STAFF_PREFIX"* ]] && return 1
+    return 0
+}
+
+# Who may open the staff by name: the same networks as the staff firewall
+# (only the local networks once 8080 is closed to the internet), "all"
+# otherwise.
+kei_koha_staff_net() {
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qE "^${INTRAPORT:-8080}/tcp[[:space:]]+DENY"; then
+        echo local
+    else
+        echo all
+    fi
+}
+
+# kei_koha_name_points NAME: here (one of this server's addresses),
+# elsewhere, or none (the name does not resolve). Only reads.
+kei_koha_name_points() {
+    local a mine
+    a=$(getent ahostsv4 "${1:-}" 2>/dev/null | awk 'NR == 1 { print $1 }')
+    [ -n "$a" ] || { echo none; return 0; }
+    mine=$( { ip -4 -o addr show 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }'; get_server_ip 2>/dev/null; echo "${WIN_LAN_IP:-}"; } | sort -u)
+    if printf '%s\n' "$mine" | grep -qxF -- "$a"; then echo here; else echo elsewhere; fi
+}
+
+# The Apache site for the staff by name.
+_kei_koha_staff_site() {
+    local domain="$1" net="$2" rule="Require all granted"
+    [ "$net" = local ] && rule="Require ip 127.0.0.1 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
+    cat <<SITE
+<VirtualHost *:80>
+    ServerName ${KEI_KOHA_STAFF_PREFIX}${domain}
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:${INTRAPORT:-8080}/
+    ProxyPassReverse / http://127.0.0.1:${INTRAPORT:-8080}/
+    <Location />
+        ${rule}
+    </Location>
+    ErrorLog \${APACHE_LOG_DIR}/koha-nexus-koha-staff-error.log
+    CustomLog \${APACHE_LOG_DIR}/koha-nexus-koha-staff-access.log combined
+</VirtualHost>
+SITE
+}
+
+_kei_koha_staff_ours() { kei_owned_users apache-site "$(kei_proxy_site_name "$KEI_KOHA_STAFF_SITE_ID")" | grep -qx koha; }
+
+# kei_koha_access [status | plan one DOMAIN | plan two | apply one DOMAIN
+# confirm | apply two confirm]. Results: mode, domain, opac, staff,
+# recovery, staff_net, points (NAME|here/elsewhere/none). Status and plan
+# only read. Returns 2 bad arguments, 3 Koha or Apache missing, 4 no
+# "confirm", and kei_proxy_apply_site's codes (5 configtest, 6 the other
+# sites would change, 7 changed by hand).
+kei_koha_access() {
+    local action="${1:-status}" mode="${2:-}" domain="${3:-}" ans="${4:-}" net name rc tmp a _i
+    case "$action" in status|plan|apply) ;; *) msg_error "" "koha-access status|plan|apply"; return 2 ;; esac
+    is_koha_installed || { msg_error "" "$(t "Koha is not installed.")"; return 3; }
+    if [ "$action" = status ]; then
+        mode=$(_kei_koha_access_get mode); domain=$(_kei_koha_access_get domain)
+        if [ "$mode" != one ] || ! kei_koha_domain_valid "$domain"; then mode=two; domain=""; fi
+    else
+        case "$mode" in
+            one) kei_koha_domain_valid "$domain" || { msg_error "" "$(t "Type the institution's domain, for example biblioteca.org.br (no http://, no path).")"; return 2; } ;;
+            two) ans="${3:-}"; domain="" ;;
+            *) msg_error "" "koha-access $action one DOMAIN | two"; return 2 ;;
+        esac
+    fi
+    net=$(kei_koha_staff_net)
+    kei_result mode "$mode"
+    if [ "$mode" = one ]; then
+        name="${KEI_KOHA_STAFF_PREFIX}${domain}"
+        kei_result domain "$domain"
+        kei_result opac "http://$domain"
+        kei_result staff "http://$name"
+        kei_result recovery "http://127.0.0.1:${INTRAPORT:-8080}"
+        kei_result staff_net "$net"
+        kei_result points "$domain|$(kei_koha_name_points "$domain")"
+        kei_result points "$name|$(kei_koha_name_points "$name")"
+    else
+        read -r a _i < <(kei_lan_address)
+        kei_result opac "http://$a"
+        kei_result staff "http://$a:${INTRAPORT:-8080}"
+    fi
+    [ "$action" = apply ] || return 0
+    [ "$ans" = confirm ] || { echo "$(t "Nothing was changed: the plan needs a yes (confirm).")" >&2; return 4; }
+    if [ "$mode" = one ]; then
+        command -v apache2ctl >/dev/null 2>&1 || { msg_error "" "$(t "Apache is not installed.")"; return 3; }
+        kei_proxy_module_use koha proxy || return 1
+        kei_proxy_module_use koha proxy_http || return 1
+        tmp=$(mktemp) || return 1
+        _kei_koha_staff_site "$domain" "$net" > "$tmp"
+        kei_proxy_apply_site koha "$KEI_KOHA_STAFF_SITE_ID" "$tmp"; rc=$?
+        rm -f "$tmp"
+        if [ "$rc" != 0 ]; then
+            # Refused: no site of ours, so the modules go back as they were.
+            _kei_koha_staff_ours || { kei_proxy_module_release koha proxy_http; kei_proxy_module_release koha proxy; } >/dev/null 2>&1
+            return "$rc"
+        fi
+    else
+        if _kei_koha_staff_ours; then
+            kei_proxy_remove_site koha "$KEI_KOHA_STAFF_SITE_ID"; rc=$?
+            [ "$rc" = 0 ] || return "$rc"
+        fi
+        kei_proxy_module_release koha proxy_http >/dev/null 2>&1
+        kei_proxy_module_release koha proxy >/dev/null 2>&1
+    fi
+    mkdir -p "${KEI_KOHA_ACCESS_FILE%/*}" || return 1
+    tmp=$(mktemp "$KEI_KOHA_ACCESS_FILE.XXXXXX") || return 1
+    { printf 'mode=%s\ndomain=%s\n' "$mode" "$domain" > "$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$KEI_KOHA_ACCESS_FILE"; } || { rm -f "$tmp"; return 1; }
+    log "koha access: $mode${domain:+ ($domain)}"
+    return 0
+}
+
 kei_addresses() {
     local platform="${1:-}" mode="${2:-}" url kind scheme host port ifc a item code
     local -a configured=() shown=() ports=()
@@ -2570,7 +2704,12 @@ kei_addresses() {
                     kei_result unset "${k%%:*}"
                 fi
             done
-            ports=("opac|http|80" "staff|http|8080") ;;
+            ports=("opac|http|80" "staff|http|8080")
+            # One port (U10): the staff also by name on 80.
+            if [ "$(_kei_koha_access_get mode)" = one ] && kei_koha_domain_valid "$(_kei_koha_access_get domain)"; then
+                url="http://${KEI_KOHA_STAFF_PREFIX}$(_kei_koha_access_get domain)"
+                case " ${configured[*]} " in *"|$url "*) ;; *) kei_result alternative "staff|$url"; shown+=("$url") ;; esac
+            fi ;;
         tainacan)
             url=$(_kei_tn_get url); url="${url%/}"
             [ -n "$url" ] && configured+=("site|$url") ;;
@@ -47211,6 +47350,7 @@ kei_task() {
         windows-check)      kei_windows_check "$@" ;;
         port-check)         kei_port_check "$@" ;;
         web-ports)          kei_web_ports ;;
+        koha-access)        kei_koha_access "$@" ;;
         instance-names)     kei_instance_names read ;;
         instance-name)      kei_instance_names set "${1:-}" "${2:-}" ;;
         koha-languages)

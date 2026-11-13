@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.207",
+ "panel_version": "1.5.208",
  "languages": [
   {
    "code": "en",
@@ -326,7 +326,8 @@
    "entries": [
     "cloudflare",
     "ssl",
-    "staff-firewall"
+    "staff-firewall",
+    "koha-access"
    ],
    "features": [],
    "media": [],
@@ -1371,6 +1372,16 @@
    "section": "koha-addresses",
    "label": "🚧  Staff firewall (restrict port 8080)",
    "description": "Blocks or opens the staff port 8080 to the internet",
+   "kind": "native",
+   "status": "available",
+   "media": []
+  },
+  "koha-access": {
+   "id": "koha-access",
+   "type": "entry",
+   "section": "koha-addresses",
+   "label": "🔀  One port or two",
+   "description": "Catalog and staff on two ports by IP, or on one port with names (admin.your-domain)",
    "kind": "native",
    "status": "available",
    "media": []
@@ -5529,6 +5540,56 @@
    "zh": "阻止或开放馆员端口 8080 的互联网访问",
    "ja": "職員用ポート 8080 のインターネットからのアクセスを遮断または許可します",
    "ko": "직원용 8080 포트의 인터넷 접근을 차단하거나 허용합니다"
+  },
+  "🔀  One port or two": {
+   "en": "🔀  One port or two",
+   "pt-BR": "🔀  Uma porta ou duas",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
+  },
+  "Catalog and staff on two ports by IP, or on one port with names (admin.your-domain)": {
+   "en": "Catalog and staff on two ports by IP, or on one port with names (admin.your-domain)",
+   "pt-BR": "Catálogo e equipe em duas portas pelo IP, ou numa porta só com nomes (admin.seu-domínio)",
+   "es": null,
+   "fr": null,
+   "it": null,
+   "de": null,
+   "nl": null,
+   "sv": null,
+   "pl": null,
+   "cs": null,
+   "ru": null,
+   "uk": null,
+   "tr": null,
+   "tl": null,
+   "id": null,
+   "ar": null,
+   "fa": null,
+   "hi": null,
+   "bn": null,
+   "vi": null,
+   "zh": null,
+   "ja": null,
+   "ko": null
   },
   "💾  Backups and schedules": {
    "en": "💾  Backups and schedules",
@@ -19179,6 +19240,44 @@
     ]
    }
   },
+  "koha-access": {
+   "en": {
+    "summary": "Chooses how people open Koha: two ports by this server's IP (the default), or one port with names, the staff at admin.your-domain.",
+    "overview": [
+     "With two ports the catalog answers on 80 and the staff on 8080, both by the server's IP, with no names to set up. With one port the staff also answers by name on port 80 (admin. followed by the institution's domain). Both names must point to this server (DNS or tunnel); by IP only the catalog opens. Koha's own site is never changed and port 8080 keeps working as the way in from the server."
+    ],
+    "steps": [
+     "Open **One port or two** (also the button in Addresses and access).",
+     "Choose two ports, or one port and type the institution's domain.",
+     "Read the review: addresses, who may open the staff by name and whether each name already points here. Nothing has changed yet.",
+     "Apply, then use **Test access** to check each address."
+    ],
+    "tips": [
+     "A name that does not point here yet is only a warning: it starts working once the DNS or the tunnel points it to this server.",
+     "Going back to two ports removes only the site Koha.Nexus added."
+    ],
+    "related": [
+     "staff-firewall",
+     "cloudflare"
+    ]
+   },
+   "pt-BR": {
+    "summary": "Escolhe como as pessoas abrem o Koha: duas portas pelo IP deste servidor (o padrão), ou uma porta com nomes, a equipe em admin.seu-domínio.",
+    "overview": [
+     "Com duas portas, o catálogo responde na 80 e a equipe na 8080, as duas pelo IP do servidor, sem configurar nomes. Com uma porta, a equipe também responde pelo nome na porta 80 (admin. seguido do domínio da instituição). Os dois nomes precisam apontar para este servidor (DNS ou túnel); pelo IP abre só o catálogo. O site do próprio Koha nunca é alterado e a porta 8080 continua funcionando como entrada a partir do servidor."
+    ],
+    "steps": [
+     "Abra **Uma porta ou duas** (também o botão em Endereços e acesso).",
+     "Escolha duas portas, ou uma porta e digite o domínio da instituição.",
+     "Leia a revisão: endereços, quem pode abrir a equipe pelo nome e se cada nome já aponta para cá. Nada foi alterado ainda.",
+     "Aplique e use **Testar acesso** para conferir cada endereço."
+    ],
+    "tips": [
+     "Um nome que ainda não aponta para cá é só um aviso: passa a funcionar quando o DNS ou o túnel o apontar para este servidor.",
+     "Voltar para duas portas remove só o site que o Koha.Nexus acrescentou."
+    ]
+   }
+  },
   "sec-koha-addresses": {
    "en": {
     "summary": "How Koha is reached: OPACBaseURL and staffClientBaseURL as configured, the other names of the server, the tunnel, and the cards for the Cloudflare Tunnel, the free SSL certificate and the staff firewall.",
@@ -24817,165 +24916,165 @@
  },
  "coverage": {
   "en": {
-   "manual": 193,
-   "manual_total": 193,
+   "manual": 194,
+   "manual_total": 194,
    "manual_outdated": [],
-   "strings": 550,
-   "strings_total": 550
+   "strings": 552,
+   "strings_total": 552
   },
   "pt-BR": {
-   "manual": 193,
-   "manual_total": 193,
+   "manual": 194,
+   "manual_total": 194,
    "manual_outdated": [],
-   "strings": 544,
-   "strings_total": 550
+   "strings": 546,
+   "strings_total": 552
   },
   "es": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 550
+   "strings_total": 552
   },
   "fr": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 550
+   "strings_total": 552
   },
   "it": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 398,
-   "strings_total": 550
+   "strings_total": 552
   },
   "de": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 397,
-   "strings_total": 550
+   "strings_total": 552
   },
   "nl": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "sv": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "pl": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "cs": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "ru": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "uk": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "tr": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "tl": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "id": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "ar": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "fa": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "hi": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "bn": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "vi": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "zh": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "ja": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   },
   "ko": {
    "manual": 0,
-   "manual_total": 193,
+   "manual_total": 194,
    "manual_outdated": [],
    "strings": 364,
-   "strings_total": 550
+   "strings_total": 552
   }
  }
 }

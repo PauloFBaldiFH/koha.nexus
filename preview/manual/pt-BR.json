@@ -2858,6 +2858,23 @@
     "Acervos, itens e contas não mudam. Se a tradução não puder ser baixada, o WordPress fica no idioma que tinha e a mensagem avisa."
    ],
    "_en": "d521ede8ba"
+  },
+  "koha-access": {
+   "summary": "Escolhe como as pessoas abrem o Koha: duas portas pelo IP deste servidor (o padrão), ou uma porta com nomes, a equipe em admin.seu-domínio.",
+   "overview": [
+    "Com duas portas, o catálogo responde na 80 e a equipe na 8080, as duas pelo IP do servidor, sem configurar nomes. Com uma porta, a equipe também responde pelo nome na porta 80 (admin. seguido do domínio da instituição). Os dois nomes precisam apontar para este servidor (DNS ou túnel); pelo IP abre só o catálogo. O site do próprio Koha nunca é alterado e a porta 8080 continua funcionando como entrada a partir do servidor."
+   ],
+   "steps": [
+    "Abra **Uma porta ou duas** (também o botão em Endereços e acesso).",
+    "Escolha duas portas, ou uma porta e digite o domínio da instituição.",
+    "Leia a revisão: endereços, quem pode abrir a equipe pelo nome e se cada nome já aponta para cá. Nada foi alterado ainda.",
+    "Aplique e use **Testar acesso** para conferir cada endereço."
+   ],
+   "tips": [
+    "Um nome que ainda não aponta para cá é só um aviso: passa a funcionar quando o DNS ou o túnel o apontar para este servidor.",
+    "Voltar para duas portas remove só o site que o Koha.Nexus acrescentou."
+   ],
+   "_en": "cd126c2fe0"
   }
  }
 }

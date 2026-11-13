@@ -62,6 +62,7 @@ on:
       - "tests/platforms.bats"
       - "tests/addresses.bats"
       - "tests/ports.bats"
+      - "tests/koha_access.bats"
       - "tests/tainacan.bats"
       - "tests/tainacan_system.bats"
       - "tests/tainacan_reboot.bats"
@@ -97,6 +98,7 @@ on:
       - "tests/platforms.bats"
       - "tests/addresses.bats"
       - "tests/ports.bats"
+      - "tests/koha_access.bats"
       - "tests/tainacan.bats"
       - "tests/tainacan_system.bats"
       - "tests/tainacan_reboot.bats"
@@ -139,7 +141,7 @@ jobs:
               apt-get install -y -qq apache2 bats curl openssl python3 iproute2 gnupg restic rclone >/dev/null
               restic version
               cd /src
-              bats tests/platforms.bats tests/addresses.bats tests/ports.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
+              bats tests/platforms.bats tests/addresses.bats tests/ports.bats tests/koha_access.bats tests/proxy.bats tests/docker.bats tests/tainacan.bats
               bats tests/backup_engine.bats tests/backup_set.bats tests/schedule_controls.bats tests/dspace_web.bats tests/admin_access.bats tests/tainacan_free.bats tests/dspace_free.bats
               KEI_REQUIRE_REAL_EVENTS=1 bats tests/tainacan_events.bats
               bats tests/uninstall_registry.bats'
