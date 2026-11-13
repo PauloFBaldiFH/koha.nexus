@@ -14,6 +14,7 @@ from kei_panel.dspace import origin, payload
 from kei_panel.env import PanelEnv
 from kei_panel.routines import dspace
 from kei_panel.screens.dialogs import InputScreen, MessageScreen
+from kei_panel.screens.port_field import PortState
 from kei_panel.screens.install_flow import CheckReportScreen, CompletionScreen, PlanSummaryScreen
 from kei_panel.tasks import TaskResult
 from kei_panel.widgets.cards import ActionCard
@@ -357,7 +358,8 @@ def test_web_repair_uses_the_chosen_actual_network_ip_and_explicit_confirmation(
 
 def test_wsl_install_can_choose_localhost_without_copying_an_example_ip(monkeypatch):
     calls=mock_calls(monkeypatch,{'availability':{'available':True},'dspace-prerequisites':{'platform':'wsl2'},'status':{'status':'absent'},'plan':{'url':'http://localhost:8100'}})
-    app=App([True,'local',False])
+    # U9: the port field answers 8100, free.
+    app=App([True,'local',PortState(8100,'free','',0,''),False])
     async def status():return {'docker':{'installed':True}}
     app.bridge=SimpleNamespace(status=status)
     asyncio.run(dspace.install(app))

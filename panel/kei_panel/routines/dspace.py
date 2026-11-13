@@ -126,6 +126,8 @@ async def install(app):
     if current is None:
         return
     url = current.get('url')
+    from ..screens.port_field import PortScreen, address
+    port_body = t('DSpace answers on a port of its own. Keep the suggested port or type another.')
     if not url and deps.get('platform') in ('wsl1', 'wsl2'):
         access = await app.push_screen_wait(ChoiceScreen(TITLE,
             t('Where will you open DSpace? On Windows/WSL, localhost avoids depending on LAN forwarding. Network access needs the real Windows IP and its network setup.'),
@@ -133,7 +135,23 @@ async def install(app):
         if access is None:
             return
         if access == 'local':
-            url = 'http://localhost:8100'
+            # The port shown, editable and checked (U9).
+            chosen = await app.push_screen_wait(PortScreen(TITLE, port_body, 'dspace', host='localhost'))
+            if chosen is None:
+                return
+            url = address(chosen, 'http', 'localhost')
+    elif not url:
+        access = await app.push_screen_wait(ChoiceScreen(TITLE,
+            t('How will people open DSpace?'),
+            [('port', t("This server's address, on a port of its own")),
+             ('domain', t('A name (domain) already pointing to this server'))]))
+        if access is None:
+            return
+        if access == 'port':
+            chosen = await app.push_screen_wait(PortScreen(TITLE, port_body, 'dspace'))
+            if chosen is None:
+                return
+            url = address(chosen)
     url = url or await app.push_screen_wait(InputScreen(
         TITLE, t('Use this server’s IP and a separate port (for example http://192.168.1.20:8100), or a DNS name already pointing here. Address and HTTPS assistance remains available after installation.'),
         t('Repository address:'), validate=lambda v: '' if origin(v) else t('Enter one HTTP(S) address without credentials or a path.')))

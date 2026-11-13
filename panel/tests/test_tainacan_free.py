@@ -99,13 +99,22 @@ def test_a_domain_is_asked_and_confirmed_before_it_changes(ran):
     assert ran == [("tainacan-address", ("https://acervo.example.org",))]
 
 
+def port(s):
+    """The PortField (U9): the proposed port, free."""
+    from kei_panel.screens.port_field import PortScreen, PortState
+    assert isinstance(s, PortScreen) and s._first == 8090 and s._host == "192.168.0.10"
+    return PortState(8090, "free", lan="192.168.0.10")
+
+
 @pytest.mark.parametrize("mode, after", [
     ("free", [("tainacan-free", ("on",))]),
     ("local", []),
     ("later", []),
 ])
 def test_the_installation_asks_where_the_collection_will_answer(ran, mode, after):
-    app = FakeApp([pick(mode), lambda s: isinstance(s, PlanSummaryScreen)], {
+    # Local and later ask the port (U9); the free address does not.
+    answers = [pick(mode)] + ([port] if mode != "free" else []) + [lambda s: isinstance(s, PlanSummaryScreen)]
+    app = FakeApp(answers, {
         "tainacan-free-status": free(available="yes"),
         "tainacan-plan": outcome({"plan": "install", "address": "http://192.168.0.10:8090"})})
     run(platforms.tainacan_install(app))
@@ -117,7 +126,7 @@ def test_the_installation_asks_where_the_collection_will_answer(ran, mode, after
 
 
 def test_the_installation_shows_why_the_free_address_cannot_be_chosen_and_asks_again(ran):
-    app = FakeApp([pick("free"), pick("later"), lambda s: True], {
+    app = FakeApp([pick("free"), pick("later"), port, lambda s: True], {
         "tainacan-free-status": free(available="no", reason="Koha on this server has no free address yet."),
         "tainacan-plan": outcome({"plan": "install", "address": "http://192.168.0.10:8090"})})
     run(platforms.tainacan_install(app))
