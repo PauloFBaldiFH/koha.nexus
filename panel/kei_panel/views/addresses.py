@@ -126,8 +126,10 @@ class AddressesView(SectionView):
                 card.set_url(url, line, state)
         windows = self.query_one("#addr-windows", Label)
         windows.display = data.host_platform == "wsl"
-        windows.update(t("? not checked from Windows: a test from inside WSL does not prove access from Windows "
-                         "or from the network."))
+        line, state = addresses.windows_text(data)
+        windows.update(line)
+        windows.set_class(state == "ok", "addr-ok")
+        windows.set_class(state == "bad", "addr-bad")
         rows = []
         for kind, url in data.alternatives:
             effect = addresses.alternative_text(self.platform, url, data.configured, data.checks.get(url))

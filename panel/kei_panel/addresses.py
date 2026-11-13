@@ -10,8 +10,10 @@ test:
                 its other network addresses), with the effect to expect
   checked       each test says where it was made from and when: "from this
                 server" (the installer's addresses test); from Windows only
-                after the Windows side tested it (U7: until then "? not
-                checked from Windows")
+                after the Windows side tested it: the tray opens each
+                configured address from Windows every 10 minutes and the
+                installer keeps the answer ("wincheck"); until then "? not
+                checked from Windows"
 
 The installer (`--task addresses PLATFORM [test]`) gives the addresses; the
 panel only reads them here.
@@ -52,6 +54,7 @@ class Addresses:
     unset: list[str] = field(default_factory=list)
     alternatives: list[tuple[str, str]] = field(default_factory=list)
     checks: dict[str, Check] = field(default_factory=dict)
+    win_checks: dict[str, Check] = field(default_factory=dict)   # made from Windows
 
 
 def _url(value: str) -> str:
@@ -82,12 +85,13 @@ def parse(platform: str, out) -> Addresses:
         kind, _, url = row.partition("|")
         if kind in KIND_NAMES and _url(url):
             a.alternatives.append((kind, url))
-    for row in rows("check"):
-        parts = row.split("|")
-        if len(parts) == 4 and _url(parts[0]):
-            url, code, redirect, at = parts
-            a.checks[url] = Check(code if code.isdigit() else "000", redirect if _url(redirect) else "",
-                                  int(at) if at.isdigit() else 0)
+    for key, into in (("check", a.checks), ("wincheck", a.win_checks)):
+        for row in rows(key):
+            parts = row.split("|")
+            if len(parts) == 4 and _url(parts[0]):
+                url, code, redirect, at = parts
+                into[url] = Check(code if code.isdigit() and len(code) == 3 else "000",
+                                  redirect if _url(redirect) else "", int(at) if at.isdigit() else 0)
     return a
 
 
@@ -123,6 +127,44 @@ def check_text(check: Check | None, now: float | None = None) -> tuple[str, str]
     if code:
         return t("✖ error from this server (HTTP ${code}, ${when})", code=check.code, when=when), "bad"
     return t("✖ no answer from this server (${when})", when=when), "bad"
+
+
+WINDOWS_STALE_S = 3600             # the tray tests every 10 minutes
+
+
+def windows_text(a: Addresses, now: float | None = None) -> tuple[str, str]:
+    """(line, state) for the Windows line (WSL only): one result per
+    configured address, as the Windows side found it."""
+    unknown = t("? not checked from Windows: a test from inside WSL does not prove access from Windows "
+                "or from the network.")
+    found = [(u, a.win_checks[u]) for _k, u in a.configured if u in a.win_checks]
+    if not found:
+        return unknown, ""
+    now = time.time() if now is None else now
+    parts, states = [], []
+    for url, check in found:
+        when = ago(check.at, now)
+        code = int(check.code) if check.code.isdigit() else 0
+        if check.at and now - check.at > WINDOWS_STALE_S:
+            parts.append(t("? ${url}: last answer from Windows ${when}, the tray has not tested it since",
+                           url=url, when=when))
+            states.append("")
+        elif 200 <= code < 400:
+            parts.append(t("✓ ${url} answered from Windows (HTTP ${code}, ${when})", url=url, code=check.code,
+                           when=when))
+            states.append("ok")
+        elif code:
+            parts.append(t("✖ ${url}: error from Windows (HTTP ${code}, ${when})", url=url, code=check.code,
+                           when=when))
+            states.append("bad")
+        else:
+            parts.append(t("✖ ${url}: no answer from Windows (${when})", url=url, when=when))
+            states.append("bad")
+    if len(found) < len(a.configured):
+        parts.append(t("? the other addresses were not checked from Windows yet"))
+        states.append("")
+    state = "bad" if "bad" in states else "" if "" in states else "ok"
+    return "\n".join(parts), state
 
 
 def _same_site(a: str, b: str) -> bool:

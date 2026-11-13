@@ -38,6 +38,7 @@ $here = $PSScriptRoot
 $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $STATUS_EVERY_S = 60
 $DISK_EVERY_S = 1800
+$ACCESS_EVERY_S = 600              # the access test made from Windows (U7)
 
 # The Koha icon (koha.ico) with a status dot in the lower right corner, at
 # the notification area's own size for this screen's scaling. The leaf is
@@ -289,23 +290,29 @@ $job = $null
 $graceUntil = [int64](Get-UnixTime) + [int64]$cfg.BootGraceS
 $nextStatus = [DateTime]::MinValue
 $nextDisk = [DateTime]::MinValue
+$nextAccess = [DateTime]::MinValue
 
 function Request-Check { param([int]$InSeconds = 0) $script:nextStatus = (Get-Date).AddSeconds($InSeconds) }
 
 function Start-Check {
-    param([bool]$WithDisk)
+    param([bool]$WithDisk, [bool]$WithAccess)
     $ps = [powershell]::Create()
     $ps.Runspace = $pool
     [void]$ps.AddScript({
-            param($LangDir, $WithDisk, $GraceUntil)
+            param($LangDir, $WithDisk, $GraceUntil, $WithAccess)
             Import-KeiLanguage -LangDir $LangDir
             $status = Get-KohaStatus -GraceUntil $GraceUntil
             # The stop the end of a Windows session runs, kept current in Debian.
             if ($status.State -eq 'running') { Update-KohaStopScript | Out-Null }
+            # Each configured address opened from Windows itself, recorded
+            # for the panel's "Addresses and access" screen.
+            if ($WithAccess -and $status.State -eq 'running') {
+                try { Test-KohaWindowsAccess | Out-Null } catch { Write-KohaLog ('windows access test failed: ' + $_.Exception.Message) }
+            }
             $disk = $null
             if ($WithDisk) { $disk = Get-KohaDiskHealth -Linux $status.Linux }
             return [pscustomobject]@{ Status = $status; Disk = $disk }
-        }).AddArgument($langDir).AddArgument($WithDisk).AddArgument($graceUntil)
+        }).AddArgument($langDir).AddArgument($WithDisk).AddArgument($graceUntil).AddArgument($WithAccess)
     return @{ PS = $ps; Handle = $ps.BeginInvoke() }
 }
 
@@ -373,8 +380,10 @@ $timer.add_Tick({
         if ($now -ge $script:nextStatus) {
             $withDisk = ($now -ge $script:nextDisk)
             if ($withDisk) { $script:nextDisk = $now.AddSeconds($DISK_EVERY_S) }
+            $withAccess = ($now -ge $script:nextAccess)
+            if ($withAccess) { $script:nextAccess = $now.AddSeconds($ACCESS_EVERY_S) }
             $script:nextStatus = $now.AddSeconds($STATUS_EVERY_S)
-            $script:job = Start-Check $withDisk
+            $script:job = Start-Check $withDisk $withAccess
         }
     })
 $timer.Start()

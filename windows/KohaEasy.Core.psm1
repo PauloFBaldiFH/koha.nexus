@@ -692,6 +692,104 @@ function Resolve-KohaIndicator {
 }
 
 # ----------------------------------------------------------------------
+# The access test made from Windows (U7, study 17.4)
+# ----------------------------------------------------------------------
+# A test from inside WSL does not prove that Windows reaches an address:
+# the tray opens each configured address from Windows itself (only GET,
+# no redirect followed, 6 seconds) and Debian keeps the answer for the
+# "Addresses and access" screen (--task windows-check). Only the HTTP code
+# and the redirect go back; Debian accepts them only for its configured
+# addresses. An HTTPS address whose certificate Windows does not trust is
+# recorded as no answer, as a browser would warn there.
+
+# The values of "@@result KEY=VALUE" lines.
+function ConvertFrom-KohaResultLines {
+    param([string]$Output, [string]$Key)
+    $prefix = '@@result ' + $Key + '='
+    $found = @()
+    foreach ($line in @($Output -split "`n")) {
+        $l = $line.TrimEnd("`r")
+        if ($l.StartsWith($prefix)) { $found += $l.Substring($prefix.Length) }
+    }
+    return $found
+}
+
+# The redirect as an absolute http(s) address, or '-'.
+function Format-KohaRedirect {
+    param([string]$Base, [string]$Location)
+    if (-not $Location) { return '-' }
+    try {
+        $abs = New-Object System.Uri((New-Object System.Uri($Base)), $Location)
+        $text = $abs.AbsoluteUri
+    } catch { return '-' }
+    if ($text -match '^https?://[^\s|]{1,2000}$') { return $text }
+    return '-'
+}
+
+# One URL<TAB>CODE<TAB>REDIRECT line per answer, for windows-check's stdin.
+function Format-KohaWindowsChecks {
+    param($Answers)
+    $lines = @()
+    foreach ($a in @($Answers)) {
+        if ($null -eq $a) { continue }
+        $lines += ('{0}{3}{1}{3}{2}' -f $a.Url, $a.Code, $a.Redirect, "`t")
+    }
+    return (($lines -join "`n") + "`n")
+}
+
+# GET URL/ from Windows: Code (three digits, '000' without an answer) and
+# Redirect (the Location header, or '-').
+function Invoke-KohaHttpProbe {
+    param([Parameter(Mandatory = $true)][string]$Url, [int]$TimeoutMs = 6000)
+    $code = '000'
+    $redirect = '-'
+    $target = $Url.TrimEnd('/') + '/'
+    $resp = $null
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    } catch { }
+    try {
+        $req = [System.Net.HttpWebRequest]::Create($target)
+        $req.Method = 'GET'
+        $req.AllowAutoRedirect = $false
+        $req.Timeout = $TimeoutMs
+        $req.ReadWriteTimeout = $TimeoutMs
+        $req.Proxy = $null
+        $resp = $req.GetResponse()
+    } catch [System.Net.WebException] {
+        $resp = $_.Exception.Response
+    } catch {
+        $resp = $null
+    }
+    if ($null -ne $resp) {
+        try {
+            $n = [int]$resp.StatusCode
+            if ($n -ge 100 -and $n -le 999) { $code = '{0:D3}' -f $n }
+            $redirect = Format-KohaRedirect -Base $target -Location ([string]$resp.Headers['Location'])
+        } catch { } finally { $resp.Close() }
+    }
+    return [pscustomobject]@{ Url = $Url; Code = $code; Redirect = $redirect }
+}
+
+# The tray runs this in the background about every 10 minutes while the
+# systems run. Returns how many addresses were tested.
+function Test-KohaWindowsAccess {
+    param([int]$TimeoutMs = 6000)
+    $r = Invoke-KohaLinux -Command @($script:Cfg.PanelPath, '--task', 'windows-addresses')
+    if ($r.ExitCode -ne 0) { return 0 }
+    $urls = @(ConvertFrom-KohaResultLines -Output $r.Output -Key 'configured' |
+            Where-Object { $_ -match '^https?://[^\s|]{1,2000}$' } | Select-Object -Unique)
+    if ($urls.Count -eq 0) { return 0 }
+    $answers = @($urls | ForEach-Object { Invoke-KohaHttpProbe -Url $_ -TimeoutMs $TimeoutMs })
+    $w = Invoke-KohaLinux -Command @($script:Cfg.PanelPath, '--task', 'windows-check', '-') -InputText (Format-KohaWindowsChecks $answers)
+    if ($w.ExitCode -ne 0) {
+        Write-KohaLog ('windows access test not recorded (exit {0})' -f $w.ExitCode)
+        return 0
+    }
+    return $answers.Count
+}
+
+# ----------------------------------------------------------------------
 # Notifications
 # ----------------------------------------------------------------------
 # Koha's own name and icon on its notifications once the Koha shortcut in

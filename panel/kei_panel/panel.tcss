@@ -967,6 +967,8 @@ App.-plain #picker-drop {
 #addr-alternatives { margin-bottom: 1; padding-left: 1; }
 .addr-head { padding-top: 1; padding-bottom: 0; }
 .addr-line { width: 1fr; }
+#addr-windows.addr-ok { color: $success; }
+#addr-windows.addr-bad { color: $error; }
 #addr-windows { color: $warning; padding-left: 1; margin-bottom: 1; }
 .addr-row { height: auto; margin-bottom: 1; }
 .addr-name { width: 18; text-style: bold; padding-left: 1; }

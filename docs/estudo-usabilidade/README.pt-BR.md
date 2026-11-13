@@ -1857,3 +1857,62 @@ Testes:
 A segunda parte do U7 é o teste de acesso feito pelo próprio Windows, gravado
 para a tela “Endereços e acesso”, que hoje mostra “? não verificado a partir
 do Windows”.
+
+## 25. U7, segunda parte: o teste de acesso feito pelo Windows
+
+Um teste feito de dentro do WSL não prova que o Windows chega ao endereço
+(seção 17.4). Agora o ícone da bandeja abre, a partir do próprio Windows,
+cada endereço configurado (OPACBaseURL e staffClientBaseURL do Koha, o
+endereço do Tainacan e o do DSpace). O teste roda a cada 10 minutos, enquanto
+os sistemas estão ligados, e o resultado fica gravado no Debian. A tela
+“Endereços e acesso” mostra esse resultado, com a origem e a hora:
+
+- “✓ http://192.168.0.20:8090 respondeu pelo Windows (HTTP 200, há 4 min)”;
+- “✖ …: sem resposta pelo Windows” ou “✖ …: erro pelo Windows (HTTP 503)”;
+- “? os outros endereços ainda não foram testados pelo Windows”, quando só
+  parte deles tem resultado;
+- um resultado com mais de uma hora não aparece como funcionando: a tela diz
+  quando foi a última resposta e que a bandeja não testou de novo;
+- sem nenhum resultado, continua “? não verificado a partir do Windows”.
+  Num servidor Linux (fora do WSL) a linha não aparece.
+
+**Como funciona.**
+
+- O teste do Windows (`Test-KohaWindowsAccess` em `KohaEasy.Core.psm1`) só
+  faz GET em cada endereço. Ele não segue redirecionamentos, não envia
+  credenciais e espera no máximo 6 segundos por endereço. Roda no mesmo
+  trabalho em segundo plano que já consulta o estado, sem travar o menu.
+- A lista de endereços vem do Debian (`--task windows-addresses`). O Windows
+  só testa o que o Debian diz que está configurado.
+- O resultado volta pelo `--task windows-check -`, pela entrada padrão,
+  porque o `wsl.exe` passa a linha de comando por um shell. Vai uma linha por
+  endereço: endereço, código HTTP e redirecionamento. O Debian recusa tudo se
+  um endereço não estiver configurado, se o código não tiver três dígitos ou
+  se o redirecionamento não for um endereço http(s). Nesse caso nada é
+  gravado.
+- O arquivo é `/var/lib/koha-nexus/windows-checks`, com uma linha por
+  endereço (`URL|CÓDIGO|REDIRECIONAMENTO|HORA`), regravado de forma atômica.
+  O `--task addresses` lê esse arquivo só no WSL (linhas `wincheck=`). Abrir
+  a tela continua só lendo.
+- Um endereço HTTPS com certificado em que o Windows não confia fica gravado
+  como sem resposta, como o navegador avisaria.
+
+Capturas (modo demonstração, 80x24 e 160x48), em `capturas/u7/`:
+`u7-1-enderecos-windows-tainacan`, `u7-2-enderecos-windows-koha` (os dois
+endereços com resposta) e `u7-3-enderecos-windows-dspace` (ainda sem teste
+pelo Windows).
+
+Testes:
+
+- `tests/addresses.bats`: lista só os endereços configurados; grava,
+  substitui e mostra o resultado só no WSL; recusa endereço não configurado,
+  código inválido e redirecionamento que não é web; lê a entrada padrão com
+  fim de linha do Windows.
+- `panel/tests/test_u7_windows_access.py`: leitura separada dos resultados
+  do servidor e do Windows, textos de cada caso, resultado antigo, tela
+  real, o instalador só aceita respostas, a bandeja só lê, e traduções.
+- `tests/windows_checks.ps1`, na CI `windows-tools`: linhas `@@result`,
+  redirecionamento relativo que vira absoluto, `javascript:` recusado,
+  formato da entrada padrão e endereço sem resposta = `000`.
+
+Isto fecha o U7. O próximo é o U8 (texto do backup completo).
