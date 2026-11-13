@@ -2032,3 +2032,48 @@ Testes:
 
 Próximos: U9 parte 2 (portas do Windows), U10 (Koha com uma ou duas
 portas) e U11 (remoção do Koha).
+
+## 28. U9 parte 2: o Windows abre as portas dos sistemas instalados
+
+Antes, o Windows liberava só as portas fixas 80, 8080 e 8100 no firewall, no
+firewall do Hyper-V e no encaminhamento para o Debian (`WebPorts` em
+`KohaEasy.Core.psm1`). Um Tainacan na porta 8090, ou qualquer sistema numa
+porta escolhida no campo do U9, não abria pelos outros computadores da rede
+quando o Debian roda no WSL (hipótese da seção 16.2).
+
+- **Portas reais.** A nova tarefa do instalador `kei_task web-ports` lista as
+  portas em que os sistemas instalados respondem: as duas do Koha, a porta
+  de rede local do Tainacan e a porta própria do DSpace. Um DSpace num nome
+  com https fica de fora, porque passa por proxy ou túnel, não por uma porta
+  do Windows. A tarefa só lê.
+- **O que o Windows abre.** A configuração da rede (`SetupNetwork`, com
+  permissão de administrador) abre as portas fixas mais as dos sistemas e
+  guarda a lista em `state.json`. As portas fixas continuam abertas, para que
+  nada que funcionava deixe de funcionar. Uma porta que nenhum sistema usa
+  mais perde o encaminhamento. São no máximo 32 portas.
+- **Quando falta uma porta.** Rodar o instalador de novo percebe a porta
+  nova e refaz a configuração (o Windows pede permissão uma vez). A bandeja,
+  a cada 10 minutos, avisa uma vez por conjunto de portas: “Os outros
+  computadores ainda não chegam à porta N. Rode o instalador do Koha de
+  novo…”. A bandeja não pede permissão de administrador sozinha.
+- **Desinstalação.** Remove também o encaminhamento das portas guardadas.
+
+Nada muda numa instalação existente até a próxima vez que o instalador
+rodar. Sem o Debian ligado, vale a lista guardada (ou a fixa).
+
+Sem capturas novas: a mudança é no Windows (firewall, encaminhamento e o
+aviso da bandeja), sem tela nova no painel.
+
+Testes:
+
+- `tests/ports.bats` (5): o novo teste confere as portas dos sistemas, as
+  ausentes, um https sem porta, uma resposta quebrada do DSpace e repetidas;
+- `tests/windows_checks.ps1` (no Windows da CI): portas fixas mais as dos
+  sistemas, ordenadas e sem repetição, valores inválidos fora, limite de
+  32, porta que falta, aviso uma vez só, e o encaminhamento de cada porta;
+- `panel/tests/test_u9_ports.py` (6): o firewall e o Hyper-V usam a lista
+  lida, a configuração pede atualização quando falta porta, a bandeja avisa,
+  e os textos novos têm português.
+
+Próximos: U10 (Koha com uma ou duas portas) e U11 (remoção do Koha).
+

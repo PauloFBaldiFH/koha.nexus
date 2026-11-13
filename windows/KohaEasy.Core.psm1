@@ -124,6 +124,8 @@ $script:StateDefaults = [ordered]@{
     launcherHash         = ''
     appIdShortcut        = $false
     lanSetup             = 0
+    webPorts             = @()
+    webPortsNotified     = ''
     trayClosed           = $false
     trayPromoted         = $false
     trayTipShown         = $false
@@ -1852,7 +1854,7 @@ function Invoke-KohaRunHeld {
 }
 
 # ----------------------------------------------------------------------
-# Other PCs of the library network (ports 80, 8080 and DSpace's 8100)
+# Other PCs of the library network (80, 8080, 8100 and the systems' ports)
 # ----------------------------------------------------------------------
 # Apache inside Debian listens on every address. What Windows adds, once,
 # with administrator rights (KohaEasy.ps1 SetupNetwork), for both network
@@ -1888,10 +1890,71 @@ function Test-KohaIPv4 {
     return $true
 }
 
+# The ports Windows opens to the library network (U9 part 2, study 16.2):
+# the fixed ones (80, 8080, 8100), kept so nothing that worked stops
+# working, and the ports the installed systems really answer on (a
+# Tainacan or DSpace installed on a port of its own, a Koha on other
+# ports), read from Debian by the task web-ports.
+$script:WebPortsMax = 32
+
+# Pure: the fixed ports plus the "@@result port=N" lines, sorted, each once.
+# Anything that is not a port from 1 to 65535 is left out.
+function Resolve-KohaWebPorts {
+    param([AllowEmptyString()][string]$Output = '', [int[]]$Base = $script:Cfg.WebPorts)
+    $set = New-Object 'System.Collections.Generic.SortedSet[int]'
+    foreach ($p in @($Base)) { if ([int]$p -ge 1 -and [int]$p -le 65535) { [void]$set.Add([int]$p) } }
+    foreach ($v in @(ConvertFrom-KohaResultLines -Output $Output -Key 'port')) {
+        if ($set.Count -ge $script:WebPortsMax) { break }
+        if ([string]$v -match '^\d{1,5}$') {
+            $n = [int]$v
+            if ($n -ge 1 -and $n -le 65535) { [void]$set.Add($n) }
+        }
+    }
+    return [int[]]@($set)
+}
+
+# Pure: the tray's notice, once for each new set of ports a system answers
+# on and the library network does not reach yet ($null when there is none,
+# or it was already given). Key = what goes to state.webPortsNotified.
+function Get-KohaWebPortsNotice {
+    param([int[]]$Missing, [string]$Notified = '')
+    $m = @(@($Missing) | Where-Object { $null -ne $_ -and [int]$_ -gt 0 } | Sort-Object -Unique)
+    if ($m.Count -eq 0) { return $null }
+    $key = $m -join ','
+    if ($key -eq $Notified) { return $null }
+    return [pscustomobject]@{
+        Key   = $key
+        Title = (T 'A system is not open to the library network yet')
+        Text  = ((T 'The other computers cannot reach port {0} yet. Run the Koha installer again: Windows asks for permission once and opens it.') -f ($m -join ', '))
+    }
+}
+
+# The ports opened by the last SetupNetwork (state.json), else the fixed ones.
+function Get-KohaWebPorts {
+    $saved = @((Get-KohaState).webPorts | Where-Object { $null -ne $_ -and [string]$_ -match '^\d{1,5}$' } | ForEach-Object { [int]$_ })
+    if ($saved.Count -eq 0) { return [int[]]$script:Cfg.WebPorts }
+    return (Resolve-KohaWebPorts -Base $saved)
+}
+
+# The ports the installed systems answer on now, or $null when Debian is
+# not running or does not answer (never starts the distro).
+function Read-KohaInstalledWebPorts {
+    if (-not (Test-KohaDistroRunning)) { return $null }
+    $r = Invoke-KohaLinux -Command @($script:Cfg.PanelPath, '--task', 'web-ports')
+    if ($r.ExitCode -ne 0) { return $null }
+    return (Resolve-KohaWebPorts -Output ([string]$r.Output))
+}
+
+# Pure: the ports in $Wanted that $Open does not have yet.
+function Get-KohaMissingWebPorts {
+    param([int[]]$Wanted, [int[]]$Open)
+    return [int[]]@(@($Wanted) | Where-Object { @($Open) -notcontains $_ })
+}
+
 # Pure: the netsh commands that point ports 80, 8080 and 8100 of every Windows
 # address at Debian (delete first, so a changed address never stacks up).
 function Get-KohaPortProxyCommands {
-    param([Parameter(Mandatory = $true)][string]$WslIp, [int[]]$Ports = $script:Cfg.WebPorts)
+    param([Parameter(Mandatory = $true)][string]$WslIp, [int[]]$Ports = (Get-KohaWebPorts))
     $cmds = New-Object System.Collections.ArrayList
     foreach ($port in $Ports) {
         [void]$cmds.Add(@('interface', 'portproxy', 'delete', 'v4tov4', ('listenport={0}' -f $port), 'listenaddress=0.0.0.0'))
@@ -1923,7 +1986,8 @@ function Get-KohaPortProxyRules {
 # Mirrored mode: Koha's forwarding from a time WSL ran in NAT mode is
 # removed, so ports 80, 8080 and 8100 of this PC go to Debian again.
 function Remove-KohaPortProxy {
-    $ours = @(Get-KohaPortProxyRules | Where-Object { $_.ListenAddress -eq '0.0.0.0' -and ($script:Cfg.WebPorts -contains $_.ListenPort) })
+    $known = @(Resolve-KohaWebPorts -Base (@(Get-KohaWebPorts) + @($script:Cfg.WebPorts)))
+    $ours = @(Get-KohaPortProxyRules | Where-Object { $_.ListenAddress -eq '0.0.0.0' -and ($known -contains $_.ListenPort) })
     foreach ($r in $ours) {
         & netsh.exe interface portproxy delete v4tov4 ('listenport={0}' -f $r.ListenPort) 'listenaddress=0.0.0.0' 2>&1 | Out-Null
     }
@@ -1950,7 +2014,7 @@ function Update-KohaPortProxy {
             return 'failed'
         }
     }
-    Write-KohaLog ('network: ports {0} forwarded to {1}' -f ($script:Cfg.WebPorts -join ', '), $WslIp) 'network'
+    Write-KohaLog ('network: ports {0} forwarded to {1}' -f ((Get-KohaWebPorts) -join ', '), $WslIp) 'network'
     return 'forwarded'
 }
 
@@ -1960,15 +2024,24 @@ function Update-KohaPortProxy {
 function Set-KohaLanAccess {
     param([string]$Mode = (Get-KohaNetMode))
     $name = $script:Cfg.FirewallRule
+    # The fixed ports and those of the installed systems (U9 part 2); a
+    # port no longer used loses its forwarding.
+    $before = @(Get-KohaWebPorts)
+    $ports = Read-KohaInstalledWebPorts
+    if ($null -eq $ports) { $ports = Resolve-KohaWebPorts -Base (@($before) + @($script:Cfg.WebPorts)) }
+    foreach ($gone in @(Get-KohaMissingWebPorts -Wanted $before -Open $ports)) {
+        & netsh.exe interface portproxy delete v4tov4 ('listenport={0}' -f $gone) 'listenaddress=0.0.0.0' 2>&1 | Out-Null
+    }
+    Set-KohaState @{ webPorts = [int[]]$ports } | Out-Null
     Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction SilentlyContinue
     New-NetFirewallRule -DisplayName $name -Group 'Koha' -Direction Inbound -Action Allow -Protocol TCP `
-        -LocalPort $script:Cfg.WebPorts -RemoteAddress LocalSubnet -Profile Any | Out-Null
+        -LocalPort $ports -RemoteAddress LocalSubnet -Profile Any | Out-Null
     $hv = Get-Command New-NetFirewallHyperVRule -ErrorAction SilentlyContinue
     if ($hv) {
         try {
             Get-NetFirewallHyperVRule -Name 'KohaWeb' -ErrorAction SilentlyContinue | Remove-NetFirewallHyperVRule -ErrorAction SilentlyContinue
             $rule = @{ Name = 'KohaWeb'; DisplayName = $name; Direction = 'Inbound'; VMCreatorId = $script:WslVmCreatorId
-                Protocol = 'TCP'; LocalPorts = $script:Cfg.WebPorts; Action = 'Allow' }
+                Protocol = 'TCP'; LocalPorts = $ports; Action = 'Allow' }
             if ($hv.Parameters.ContainsKey('Profiles')) { $rule['Profiles'] = 'Any' }
             New-NetFirewallHyperVRule @rule | Out-Null
         } catch {
@@ -2025,6 +2098,9 @@ function Get-KohaLanSetupNeed {
     if (-not [bool]$fw.Rule -or $fw.HyperVRule -eq $false) { return 'repair' }
     if (-not (Test-KohaNetTaskRegistered)) { return 'repair' }
     if (Test-KohaOldTasksPresent) { return 'update' }
+    # A system installed on a port of its own after the last SetupNetwork.
+    $now = Read-KohaInstalledWebPorts
+    if ($null -ne $now -and @(Get-KohaMissingWebPorts -Wanted $now -Open (Get-KohaWebPorts)).Count -gt 0) { return 'ports' }
     return ''
 }
 

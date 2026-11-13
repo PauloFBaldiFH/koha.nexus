@@ -58,7 +58,8 @@ function Test-KohaUninstallNeedsAdmin {
     if (@(Get-KohaTasks).Count -gt 0 -or (Test-KohaOldTasksPresent)) { return $true }
     if (@(Get-NetFirewallRule -DisplayName $cfg.FirewallRule -ErrorAction SilentlyContinue).Count -gt 0) { return $true }
     try {
-        if (@(Get-KohaPortProxyRules | Where-Object { $_.ListenAddress -eq '0.0.0.0' -and ($cfg.WebPorts -contains $_.ListenPort) }).Count -gt 0) { return $true }
+        $known = @(Resolve-KohaWebPorts -Base (@(Get-KohaWebPorts) + @($cfg.WebPorts)))
+        if (@(Get-KohaPortProxyRules | Where-Object { $_.ListenAddress -eq '0.0.0.0' -and ($known -contains $_.ListenPort) }).Count -gt 0) { return $true }
     } catch { }
     return $false
 }

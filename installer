@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.206"
+PANEL_VERSION=" 1.5.207"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2475,6 +2475,19 @@ kei_windows_check() {
 #   apache | docker | other:NAME  another site or program (NAME from ss)
 # What it reads: the systems' own addresses, the real listeners (ss), the
 # Apache Listen lines and the registry of opened ports.
+# The port of DSpace's address ("" without DSpace); with "plain", only an
+# address on a port of its own or plain http (an https name goes through
+# a proxy or tunnel, not through a port Windows has to open).
+_kei_dspace_port() {
+    kei_dspace_runtime status 2>/dev/null | KEI_PLAIN="${1:-}" python3 -c 'import json,os,sys
+from urllib.parse import urlsplit
+try:
+    d=json.load(sys.stdin); u=urlsplit(d.get("url","") if isinstance(d,dict) else "")
+    if os.environ.get("KEI_PLAIN") and not u.port and u.scheme!="http": print("")
+    else: print(u.port or (443 if u.scheme=="https" else 80 if u.scheme=="http" else ""))
+except Exception: print("")' 2>/dev/null
+}
+
 kei_port_owner() {
     local p="${1:-}" url line proc owner
     [[ "$p" =~ ^[0-9]{1,5}$ ]] && [ "$p" -ge 1 ] && [ "$p" -le 65535 ] || return 2
@@ -2482,12 +2495,7 @@ kei_port_owner() {
     if [ "$(_kei_tn_get status 2>/dev/null)" = installed ] || [ -n "$(_kei_tn_get lan_port 2>/dev/null)" ]; then
         [ "$(_kei_tn_get lan_port 2>/dev/null)" = "$p" ] && { echo tainacan; return 0; }
     fi
-    url=$(kei_dspace_runtime status 2>/dev/null | python3 -c 'import json,sys
-from urllib.parse import urlsplit
-try:
-    d=json.load(sys.stdin); u=urlsplit(d.get("url","") if isinstance(d,dict) else "")
-    print(u.port or (443 if u.scheme=="https" else 80 if u.scheme=="http" else ""))
-except Exception: print("")' 2>/dev/null)
+    url=$(_kei_dspace_port)
     [ -n "$url" ] && [ "$url" = "$p" ] && { echo dspace; return 0; }
     case " $KEI_TAINACAN_LOCAL_PORTS 18100 18101 18102 " in *" $p "*) echo reserved; return 0 ;; esac
     line=$(ss -Hltnp 2>/dev/null | awk -v p="$p" '{ n = split($4, a, ":"); if (a[n] == p) { print; exit } }')
@@ -2526,6 +2534,22 @@ kei_port_check() {
     fi
     read -r ip _i < <(kei_lan_address)
     [ -n "$ip" ] && kei_result lan "$ip"
+    return 0
+}
+
+# kei_web_ports: the ports the installed systems answer on, for Windows
+# (U9 part 2): its firewall and port forwarding open these, not a fixed
+# list. One port= per port, sorted; Koha's two, Tainacan's local-network
+# port and DSpace's own port. Read only.
+kei_web_ports() {
+    local p
+    {
+        is_koha_installed && printf '%s\n%s\n' "${OPACPORT:-80}" "${INTRAPORT:-8080}"
+        _kei_tn_get lan_port 2>/dev/null
+        _kei_dspace_port plain
+    } | while IFS= read -r p; do
+        [[ "$p" =~ ^[0-9]{1,5}$ ]] && [ "$p" -ge 1 ] && [ "$p" -le 65535 ] && echo "$p"
+    done | sort -nu | while IFS= read -r p; do kei_result port "$p"; done
     return 0
 }
 
@@ -47186,6 +47210,7 @@ kei_task() {
         windows-addresses)  kei_windows_addresses ;;
         windows-check)      kei_windows_check "$@" ;;
         port-check)         kei_port_check "$@" ;;
+        web-ports)          kei_web_ports ;;
         instance-names)     kei_instance_names read ;;
         instance-name)      kei_instance_names set "${1:-}" "${2:-}" ;;
         koha-languages)

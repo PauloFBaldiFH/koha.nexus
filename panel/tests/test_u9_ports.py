@@ -153,3 +153,22 @@ def test_new_texts_have_portuguese(pt):
               'How will people open DSpace?', "This server's address, on a port of its own",
               'A name (domain) already pointing to this server'}
     assert sorted(s for s in texts if pt(s) == s) == []
+
+
+def test_windows_opens_the_ports_of_the_installed_systems(pt):
+    """U9 part 2: Windows' firewall and forwarding take the ports from the
+    installer's web-ports task (fixed 80, 8080, 8100 kept), not a fixed list;
+    the tray says once when a new port is not open yet. The pure functions
+    run in tests/windows_checks.ps1 on Windows."""
+    core = (ROOT / 'windows' / 'KohaEasy.Core.psm1').read_text(encoding='utf-8-sig')
+    lan = core[core.index('function Set-KohaLanAccess'):core.index('function Start-KohaNetworkTask')]
+    assert "'web-ports'" in core and 'Read-KohaInstalledWebPorts' in lan
+    assert '-LocalPort $ports' in lan and 'LocalPorts = $ports' in lan
+    assert '$script:Cfg.WebPorts -join' not in core
+    assert "return 'ports'" in core[core.index('function Get-KohaLanSetupNeed'):]
+    tray = (ROOT / 'windows' / 'KohaEasy.Tray.ps1').read_text(encoding='utf-8-sig')
+    assert 'Get-KohaWebPortsNotice' in tray and "webPortsNotified" in tray
+    installer = (ROOT / 'installer').read_text()
+    assert 'web-ports)          kei_web_ports ;;' in installer
+    for text in re.findall(r"\(T '([^']+)'\)", core[core.index('function Get-KohaWebPortsNotice'):core.index('function Get-KohaWebPorts {')]):
+        assert pt(text) != text, text
