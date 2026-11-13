@@ -1,7 +1,7 @@
 install.url=http://172.17.0.2:8090
 install.status=installed
 net.route_get=1.1.1.1 via 172.17.0.1 dev eth0 src 172.17.0.2 uid 0 
-net.addresses=lo=127.0.0.1/8 eth0=172.17.0.2/16 kn-tainacan=10.213.1.1/24 docker0=172.18.0.1/16 
+net.addresses=lo=127.0.0.1/8 eth0=172.17.0.2/16 docker0=172.18.0.1/16 kn-tainacan=10.213.1.1/24 
 net.default_routes=default via 172.17.0.1 dev eth0 ;
 net.get_server_ip=172.17.0.2
 service.home_http=200
