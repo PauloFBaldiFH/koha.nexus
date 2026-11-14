@@ -120,16 +120,47 @@ async def install_koha(app) -> None:
             return
         env["KEI_TASK_REINSTALL"] = word
 
+    # One port or two (U10): chosen here, applied once Koha answers. A
+    # reinstall starts from the choice already made.
+    from . import koha_access
+    mode_now, domain_now = "two", ""
+    if out.get("exists") == "yes" and app.bridge.has_task("koha-access"):
+        now = await app.bridge.task("koha-access", "status")
+        if isinstance(now, koha_access.TaskOutcome) and now.ok:
+            r = koha_access.results(now)
+            mode_now, domain_now = (r.get("mode") or ["two"])[0], (r.get("domain") or [""])[0]
+    access = (mode_now, domain_now)
+    if app.bridge.has_task("koha-access"):
+        access = await koha_access.choose(app, t(koha_access.TITLE), mode_now, domain_now)
+        if access is None:
+            return
+
     result = await run_task(app, title, "install", env=env, total_steps=INSTALL_STEPS, cancellable=False)
     if failed(result):
         await show_failure(app, title, result)
         return
     done = result.value
     fails, warns = _num(done, "v_fail"), _num(done, "v_warn")
+    prompt, access_error = t("Open these addresses in the browser:"), None
+    # One port again on a reinstall too: Koha's addresses start empty there.
+    if access[0] == "one" or access != (mode_now, domain_now):
+        mode, domain = access
+        applied = await run_task(app, t(koha_access.TITLE), "koha-access", "apply", mode,
+                                 *([domain] if domain else []), "confirm", cancellable=False)
+        if failed(applied):
+            access_error = applied
+        elif mode == "one":
+            prompt += "\n" + t("The staff also opens at http://admin.${domain} (one port), once both names point to "
+                               "this server.", domain=domain)
     head = t("Your library is ready!") if not fails else \
         t("Koha was installed, but the final check found ${fails} problem(s).", fails=fails)
-    await app.push_screen_wait(CredentialsScreen(head, t("Open these addresses in the browser:"),
-                                                 credential_groups(done), kind="error" if fails else "ok"))
+    await app.push_screen_wait(CredentialsScreen(head, prompt, credential_groups(done),
+                                                 kind="error" if fails else "ok"))
+    if access_error is not None:
+        await show_failure(app, t(koha_access.TITLE), access_error)
+        await app.push_screen_wait(MessageScreen(t(koha_access.TITLE), t(
+            "Koha was installed with two ports. Choose one port again in Koha > Addresses and access > One port "
+            "or two."), kind="info"))
 
     if fails or warns:
         if fails:

@@ -155,6 +155,105 @@ def test_in_the_panel_addresses_of_koha(monkeypatch):
     assert rows['Staff'] == 'http://admin.biblioteca.org.br'
 
 
+def test_kohas_own_addresses_in_the_review():
+    """U10 extra: OPACBaseURL and staffClientBaseURL follow the choice."""
+    r = ka.results(outcome(ONE + ['@@result base=opac|http://192.168.0.20|http://biblioteca.org.br|change',
+                                  '@@result base=staff|https://equipe.koha.nexus|https://equipe.koha.nexus|keep']))
+    rows = dict(ka.plan_rows(r))
+    assert rows["Koha's catalog address (OPACBaseURL)"] == 'http://192.168.0.20 → http://biblioteca.org.br'
+    assert rows["Koha's staff address (staffClientBaseURL)"].startswith('Kept: https://equipe.koha.nexus')
+    r = ka.results(outcome(TWO + ['@@result base=opac|http://biblioteca.org.br||restore',
+                                  '@@result base=staff|http://x.org|http://x.org|same']))
+    rows = dict(ka.plan_rows(r))
+    assert rows["Koha's catalog address (OPACBaseURL)"] == 'Back to what it was: (empty)'
+    assert rows["Koha's staff address (staffClientBaseURL)"] == 'Unchanged: http://x.org'
+
+
+def test_a_preference_not_written_is_said(monkeypatch):
+    import kei_panel.routines.common as common
+    said = []
+
+    async def run_task(app, title, name, *args, **kwargs):
+        return TaskResult(ok=True, value=outcome(['@@result base_failed=OPACBaseURL']))
+
+    async def show_done(app, title, result, default=''):
+        said.append(default)
+    monkeypatch.setattr(common, 'run_task', run_task)
+    monkeypatch.setattr(common, 'show_done', show_done)
+    asyncio.run(ka.koha_access(App(['one', 'biblioteca.org.br', True])))
+    assert 'OPACBaseURL' in said[0] and 'System preferences' in said[0]
+
+
+class InstallBridge:
+    def __init__(self, exists='no', status=TWO):
+        self.exists, self.status_lines, self.calls = exists, status, []
+
+    def has_task(self, name):
+        return True
+
+    async def task(self, name, *args, **kwargs):
+        self.calls.append((name, *args))
+        return outcome(self.status_lines)
+
+
+def install_app(answers, exists='no', status=TWO):
+    from kei_panel.screens.dialogs import ChoiceScreen, ConfirmScreen, CredentialsScreen, InputScreen
+    app = App([])
+    app.bridge = InstallBridge(exists, status)
+    queue = list(answers)
+
+    async def push(screen):
+        app.screens.append(screen)
+        if isinstance(screen, (ChoiceScreen, InputScreen)):
+            return queue.pop(0)
+        if isinstance(screen, ConfirmScreen):
+            return 'Reboot' not in screen._title and 'View Diagnostics' not in screen._title
+        return None
+    app.push_screen_wait = push
+    return app
+
+
+@pytest.fixture
+def installing(monkeypatch):
+    import kei_panel.routines.install as inst
+    calls = []
+
+    async def run_task(app, title, name, *args, **kwargs):
+        calls.append((name, *args))
+        if name == 'install-check':
+            return TaskResult(ok=True, value=outcome(['@@result v_ok=10', '@@result tz=America/Sao_Paulo',
+                                                      f'@@result exists={app.bridge.exists}',
+                                                      '@@result db_name=koha_library']))
+        if name == 'install':
+            return TaskResult(ok=True, value=outcome(['@@result v_fail=0', '@@result v_warn=0']))
+        return TaskResult(ok=True, value=outcome(['@@result mode=one']))
+    monkeypatch.setattr(inst, 'run_task', run_task)
+    return calls
+
+
+def test_the_install_asks_one_port_or_two(installing):
+    from kei_panel.screens.dialogs import ChoiceScreen, CredentialsScreen
+    import kei_panel.routines.install as inst
+    app = install_app(['one', 'biblioteca.org.br'])
+    asyncio.run(inst.install_koha(app))
+    choice = next(s for s in app.screens if isinstance(s, ChoiceScreen))
+    assert choice._default == 'two'
+    # Asked before anything is installed, applied once Koha answers.
+    assert [c[0] for c in installing] == ['install-check', 'install', 'koha-access']
+    assert installing[-1] == ('koha-access', 'apply', 'one', 'biblioteca.org.br', 'confirm')
+    cred = next(s for s in app.screens if isinstance(s, CredentialsScreen))
+    assert 'http://admin.biblioteca.org.br' in cred._body
+
+
+def test_the_install_with_two_ports_changes_nothing_more(installing):
+    import kei_panel.routines.install as inst
+    asyncio.run(inst.install_koha(install_app(['two'])))
+    assert [c[0] for c in installing] == ['install-check', 'install']
+    installing.clear()
+    asyncio.run(inst.install_koha(install_app([None])))       # cancelled: nothing installed
+    assert [c[0] for c in installing] == ['install-check']
+
+
 @pytest.fixture
 def pt(monkeypatch, tmp_path):
     import kei_panel.i18n as i18n
@@ -173,6 +272,14 @@ def test_new_texts_have_portuguese(pt):
     # Texts split over lines: joined as the source has them.
     for m in re.finditer(r'(?<![\w.])t\(\s*((?:"[^"]*"\s*)+)', source):
         texts.add(''.join(re.findall(r'"([^"]*)"', m.group(1))))
+    # The second part: Koha's own addresses and the choice in the install.
+    texts |= {*ka.BASES.values(), '(empty)', 'Kept: ${url} (another public name, as the tunnel\'s)',
+              'Back to what it was: ${url}', 'Unchanged: ${url}',
+              "⚠ Koha's own address could not be changed (${names}). Set it in Koha: Administration > System "
+              "preferences.",
+              'The staff also opens at http://admin.${domain} (one port), once both names point to this server.',
+              'Koha was installed with two ports. Choose one port again in Koha > Addresses and access > One port '
+              'or two.'}
     installer = (ROOT / 'installer').read_text()
     body = installer[installer.index('kei_koha_access() {'):]
     body = body[:body.index('\n}\n')]

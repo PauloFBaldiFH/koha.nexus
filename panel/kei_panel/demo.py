@@ -1111,6 +1111,12 @@ async def demo_task(out: "TaskOutcome", name: str, args: tuple[str, ...], report
                      f"@@result staff=http://admin.{domain}", "@@result recovery=http://127.0.0.1:8080",
                      "@@result staff_net=local", f"@@result points={domain}|here",
                      f"@@result points=admin.{domain}|none"]
+        if action != "status":
+            # Koha's own addresses follow (the staff one was empty).
+            lines += ([f"@@result base=opac|http://192.168.0.20|http://{domain}|change",
+                       f"@@result base=staff||http://admin.{domain}|change"] if mode == "one" else
+                      ["@@result base=opac|http://192.168.0.20|http://192.168.0.20|same",
+                       "@@result base=staff|||same"])
         await asyncio.sleep(0.2)
         for line in lines:
             out.feed(line, reporter, on_result)

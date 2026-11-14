@@ -144,3 +144,83 @@ $1" 3>&-
     run lib 'is_database_ready() { return 1; }; kei_addresses koha'
     ! grep -q 'admin.biblioteca' <<< "$output"
 }
+
+# Koha's own addresses (OPACBaseURL, staffClientBaseURL) in a file database:
+# PREF=VALUE lines; writes are logged.
+prefs() {
+    printf '%s\n' "is_database_ready() { return 0; }
+DB_NAME=koha_library
+run_sql() { sed -n \"s/^\$(sed -n \"s/.*variable='\\([A-Za-z]*\\)'.*/\\1/p\" <<< \"\$1\")=//p\" '$T/prefs'; }
+_kei_koha_set_pref() { echo \"pref \$1=\$2\" >> '$T/calls'; grep -v \"^\$1=\" '$T/prefs' > '$T/prefs.new'; echo \"\$1=\$2\" >> '$T/prefs.new'; mv '$T/prefs.new' '$T/prefs'; }
+plack_restart() { echo plack >> '$T/calls'; }
+systemctl() { echo \"systemctl \$*\" >> '$T/calls'; }"
+}
+
+@test "Koha's addresses follow one port and come back with two" {
+    printf 'OPACBaseURL=http://192.168.0.20\nstaffClientBaseURL=\n' > "$T/prefs"
+    run lib "$(prefs)
+kei_koha_access plan one biblioteca.org.br"
+    grep -qx '@@result base=opac|http://192.168.0.20|http://biblioteca.org.br|change' <<< "$output"
+    grep -qx '@@result base=staff||http://admin.biblioteca.org.br|change' <<< "$output"
+    [ ! -f "$T/calls" ]
+    run lib "$(prefs)
+kei_koha_access apply one biblioteca.org.br confirm"
+    [ "$status" -eq 0 ]
+    grep -qx 'OPACBaseURL=http://biblioteca.org.br' "$T/prefs"
+    grep -qx 'staffClientBaseURL=http://admin.biblioteca.org.br' "$T/prefs"
+    grep -qx plack "$T/calls"
+    grep -qx 'prev_opac=http://192.168.0.20' "$KEI_OWNED_DIR/koha-access"
+    grep -qx 'set_staff=http://admin.biblioteca.org.br' "$KEI_OWNED_DIR/koha-access"
+    # Another domain: what came before is still the IP.
+    run lib "$(prefs)
+kei_koha_access apply one acervo.example.org confirm"
+    grep -qx 'OPACBaseURL=http://acervo.example.org' "$T/prefs"
+    grep -qx 'prev_opac=http://192.168.0.20' "$KEI_OWNED_DIR/koha-access"
+    run lib "$(prefs)
+kei_koha_access plan two"
+    grep -qx '@@result base=opac|http://acervo.example.org|http://192.168.0.20|restore' <<< "$output"
+    run lib "$(prefs)
+kei_koha_access apply two confirm"
+    [ "$status" -eq 0 ]
+    grep -qx 'OPACBaseURL=http://192.168.0.20' "$T/prefs"
+    grep -qx 'staffClientBaseURL=' "$T/prefs"
+    ! grep -q '^prev_\|^set_' "$KEI_OWNED_DIR/koha-access"
+}
+
+@test "Koha's addresses: a public name is kept; a value changed by hand is not put back" {
+    printf 'OPACBaseURL=https://catalogo.koha.nexus\nstaffClientBaseURL=http://192.168.0.20:8080\n' > "$T/prefs"
+    run lib "$(prefs)
+kei_koha_access apply one biblioteca.org.br confirm"
+    [ "$status" -eq 0 ]
+    grep -qx '@@result base=opac|https://catalogo.koha.nexus|https://catalogo.koha.nexus|keep' <<< "$output"
+    grep -qx 'OPACBaseURL=https://catalogo.koha.nexus' "$T/prefs"
+    grep -qx 'staffClientBaseURL=http://admin.biblioteca.org.br' "$T/prefs"
+    ! grep -q '^prev_opac' "$KEI_OWNED_DIR/koha-access"
+    # Changed by hand while on one port: two ports leaves it as it is.
+    sed -i 's|^staffClientBaseURL=.*|staffClientBaseURL=https://equipe.example.org|' "$T/prefs"
+    rm -f "$T/calls"
+    run lib "$(prefs)
+kei_koha_access apply two confirm"
+    grep -qx '@@result base=staff|https://equipe.example.org|https://equipe.example.org|same' <<< "$output"
+    grep -qx 'staffClientBaseURL=https://equipe.example.org' "$T/prefs"
+    ! grep -q '^pref ' "$T/calls" && ! grep -qx plack "$T/calls"
+}
+
+@test "Koha's addresses: a preference that cannot be written is said; the site stays" {
+    printf 'OPACBaseURL=\nstaffClientBaseURL=\n' > "$T/prefs"
+    run lib "$(prefs)
+_kei_koha_set_pref() { return 1; }
+kei_koha_access apply one biblioteca.org.br confirm"
+    [ "$status" -eq 0 ]
+    grep -qx '@@result base_failed=OPACBaseURL' <<< "$output"
+    grep -qx 'mode=one' "$KEI_OWNED_DIR/koha-access"
+    ! grep -q '^set_' "$KEI_OWNED_DIR/koha-access"
+}
+
+@test "a preference value goes into SQL with its quotes doubled" {
+    printf '#!/bin/sh\nprintf "%%s\\n" "$2" > "%s/sql"\n' "$T" > "$T/bin/mysql"; chmod +x "$T/bin/mysql"
+    run lib "DB_NAME=koha_library
+_kei_koha_set_pref OPACBaseURL \"http://x.org/a'b\\\\c\""
+    [ "$status" -eq 0 ]
+    grep -qF "VALUES ('OPACBaseURL', 'http://x.org/a''b\\\\c', 'Free')" "$T/sql"
+}

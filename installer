@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.210"
+PANEL_VERSION=" 1.5.211"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -2621,14 +2621,60 @@ SITE
 
 _kei_koha_staff_ours() { kei_owned_users apache-site "$(kei_proxy_site_name "$KEI_KOHA_STAFF_SITE_ID")" | grep -qx koha; }
 
+# Koha's own addresses follow the choice (U10, second part). One port:
+# OPACBaseURL and staffClientBaseURL become http://DOMAIN and
+# http://admin.DOMAIN, unless one holds another public name (the tunnel's,
+# or one set by hand), which is kept and said. What they held before and
+# what was set here go to the access file: back to two ports puts the old
+# value back, only where it still holds what was set here.
+_kei_koha_pref() { run_sql "SELECT value FROM ${DB_NAME}.systempreferences WHERE variable='$1' LIMIT 1;" 2>/dev/null | head -n 1; }
+
+# A public name: letters in it, at least one dot, not localhost.
+_kei_koha_public_name() { [[ "${1:-}" == *.* && "${1:-}" =~ [A-Za-z] && "${1:-}" != localhost* ]]; }
+
+# _kei_koha_base_plan MODE DOMAIN: one line per preference,
+# KEY|PREFERENCE|NOW|NEXT|change, keep, restore or same. Nothing without
+# a database to read.
+_kei_koha_base_plan() {
+    local mode="$1" domain="$2" key pref now next set host st
+    is_database_ready >/dev/null 2>&1 || return 0
+    for key in opac staff; do
+        pref=OPACBaseURL; next="http://$domain"
+        [ "$key" = staff ] && { pref=staffClientBaseURL; next="http://${KEI_KOHA_STAFF_PREFIX}$domain"; }
+        now=$(_kei_koha_pref "$pref")
+        set=$(_kei_koha_access_get "set_$key")
+        if [ "$mode" = one ]; then
+            host=${now#*://}; host=${host%%[:/]*}
+            if [ "$now" = "$next" ]; then st=same
+            elif [ -n "$now" ] && [ "$now" != "$set" ] && _kei_koha_public_name "$host"; then st=keep; next="$now"
+            else st=change; fi
+        elif [ -n "$set" ] && [ "$now" = "$set" ]; then
+            st=restore; next=$(_kei_koha_access_get "prev_$key")
+        else
+            st=same; next="$now"
+        fi
+        printf '%s|%s|%s|%s|%s\n' "$key" "$pref" "$now" "$next" "$st"
+    done
+}
+
+# _kei_koha_set_pref PREFERENCE VALUE (quotes doubled for SQL).
+_kei_koha_set_pref() {
+    local v="${2//\\/\\\\}"
+    v="${v//\'/\'\'}"
+    mysql -e "INSERT INTO ${DB_NAME}.systempreferences (variable, value, type) VALUES ('$1', '$v', 'Free') ON DUPLICATE KEY UPDATE value='$v';" >/dev/null 2>&1
+}
+
 # kei_koha_access [status | plan one DOMAIN | plan two | apply one DOMAIN
 # confirm | apply two confirm]. Results: mode, domain, opac, staff,
-# recovery, staff_net, points (NAME|here/elsewhere/none). Status and plan
-# only read. Returns 2 bad arguments, 3 Koha or Apache missing, 4 no
+# recovery, staff_net, points (NAME|here/elsewhere/none); plan and apply
+# also base (KEY|NOW|NEXT|change/keep/restore/same, Koha's own addresses)
+# and apply base_failed (PREFERENCE) when one could not be written. Status
+# and plan only read. Returns 2 bad arguments, 3 Koha or Apache missing, 4 no
 # "confirm", and kei_proxy_apply_site's codes (5 configtest, 6 the other
 # sites would change, 7 changed by hand).
 kei_koha_access() {
-    local action="${1:-status}" mode="${2:-}" domain="${3:-}" ans="${4:-}" net name rc tmp a _i
+    local action="${1:-status}" mode="${2:-}" domain="${3:-}" ans="${4:-}" net name rc tmp a _i bases line
+    local key pref now next st changed=0 rec=""
     case "$action" in status|plan|apply) ;; *) msg_error "" "koha-access status|plan|apply"; return 2 ;; esac
     is_koha_installed || { msg_error "" "$(t "Koha is not installed.")"; return 3; }
     if [ "$action" = status ]; then
@@ -2657,6 +2703,12 @@ kei_koha_access() {
         kei_result opac "http://$a"
         kei_result staff "http://$a:${INTRAPORT:-8080}"
     fi
+    if [ "$action" != status ]; then
+        bases=$(_kei_koha_base_plan "$mode" "$domain")
+        while IFS='|' read -r key pref now next st; do
+            [ -n "$key" ] && kei_result base "$key|$now|$next|$st"
+        done <<< "$bases"
+    fi
     [ "$action" = apply ] || return 0
     [ "$ans" = confirm ] || { echo "$(t "Nothing was changed: the plan needs a yes (confirm).")" >&2; return 4; }
     if [ "$mode" = one ]; then
@@ -2680,9 +2732,27 @@ kei_koha_access() {
         kei_proxy_module_release koha proxy_http >/dev/null 2>&1
         kei_proxy_module_release koha proxy >/dev/null 2>&1
     fi
+    # Koha's own addresses, once the site is in place.
+    while IFS='|' read -r key pref now next st; do
+        [ -n "$key" ] || continue
+        case "$st" in
+            change|restore)
+                if _kei_koha_set_pref "$pref" "$next"; then changed=1; else kei_result base_failed "$pref"; st=failed; fi ;;
+        esac
+        # What came before is remembered once, while the value is ours.
+        if [ "$mode" = one ] && { [ "$st" = change ] || { [ "$st" = same ] && [ "$now" = "$(_kei_koha_access_get "set_$key")" ]; }; }; then
+            a=$(_kei_koha_access_get "set_$key")
+            if [ -n "$a" ] && [ "$now" = "$a" ]; then a=$(_kei_koha_access_get "prev_$key"); else a="$now"; fi
+            rec+="prev_$key=$a"$'\n'"set_$key=$next"$'\n'
+        fi
+    done <<< "$bases"
+    if [ "$changed" = 1 ]; then
+        systemctl restart memcached >/dev/null 2>&1 || true
+        plack_restart >/dev/null 2>&1 || true
+    fi
     mkdir -p "${KEI_KOHA_ACCESS_FILE%/*}" || return 1
     tmp=$(mktemp "$KEI_KOHA_ACCESS_FILE.XXXXXX") || return 1
-    { printf 'mode=%s\ndomain=%s\n' "$mode" "$domain" > "$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$KEI_KOHA_ACCESS_FILE"; } || { rm -f "$tmp"; return 1; }
+    { printf 'mode=%s\ndomain=%s\n%s' "$mode" "$domain" "$rec" > "$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$KEI_KOHA_ACCESS_FILE"; } || { rm -f "$tmp"; return 1; }
     log "koha access: $mode${domain:+ ($domain)}"
     return 0
 }

@@ -3306,7 +3306,8 @@
   "koha-access": {
    "summary": "Chooses how people open Koha: two ports by this server's IP (the default), or one port with names, the staff at admin.your-domain.",
    "overview": [
-    "With two ports the catalog answers on 80 and the staff on 8080, both by the server's IP, with no names to set up. With one port the staff also answers by name on port 80 (admin. followed by the institution's domain). Both names must point to this server (DNS or tunnel); by IP only the catalog opens. Koha's own site is never changed and port 8080 keeps working as the way in from the server."
+    "With two ports the catalog answers on 80 and the staff on 8080, both by the server's IP, with no names to set up. With one port the staff also answers by name on port 80 (admin. followed by the institution's domain). Both names must point to this server (DNS or tunnel); by IP only the catalog opens. Koha's own site is never changed and port 8080 keeps working as the way in from the server.",
+    "Koha's own addresses (the system preferences OPACBaseURL and staffClientBaseURL) follow the choice: with one port they become the two names, unless one already holds another public name, such as the tunnel's, which is kept. Going back to two ports puts back what they held before, if nobody changed them by hand in the meantime. The same choice is also asked when Koha is installed."
    ],
    "steps": [
     "Open **One port or two** (also the button in Addresses and access).",
@@ -3316,7 +3317,8 @@
    ],
    "tips": [
     "A name that does not point here yet is only a warning: it starts working once the DNS or the tunnel points it to this server.",
-    "Going back to two ports removes only the site Koha.Nexus added."
+    "Going back to two ports removes only the site Koha.Nexus added.",
+    "The review shows each of Koha's addresses before and after; nothing changes before Apply."
    ],
    "related": [
     "staff-firewall",
