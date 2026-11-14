@@ -2862,7 +2862,8 @@
   "koha-access": {
    "summary": "Escolhe como as pessoas abrem o Koha: duas portas pelo IP deste servidor (o padrão), ou uma porta com nomes, a equipe em admin.seu-domínio.",
    "overview": [
-    "Com duas portas, o catálogo responde na 80 e a equipe na 8080, as duas pelo IP do servidor, sem configurar nomes. Com uma porta, a equipe também responde pelo nome na porta 80 (admin. seguido do domínio da instituição). Os dois nomes precisam apontar para este servidor (DNS ou túnel); pelo IP abre só o catálogo. O site do próprio Koha nunca é alterado e a porta 8080 continua funcionando como entrada a partir do servidor."
+    "Com duas portas, o catálogo responde na 80 e a equipe na 8080, as duas pelo IP do servidor, sem configurar nomes. Com uma porta, a equipe também responde pelo nome na porta 80 (admin. seguido do domínio da instituição). Os dois nomes precisam apontar para este servidor (DNS ou túnel); pelo IP abre só o catálogo. O site do próprio Koha nunca é alterado e a porta 8080 continua funcionando como entrada a partir do servidor.",
+    "Os endereços do próprio Koha (as preferências do sistema OPACBaseURL e staffClientBaseURL) acompanham a escolha: com uma porta passam a ser os dois nomes, a não ser que um deles já tenha outro nome público, como o do túnel, que é mantido. Voltar para duas portas devolve o que elas tinham antes, se ninguém as mudou à mão nesse meio tempo. A mesma escolha também é feita na instalação do Koha."
    ],
    "steps": [
     "Abra **Uma porta ou duas** (também o botão em Endereços e acesso).",
@@ -2872,9 +2873,10 @@
    ],
    "tips": [
     "Um nome que ainda não aponta para cá é só um aviso: passa a funcionar quando o DNS ou o túnel o apontar para este servidor.",
-    "Voltar para duas portas remove só o site que o Koha.Nexus acrescentou."
+    "Voltar para duas portas remove só o site que o Koha.Nexus acrescentou.",
+    "A revisão mostra cada endereço do Koha antes e depois; nada muda antes de Aplicar."
    ],
-   "_en": "cd126c2fe0"
+   "_en": "22666023e7"
   },
   "koha-remove": {
    "summary": "Remove o Koha deste servidor como um passo próprio: primeiro um pacote do Koha conferido, depois a instância, o banco de dados, o site e as tarefas agendadas. Os pacotes, os outros sistemas e os backups ficam.",

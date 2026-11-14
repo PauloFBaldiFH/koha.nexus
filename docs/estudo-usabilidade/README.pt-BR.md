@@ -2119,7 +2119,7 @@ Como foi feito (instalador, `kei_task koha-access`):
 
 Ficam para depois: a escolha durante a instalação do Koha (hoje é feita
 depois, nesta tela) e as preferências `OPACBaseURL` e `staffClientBaseURL`,
-que não são mudadas por esta ação.
+que não são mudadas por esta ação. Os dois foram feitos depois, na seção 31.
 
 Capturas (modo demonstração, 80x24 e 160x48), em `capturas/u10/`:
 `u10-1-uma-ou-duas`, `u10-2-dominio` e `u10-3-revisao`.
@@ -2208,3 +2208,57 @@ Testes:
   “Remover o Koha” na zona de remoção.
 
 Com isso, U1 a U11 estão feitos.
+
+## 31. U10 parte 2: endereços do Koha e escolha na instalação
+
+Os dois pontos que a seção 29 deixou para depois, pedidos pelo Paulo em
+14/11.
+
+**Endereços do próprio Koha.** As preferências `OPACBaseURL` e
+`staffClientBaseURL` agora acompanham a escolha de **Uma porta ou duas**:
+
+- Com uma porta, passam a ser `http://<domínio>` e
+  `http://admin.<domínio>`.
+- Se uma delas já tem outro nome público (o do túnel, ou um posto à mão),
+  ela é **mantida**, e a revisão diz isso.
+- O valor anterior e o valor posto pelo painel ficam no arquivo da escolha
+  (`koha-access`: `prev_opac`, `set_opac`, `prev_staff`, `set_staff`).
+- Voltar para duas portas devolve o valor anterior, mas **só onde a
+  preferência ainda tem o valor posto aqui**. Uma mudança feita à mão nesse
+  meio tempo fica como está.
+- Trocar de domínio guarda o valor de antes da primeira troca, não o
+  domínio anterior.
+- As preferências só mudam depois que o site foi aplicado. Depois de
+  mudá-las, o memcached e o Plack são reiniciados.
+- Uma preferência que não pôde ser gravada aparece no resultado
+  (`base_failed`) e o painel diz onde ajustar no Koha. O site fica.
+- A revisão mostra cada endereço antes e depois: “(vazio) →
+  http://admin.biblioteca.org.br”, “Mantido: …”, “Volta ao que era: …”.
+
+**Escolha na instalação.** A instalação do Koha pergunta **Uma porta ou
+duas** (e o domínio, se for uma) depois da confirmação de reinstalação e
+antes de instalar:
+
+- Duas portas é o padrão. Numa reinstalação, a escolha começa pelo que já
+  valia.
+- A escolha só é aplicada depois que o Koha responde, pela mesma tarefa
+  `koha-access apply`. Com uma porta, a tela final diz o endereço da equipe
+  por nome.
+- Se a aplicação falhar, o Koha fica instalado com duas portas e o painel
+  diz onde escolher de novo.
+- Cancelar a escolha não instala nada.
+
+Capturas (modo demonstração, 80x24 e 160x48), em `capturas/u10/`:
+`u10b-1-revisao-enderecos` e `u10b-2-instalacao-uma-ou-duas`.
+
+Testes:
+
+- `tests/koha_access.bats` (+4): os endereços seguem uma porta e voltam com
+  duas; trocar de domínio guarda o valor original; um nome público é
+  mantido; um valor mudado à mão não é desfeito; uma preferência não
+  gravada é dita sem desfazer o site; as aspas vão dobradas no SQL;
+- `panel/tests/test_u10_koha_access.py` (+4): as linhas da revisão, o aviso
+  de preferência não gravada, e a instalação que pergunta, aplica uma porta
+  depois de instalar e não faz nada a mais com duas, ou não instala se
+  cancelada;
+- `test_routines.py` ajustado: a instalação ganhou a pergunta.

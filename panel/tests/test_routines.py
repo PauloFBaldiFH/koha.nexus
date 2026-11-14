@@ -195,6 +195,10 @@ def test_install_asks_everything_before_erasing():
             seen["wrong"] = isinstance(app.screen, InputScreen)
             word.query_one("#value").value = "REINSTALL"
             word.query_one("#ok").press()
+            # One port or two (U10), after the erase is confirmed.
+            access = await _wait_for(pilot, ChoiceScreen)
+            seen["access"] = [key for key, _ in access._options]
+            access.dismiss("two")
             loader = await _wait_for(pilot, LoadingScreen)
             seen["cancellable"] = loader.cancellable
             ready = await _wait_for(pilot, CredentialsScreen, tries=200)
@@ -213,6 +217,7 @@ def test_install_asks_everything_before_erasing():
     seen = asyncio.run(main())
     assert "apache2" in seen["ports"] and "VALIDATION REPORT" in seen["preview"]
     assert "America/Sao_Paulo" in seen["tz"] and seen["cities"] == ["Lisbon"]
+    assert seen["access"] == ["two", "one"]
     assert seen["danger"] and seen["wrong"] and not seen["cancellable"]
     assert "demo-Pa55word" in seen["values"] and seen["later"] == "info"
 

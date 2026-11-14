@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "panel_version": "1.5.209",
+ "panel_version": "1.5.211",
  "languages": [
   {
    "code": "en",
@@ -19343,7 +19343,8 @@
    "en": {
     "summary": "Chooses how people open Koha: two ports by this server's IP (the default), or one port with names, the staff at admin.your-domain.",
     "overview": [
-     "With two ports the catalog answers on 80 and the staff on 8080, both by the server's IP, with no names to set up. With one port the staff also answers by name on port 80 (admin. followed by the institution's domain). Both names must point to this server (DNS or tunnel); by IP only the catalog opens. Koha's own site is never changed and port 8080 keeps working as the way in from the server."
+     "With two ports the catalog answers on 80 and the staff on 8080, both by the server's IP, with no names to set up. With one port the staff also answers by name on port 80 (admin. followed by the institution's domain). Both names must point to this server (DNS or tunnel); by IP only the catalog opens. Koha's own site is never changed and port 8080 keeps working as the way in from the server.",
+     "Koha's own addresses (the system preferences OPACBaseURL and staffClientBaseURL) follow the choice: with one port they become the two names, unless one already holds another public name, such as the tunnel's, which is kept. Going back to two ports puts back what they held before, if nobody changed them by hand in the meantime. The same choice is also asked when Koha is installed."
     ],
     "steps": [
      "Open **One port or two** (also the button in Addresses and access).",
@@ -19353,7 +19354,8 @@
     ],
     "tips": [
      "A name that does not point here yet is only a warning: it starts working once the DNS or the tunnel points it to this server.",
-     "Going back to two ports removes only the site Koha.Nexus added."
+     "Going back to two ports removes only the site Koha.Nexus added.",
+     "The review shows each of Koha's addresses before and after; nothing changes before Apply."
     ],
     "related": [
      "staff-firewall",
@@ -19363,7 +19365,8 @@
    "pt-BR": {
     "summary": "Escolhe como as pessoas abrem o Koha: duas portas pelo IP deste servidor (o padrão), ou uma porta com nomes, a equipe em admin.seu-domínio.",
     "overview": [
-     "Com duas portas, o catálogo responde na 80 e a equipe na 8080, as duas pelo IP do servidor, sem configurar nomes. Com uma porta, a equipe também responde pelo nome na porta 80 (admin. seguido do domínio da instituição). Os dois nomes precisam apontar para este servidor (DNS ou túnel); pelo IP abre só o catálogo. O site do próprio Koha nunca é alterado e a porta 8080 continua funcionando como entrada a partir do servidor."
+     "Com duas portas, o catálogo responde na 80 e a equipe na 8080, as duas pelo IP do servidor, sem configurar nomes. Com uma porta, a equipe também responde pelo nome na porta 80 (admin. seguido do domínio da instituição). Os dois nomes precisam apontar para este servidor (DNS ou túnel); pelo IP abre só o catálogo. O site do próprio Koha nunca é alterado e a porta 8080 continua funcionando como entrada a partir do servidor.",
+     "Os endereços do próprio Koha (as preferências do sistema OPACBaseURL e staffClientBaseURL) acompanham a escolha: com uma porta passam a ser os dois nomes, a não ser que um deles já tenha outro nome público, como o do túnel, que é mantido. Voltar para duas portas devolve o que elas tinham antes, se ninguém as mudou à mão nesse meio tempo. A mesma escolha também é feita na instalação do Koha."
     ],
     "steps": [
      "Abra **Uma porta ou duas** (também o botão em Endereços e acesso).",
@@ -19373,7 +19376,8 @@
     ],
     "tips": [
      "Um nome que ainda não aponta para cá é só um aviso: passa a funcionar quando o DNS ou o túnel o apontar para este servidor.",
-     "Voltar para duas portas remove só o site que o Koha.Nexus acrescentou."
+     "Voltar para duas portas remove só o site que o Koha.Nexus acrescentou.",
+     "A revisão mostra cada endereço do Koha antes e depois; nada muda antes de Aplicar."
     ]
    }
   },

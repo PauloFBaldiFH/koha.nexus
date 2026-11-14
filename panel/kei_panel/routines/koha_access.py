@@ -24,6 +24,8 @@ POINTS = {
     "none": "⚠ does not point anywhere yet",
 }
 NETS = {"local": "Only the local networks (as the staff firewall)", "all": "Anyone who reaches this server"}
+# Koha's own addresses (OPACBaseURL, staffClientBaseURL), in the review.
+BASES = {"opac": "Koha's catalog address (OPACBaseURL)", "staff": "Koha's staff address (staffClientBaseURL)"}
 
 
 def domain_error(value: str) -> str:
@@ -50,7 +52,52 @@ def plan_rows(r: dict[str, list[str]]) -> list[tuple[str, str]]:
         for p in r.get("points", []):
             name, _s, state = p.partition("|")
             rows.append((name, t(POINTS.get(state, POINTS["none"]))))
+    for b in r.get("base", []):
+        key, now, nxt, state = (b.split("|") + ["", "", "", ""])[:4]
+        if key in BASES:
+            rows.append((t(BASES[key]), base_text(now, nxt, state)))
     return rows
+
+
+def base_text(now: str, nxt: str, state: str) -> str:
+    """One of Koha's own addresses: what happens to it."""
+    empty = t("(empty)")
+    if state == "change":
+        return f"{now or empty} → {nxt}"
+    if state == "keep":
+        return t("Kept: ${url} (another public name, as the tunnel's)", url=now)
+    if state == "restore":
+        return t("Back to what it was: ${url}", url=nxt or empty)
+    return t("Unchanged: ${url}", url=now or empty)
+
+
+def failed_bases(out) -> list[str]:
+    return [v for v in (out.lists.get("base_failed") or []) if v] if isinstance(out, TaskOutcome) else []
+
+
+async def choose(app, title: str, mode_now: str = "two", domain_now: str = "") -> tuple[str, str] | None:
+    """Two ports or one, and the domain for one; None = cancelled."""
+    from ..screens.dialogs import ChoiceScreen, InputScreen
+
+    mode = await app.push_screen_wait(ChoiceScreen(
+        title, t("How will people open the catalog and the staff area?"),
+        [("two", t("Two ports (recommended): the catalog by this server's IP, the staff on port 8080")),
+         ("one", t("One port, with names: the staff at admin.<your domain>"))],
+        note=t("Two ports works by IP, with no names to set up in the network. One port needs a domain whose two "
+               "names point to this server (DNS or tunnel); by IP only the catalog opens."),
+        default=mode_now))
+    if mode is None:
+        return None
+    domain = ""
+    if mode == "one":
+        domain = await app.push_screen_wait(InputScreen(
+            title, t("The catalog will open at the domain and the staff at admin. followed by it. Both names "
+                     "must point to this server. Koha's own site stays as it is; port 8080 keeps working."),
+            t("Institution's domain:"), validate=domain_error, value=domain_now))
+        if not domain:
+            return None
+        domain = domain.strip().lower()
+    return mode, domain
 
 
 def unpointed(r: dict[str, list[str]]) -> list[str]:
@@ -58,7 +105,7 @@ def unpointed(r: dict[str, list[str]]) -> list[str]:
 
 
 async def koha_access(app) -> None:
-    from ..screens.dialogs import ChoiceScreen, InputScreen, MessageScreen
+    from ..screens.dialogs import MessageScreen
     from ..screens.install_flow import PlanSummaryScreen
     from .common import run_task, show_done, show_failure
 
@@ -71,24 +118,10 @@ async def koha_access(app) -> None:
     cur = results(now)
     mode_now = (cur.get("mode") or ["two"])[0]
     domain_now = (cur.get("domain") or [""])[0]
-    mode = await app.push_screen_wait(ChoiceScreen(
-        title, t("How will people open the catalog and the staff area?"),
-        [("two", t("Two ports (recommended): the catalog by this server's IP, the staff on port 8080")),
-         ("one", t("One port, with names: the staff at admin.<your domain>"))],
-        note=t("Two ports works by IP, with no names to set up in the network. One port needs a domain whose two "
-               "names point to this server (DNS or tunnel); by IP only the catalog opens."),
-        default=mode_now))
-    if mode is None:
+    picked = await choose(app, title, mode_now, domain_now)
+    if picked is None:
         return
-    domain = ""
-    if mode == "one":
-        domain = await app.push_screen_wait(InputScreen(
-            title, t("The catalog will open at the domain and the staff at admin. followed by it. Both names "
-                     "must point to this server. Koha's own site stays as it is; port 8080 keeps working."),
-            t("Institution's domain:"), validate=domain_error, value=domain_now))
-        if not domain:
-            return
-        domain = domain.strip().lower()
+    mode, domain = picked
     if mode == mode_now and domain == domain_now:
         await app.push_screen_wait(MessageScreen(title, t("This is already how Koha is opened: nothing to change."),
                                                  kind="info"))
@@ -108,4 +141,9 @@ async def koha_access(app) -> None:
             body=t("Nothing was changed so far."), note=note, action=t("Apply"))):
         return
     result = await run_task(app, title, "koha-access", "apply", mode, *([domain] if domain else []), "confirm")
-    await show_done(app, title, result, t("Done. Use Test access to check each address."))
+    done = t("Done. Use Test access to check each address.")
+    bad = failed_bases(result.value)
+    if bad:
+        done += "\n\n" + t("⚠ Koha's own address could not be changed (${names}). Set it in Koha: Administration > "
+                            "System preferences.", names=", ".join(bad))
+    await show_done(app, title, result, done)
