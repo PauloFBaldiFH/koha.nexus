@@ -249,7 +249,7 @@ Button.small {
 /* ---- loading modal (Pac-Man) --------------------------------------- */
 LoadingScreen {
     align: center middle;
-    background: $background 70%;
+    background: $background 90%;
 }
 #loader-box {
     width: 76;
@@ -300,13 +300,19 @@ LoadingScreen {
 }
 
 /* ---- dialogs ------------------------------------------------------- */
+/* The screen behind a dialog is almost hidden: at 70% its texts stayed
+   half readable around the dialog and fought with it (a question over the
+   loader of a routine showed two layers of grey text). */
+ModalScreen {
+    background: $background 90%;
+}
 ConfirmScreen, ResultScreen, ChoiceScreen, InputScreen, MessageScreen, PathPickerScreen,
 TextScreen, ChecklistScreen, CredentialsScreen, EditScreen, FieldMapScreen, RecordPreviewScreen,
 ServerHelperScreen, SaveBackupScreen, WebTransferScreen, ProfileScreen, OAuthScreen,
 CloudBackupScreen, RemoteFormScreen, PlanFormScreen, CloudflareScreen,
 DiagnosticsScreen, LogTailScreen, CheckReportScreen, PlanSummaryScreen, CompletionScreen {
     align: center middle;
-    background: $background 70%;
+    background: $background 90%;
 }
 .dialog {
     width: 70;

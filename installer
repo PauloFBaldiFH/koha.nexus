@@ -89,7 +89,7 @@ shield_signals() { trap '' INT TERM HUP; SIGNALS_SHIELDED=1; }
 trap on_exit EXIT
 unshield_signals
 
-PANEL_VERSION=" 1.5.209"
+PANEL_VERSION=" 1.5.210"
 UPDATE_URL="https://raw.githubusercontent.com/PauloFBaldiFH/koha.nexus/refs/heads/main/installer"
 
 # ======================================================================
@@ -9617,11 +9617,37 @@ cloudflare_create_tunnel() {
     cloudflared tunnel create "$1"
 }
 
+# cloudflared_protocol_dropin: on WSL the tunnel talks to Cloudflare over
+# HTTP/2 (TCP) instead of QUIC (UDP). WSL passes UDP through Windows, and
+# QUIC connections there die every few minutes ("timeout: no recent network
+# activity", then 502/530 on the public address); cloudflared only falls
+# back to HTTP/2 when QUIC never connects, not when it keeps dropping.
+# A systemd drop-in, so it holds for both ways of publishing (free address
+# and own domain) and survives "cloudflared service install". Elsewhere it
+# is removed, unless KEI_TUNNEL_PROTOCOL asks for a protocol.
+CLOUDFLARED_DROPIN="${KEI_CLOUDFLARED_DROPIN:-/etc/systemd/system/cloudflared.service.d/koha-nexus-protocol.conf}"
+cloudflared_protocol_dropin() {
+    local proto="${KEI_TUNNEL_PROTOCOL:-}"
+    [ -z "$proto" ] && is_wsl && proto=http2
+    case "$proto" in
+        http2|quic|auto)
+            mkdir -p "$(dirname "$CLOUDFLARED_DROPIN")"
+            printf '# Written by koha.nexus: see cloudflared_protocol_dropin in the installer.\n[Service]\nEnvironment=TUNNEL_TRANSPORT_PROTOCOL=%s\n' \
+                "$proto" > "$CLOUDFLARED_DROPIN"
+            chmod 644 "$CLOUDFLARED_DROPIN"
+            ;;
+        *) rm -f "$CLOUDFLARED_DROPIN" ;;
+    esac
+    systemctl daemon-reload >/dev/null 2>&1 || true
+}
+
 # The tunnel's config.yml installed as the cloudflared service and started.
 cloudflare_service_install() {
     cloudflared service uninstall || true
     cp /etc/cloudflared/config.yml /etc/cloudflared/config.yml.bak || true
     cloudflared --config /etc/cloudflared/config.yml service install
+    cloudflared_protocol_dropin
+    systemctl restart cloudflared >/dev/null 2>&1 || true
     systemctl enable --now cloudflared
     sleep 3
     return 0
@@ -9939,12 +9965,31 @@ broker_request() {
     printf '%s' "$json" > "$req"
     if [ "$signed" = "yes" ]; then
         while IFS= read -r h; do args+=(-H "$h"); done < <(broker_sign_headers "$method" "$path" "$req")
-        [ ${#args[@]} -eq 8 ] || { rm -f "$req"; BROKER_STATUS=000; return 1; }
+        [ ${#args[@]} -eq 8 ] || { rm -f "$req"; BROKER_STATUS=000; BROKER_CURL_RC=0; return 1; }
     fi
     [ -n "$json" ] && args+=(-H "Content-Type: application/json" --data-binary "@$req")
-    BROKER_CURL_RC=0
-    BROKER_STATUS=$(curl -sS --max-time 30 -X "$method" "${args[@]}" -o "$BROKER_BODY" -w '%{http_code}' \
-        "$(broker_url)$path" 2>/dev/null) || { BROKER_CURL_RC=$?; BROKER_STATUS=000; }
+    # A failed name lookup (curl 6) or refused connection (7) never reached
+    # the service, so it is tried again for any call; a cut connection only
+    # for the calls that change nothing twice (GET, PUT). On WSL the name
+    # lookup of Windows fails now and then for a few seconds, and the
+    # answer of the person (the public list "Yes") was lost to it.
+    local try retry_rc="6 7"
+    [ "$method" = "GET" ] || [ "$method" = "PUT" ] && retry_rc="6 7 28 35 52 56"
+    for try in 1 2 3; do
+        if [ "$signed" = "yes" ] && [ "$try" -gt 1 ]; then
+            # A new nonce and time for each try: the service refuses a nonce seen before.
+            args=()
+            while IFS= read -r h; do args+=(-H "$h"); done < <(broker_sign_headers "$method" "$path" "$req")
+            [ ${#args[@]} -eq 8 ] || { rm -f "$req"; BROKER_STATUS=000; BROKER_CURL_RC=0; return 1; }
+            [ -n "$json" ] && args+=(-H "Content-Type: application/json" --data-binary "@$req")
+        fi
+        BROKER_CURL_RC=0
+        BROKER_STATUS=$(curl -sS --max-time 30 -X "$method" "${args[@]}" -o "$BROKER_BODY" -w '%{http_code}' \
+            "$(broker_url)$path" 2>/dev/null) || { BROKER_CURL_RC=$?; BROKER_STATUS=000; }
+        [ "$BROKER_STATUS" = "000" ] || { BROKER_SEEN=1; break; }
+        [[ " $retry_rc " == *" $BROKER_CURL_RC "* ]] || break
+        [ "$try" -lt 3 ] && sleep "${KEI_BROKER_RETRY_DELAY:-3}"
+    done
     rm -f "$req"
     [[ "$BROKER_STATUS" == 2[0-9][0-9] ]]
 }
@@ -9965,8 +10010,16 @@ broker_error() {
     local e=""
     [ -n "$BROKER_BODY" ] && e=$(json_field "$BROKER_BODY" error)
     [ "$BROKER_STATUS" = "000" ] && e="$(t "The address service could not be reached. Check the internet connection.")"
-    # curl 6: the name does not resolve (the service is not online), not the internet.
-    [ "$BROKER_STATUS" = "000" ] && [ "${BROKER_CURL_RC:-0}" = "6" ] && e="$(broker_offline_text)"
+    # curl 6: the name does not resolve (the service is not online), not the
+    # internet. When the service answered earlier in this same run, it is
+    # online: the name lookup of this computer failed for a moment.
+    if [ "$BROKER_STATUS" = "000" ] && [ "${BROKER_CURL_RC:-0}" = "6" ]; then
+        if [ "${BROKER_SEEN:-0}" = "1" ]; then
+            e="$(t "This computer could not find the address service on the internet for a moment (a name lookup failure), although the service answered a few seconds earlier. The free address service is online: this is the network of this computer, which on WSL fails like this now and then.\n\nTry again in a minute.")"
+        else
+            e="$(broker_offline_text)"
+        fi
+    fi
     printf '%s' "${e:-HTTP $BROKER_STATUS}"
 }
 
@@ -10094,17 +10147,27 @@ broker_complete_request() {
     # The public list is of Koha catalogs: a collection-only address is not on it.
     [ -n "$opac" ] || return 0
     if prompt_yes_no "$(t "Public list of catalogs")" "$(t "Show this catalog on the public list of the koha.nexus network (koha.nexus and broker.koha.nexus/libraries)?\n\nThe list shows the library's name and the catalog's address, and helps search engines find the catalog. You can change this later in this menu.")" 14 78; then
-        broker_set_listing true
+        broker_set_listing true keep
     fi
     return 0
 }
 
-# broker_set_listing true|false: the catalog on or off the public list.
+# broker_set_listing true|false [keep]: the catalog on or off the public
+# list. With "keep", a "Yes" the service could not take is kept
+# (PUBLIC_LISTING=pending) and sent again by the daily heartbeat, instead
+# of being lost behind an error.
 broker_set_listing() {
     if broker_request PUT /v1/listing yes "{\"public\":$1}"; then
         broker_cleanup
         kv_write "$TUNNEL_CONF" 644 PUBLIC_LISTING "$([ "$1" = true ] && echo yes || echo no)"
         return 0
+    fi
+    if [ "${2:-}" = keep ] && [ "$1" = true ] && [ "$BROKER_STATUS" = "000" ]; then
+        kv_write "$TUNNEL_CONF" 644 PUBLIC_LISTING pending
+        log "broker: public list answer kept for later (curl ${BROKER_CURL_RC:-?})"
+        msg_info "$(t "Public list of catalogs")" "$(t "The address service could not be reached right now, so the catalog is not on the public list yet. Your answer is saved: this server sends it again on its own every day until the service takes it. You can also send it now with \"Show or hide the catalog on the public list of catalogs\" in this menu.")" 12 76
+        broker_cleanup
+        return 1
     fi
     msg_error "" "$(t "The address service did not confirm:")\n\n$(broker_error)" 10 74
     broker_cleanup
@@ -10152,7 +10215,7 @@ RestartSec=5s
 [Install]
 WantedBy=multi-user.target
 EOF
-    systemctl daemon-reload >/dev/null 2>&1 || true
+    cloudflared_protocol_dropin
     systemctl enable cloudflared >/dev/null 2>&1 || true
     systemctl restart cloudflared >/dev/null 2>&1 || true
     broker_install_cron
@@ -10213,6 +10276,14 @@ broker_heartbeat() {
         "{\"koha_version\":$(json_str "$koha"),\"installer_version\":$(json_str "${PANEL_VERSION# }")}"
     local rc=$?
     broker_cleanup
+    # A public list "Yes" the service could not take when it was given.
+    if [ "$(tunnel_conf_get PUBLIC_LISTING 2>/dev/null)" = "pending" ]; then
+        if broker_request PUT /v1/listing yes '{"public":true}'; then
+            kv_write "$TUNNEL_CONF" 644 PUBLIC_LISTING yes
+            log "broker: public list answer sent"
+        fi
+        broker_cleanup
+    fi
     return "$rc"
 }
 
@@ -10279,6 +10350,7 @@ function_broker_manage() {
         [ "$(tunnel_conf_get STAFF_REMOTE)" = "yes" ] && remote="$(t "on")"
         listed="$(t "off")"
         [ "$(tunnel_conf_get PUBLIC_LISTING)" = "yes" ] && listed="$(t "on")"
+        [ "$(tunnel_conf_get PUBLIC_LISTING)" = "pending" ] && listed="$(t "waiting to be sent")"
         choice=$(ui_menu "$(t "Free address")" "$(t "Catalog address: https://\$opac\nRemote staff access: \$remote\nOn the public list of catalogs: \$listed")" \
             "1" "$(t "Remote staff access (password at the edge)")" \
             "2" "$(t "Reconnect the tunnel (fetch the token again)")" \
@@ -10492,7 +10564,7 @@ function_broker_leave() {
     fi
     broker_cleanup
     systemctl disable --now cloudflared >/dev/null 2>&1 || true
-    rm -f "$CLOUDFLARED_UNIT" "$BROKER_ENV" "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
+    rm -f "$CLOUDFLARED_UNIT" "$CLOUDFLARED_DROPIN" "$BROKER_ENV" "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
     systemctl daemon-reload >/dev/null 2>&1 || true
     set_koha_public_urls "http://$(get_server_ip)" "http://$(get_server_ip):8080"
     [ -n "$collection" ] && { kei_tainacan_address local >/dev/null 2>&1 || log "broker: Tainacan kept $collection (no local address)"; }
@@ -10583,6 +10655,7 @@ function_configure_cloudflare() {
             5)
                 clear
                 display_explanation "Restarting Cloudflare Tunnel..."
+                cloudflared_protocol_dropin
                 systemctl restart cloudflared >/dev/null 2>&1
                 msg_ok "$(t "Service restarted successfully.")" 8 60
                 ;;
@@ -10795,6 +10868,7 @@ cf_service() {
     case "${1:-}" in
         restart)
             display_explanation "Restarting Cloudflare Tunnel..."
+            cloudflared_protocol_dropin
             systemctl restart cloudflared >/dev/null 2>&1 ;;
         pause)
             display_explanation "Pausing the tunnel..."
@@ -10804,6 +10878,7 @@ cf_service() {
             return 0 ;;
         resume)
             display_explanation "Resuming the tunnel..."
+            cloudflared_protocol_dropin
             systemctl enable --now cloudflared >/dev/null 2>&1 ;;
         *) return 2 ;;
     esac
@@ -14820,7 +14895,7 @@ kei_tainacan_free_off() {
         fi
         broker_cleanup
         systemctl disable --now cloudflared >/dev/null 2>&1 || true
-        rm -f "$CLOUDFLARED_UNIT" "$BROKER_ENV" "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
+        rm -f "$CLOUDFLARED_UNIT" "$CLOUDFLARED_DROPIN" "$BROKER_ENV" "$CRON_BROKER" "$TUNNEL_CONF" "$BROKER_KEY"
         systemctl daemon-reload >/dev/null 2>&1 || true
     fi
     log "broker: collection address $host released"
