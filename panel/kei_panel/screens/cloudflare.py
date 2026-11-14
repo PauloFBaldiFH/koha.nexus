@@ -89,6 +89,7 @@ class TunnelState:
     staff_host: str = ""               # free address: the staff name, even while off
     staff_remote: bool = False
     listing: bool = False
+    listing_pending: bool = False
     service: str = "absent"            # active | inactive | failed | activating | absent
     enabled: str = ""
     since: str = ""
@@ -140,6 +141,8 @@ def parse_status(results: dict[str, str], lists: dict[str, list[str]]) -> Tunnel
     s.mode = g("mode", "none") or "none"
     s.opac, s.staff, s.staff_host = g("opac", ""), g("staff", ""), g("staff_host", "")
     s.staff_remote, s.listing = g("staff_remote") == "yes", g("listing") == "yes"
+    # "pending": the person said yes, the address service has not taken it yet.
+    s.listing_pending = g("listing") == "pending"
     s.service, s.enabled = g("service", "absent") or "absent", g("enabled", "")
     s.since, s.restarts, s.version = g("since", ""), g("restarts", ""), g("version", "")
     s.package, s.cert = g("package") == "yes", g("cert") == "yes"
@@ -537,7 +540,8 @@ class CloudflareScreen(ModalScreen[None]):
             self.query_one(sel).parent.display = broker
         if broker:
             self._put("#cf-b-staff", (t("on: ${url}", url=s.staff_url) if s.staff_remote else t("off")))
-            self._put("#cf-b-list", t("shown") if s.listing else t("hidden"))
+            self._put("#cf-b-list", t("shown") if s.listing
+                      else t("waiting to be sent") if s.listing_pending else t("hidden"))
             self._put("#cf-b-rec", s.recovery or t("⚠ not saved yet"))
         self.query_one("#cf-free-new").display = not broker
         self.query_one("#cf-free-manage").display = broker
