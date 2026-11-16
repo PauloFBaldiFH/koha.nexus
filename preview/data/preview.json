@@ -12155,10 +12155,10 @@
   "Koha": {
    "en": "Koha",
    "pt-BR": "Koha",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
+   "es": "Koha",
+   "fr": "Koha",
+   "it": "Koha",
+   "de": "Koha",
    "nl": null,
    "sv": null,
    "pl": null,
@@ -14155,10 +14155,10 @@
   "MARC Replace": {
    "en": "MARC Replace",
    "pt-BR": "Substituição MARC",
-   "es": null,
-   "fr": null,
-   "it": null,
-   "de": null,
+   "es": "Sustitución MARC",
+   "fr": "Remplacement MARC",
+   "it": "Sostituzione MARC",
+   "de": "MARC-Ersetzung",
    "nl": null,
    "sv": null,
    "pl": null,
@@ -25036,28 +25036,28 @@
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 398,
+   "strings": 400,
    "strings_total": 554
   },
   "fr": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 398,
+   "strings": 400,
    "strings_total": 554
   },
   "it": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 398,
+   "strings": 400,
    "strings_total": 554
   },
   "de": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 397,
+   "strings": 399,
    "strings_total": 554
   },
   "nl": {
