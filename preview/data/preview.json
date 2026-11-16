@@ -14154,7 +14154,7 @@
   },
   "MARC Replace": {
    "en": "MARC Replace",
-   "pt-BR": null,
+   "pt-BR": "Substituição MARC",
    "es": null,
    "fr": null,
    "it": null,
@@ -25029,7 +25029,7 @@
    "manual": 195,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 548,
+   "strings": 549,
    "strings_total": 554
   },
   "es": {

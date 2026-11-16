@@ -45,3 +45,32 @@ def test_language_codes():
     assert normalize_panel_language("fil") == "tl"
     assert normalize_panel_language("") == "pt"
     assert normalize_panel_language("es-ES") == "es"
+
+
+def test_portuguese_covers_literal_panel_messages():
+    """New literal messages must ship with a usable bundled translation."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    table = load_cache(root / 'lang/pt.cache')
+    table.update(load_menu_pt(root / 'installer'))
+    missing = []
+    unsafe = []
+    for path in sorted((root / 'panel/kei_panel').rglob('*.py')):
+        for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+            if not (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name) and node.func.id == 't'
+                    and node.args and isinstance(node.args[0], ast.Constant)
+                    and isinstance(node.args[0].value, str)):
+                continue
+            source = node.args[0].value
+            if not source:
+                continue
+            location = f'{path.relative_to(root)}:{node.lineno}: {source!r}'
+            if source not in table:
+                missing.append(location)
+            elif not is_safe(source, table[source]):
+                unsafe.append(location)
+    assert not missing, 'Missing Portuguese entries:\n' + '\n'.join(missing)
+    assert not unsafe, 'Unsafe Portuguese placeholders:\n' + '\n'.join(unsafe)
