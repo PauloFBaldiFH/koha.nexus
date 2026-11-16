@@ -74,3 +74,43 @@ def test_portuguese_covers_literal_panel_messages():
                 unsafe.append(location)
     assert not missing, 'Missing Portuguese entries:\n' + '\n'.join(missing)
     assert not unsafe, 'Unsafe Portuguese placeholders:\n' + '\n'.join(unsafe)
+
+
+def test_european_panel_translation_coverage():
+    """Cover messages, menu metadata and known dynamically translated labels.
+
+    Literal t() calls alone miss section names, card descriptions and status
+    tables. Portuguese is also used to recognize existing translated labels
+    stored in constants; arbitrary paths and protocol values are not translated.
+    """
+    import ast
+    from pathlib import Path
+    from kei_panel import menus
+
+    root = Path(__file__).resolve().parents[2]
+    portuguese = load_cache(root / 'lang/pt.cache')
+    messages = set()
+    for path in (root / 'panel/kei_panel').rglob('*.py'):
+        tree = ast.parse(path.read_text(encoding='utf-8'))
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == 't' and node.args
+                    and isinstance(node.args[0], ast.Constant)
+                    and isinstance(node.args[0].value, str)):
+                messages.add(node.args[0].value)
+            elif (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                  and node.value in portuguese):
+                messages.add(node.value)
+    for section in menus.SECTIONS:
+        messages.update((section.label, section.title, section.prompt))
+        for entry in section.entries:
+            messages.update((entry.label, entry.confirm))
+    messages.update(menus.DESCRIPTIONS.values())
+    messages.discard('')
+    for language in ('es', 'fr', 'de', 'it'):
+        table = load_cache(root / f'lang/{language}.cache')
+        missing = sorted(messages - table.keys())
+        unsafe = sorted(key for key in messages & table.keys()
+                        if not is_safe(key, table[key]))
+        assert not missing, f'{language}: missing translations: {missing}'
+        assert not unsafe, f'{language}: invalid placeholders: {unsafe}'
