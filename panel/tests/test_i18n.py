@@ -114,3 +114,25 @@ def test_european_panel_translation_coverage():
                         if not is_safe(key, table[key]))
         assert not missing, f'{language}: missing translations: {missing}'
         assert not unsafe, f'{language}: invalid placeholders: {unsafe}'
+
+
+def test_bundled_cache_lines_are_readable():
+    """Reject malformed cache entries instead of silently falling back to English."""
+    import base64
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    for language in ('cs', 'nl', 'pl', 'ru', 'sv', 'uk'):
+        path = root / 'lang' / f'{language}.cache'
+        for number, line in enumerate(path.read_text(encoding='ascii').splitlines(), 1):
+            if not line or line.startswith('#'):
+                continue
+            key, separator, value = line.partition('|')
+            assert separator, f'{path.name}:{number}: missing cache separator'
+            try:
+                source = base64.b64decode(key, validate=True).decode('utf-8')
+                translated = base64.b64decode(value, validate=True).decode('utf-8')
+            except (ValueError, UnicodeError) as exc:
+                raise AssertionError(f'{path.name}:{number}: invalid cache entry') from exc
+            assert source and translated, f'{path.name}:{number}: empty cache entry'
+            assert is_safe(source, translated), f'{path.name}:{number}: invalid placeholders'
