@@ -12790,17 +12790,17 @@
    "cs": "Aktualizace panelu",
    "ru": "Обновления панели",
    "uk": "Оновлення панелі",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "Panel güncellemeleri",
+   "tl": "Mga update ng panel",
+   "id": "Pembaruan panel",
+   "ar": "تحديثات اللوحة",
+   "fa": "به‌روزرسانی‌های پنل",
+   "hi": "पैनल अपडेट",
+   "bn": "প্যানেল আপডেট",
+   "vi": "Bản cập nhật bảng điều khiển",
+   "zh": "面板更新",
+   "ja": "パネルの更新",
+   "ko": "패널 업데이트"
   },
   "Update available": {
    "en": "Update available",
@@ -25106,77 +25106,77 @@
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "tl": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "id": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "ar": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "fa": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "hi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "bn": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "vi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "zh": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "ja": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   },
   "ko": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 373,
+   "strings": 374,
    "strings_total": 554
   }
  }
