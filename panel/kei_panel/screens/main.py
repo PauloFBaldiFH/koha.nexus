@@ -19,6 +19,8 @@ they are shown; Tab moves between the sidebar and the view.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -64,10 +66,20 @@ class MainScreen(Screen):
     # The bar at the bottom: the dashboard and a shell. Every section keeps
     # its letter (b still opens the Backup center), out of the bar.
     BINDINGS = [
-        Binding(s.key, f"show('{s.id}')", split_icon(t(s.label))[1], show=s.key == "d")
+        Binding(s.key, f"show('{s.id}')", s.label, show=s.key == "d")
         for s in SECTIONS if s.key
     ] + [Binding("c", "terminal", t("Open Debian terminal")),
          Binding("ctrl+b", "toggle_sidebar", "Sidebar", show=False)]
+
+    @property
+    def active_bindings(self):
+        bindings = super().active_bindings
+        for key, active in bindings.items():
+            if active.node not in (self, self.app) or not active.binding.description:
+                continue
+            description = split_icon(t(active.binding.description))[1]
+            bindings[key] = active._replace(binding=replace(active.binding, description=description))
+        return bindings
 
     def compose(self) -> ComposeResult:
         # The groups of the installed platforms start expanded.

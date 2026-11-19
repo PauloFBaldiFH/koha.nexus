@@ -136,8 +136,6 @@ def controls(rows, files, instance, *, tainacan=None, joint=None, plans=()):
             job = cron.Job('', '', '')
             cron._from_schedule(job, row.sched)
             consistent = bool(state.get('schedule')) == (row.state == 'on') and job.freq == 'daily' and job.time() == hour
-        elif state.get('schedule'):
-            note += ' ' + 'The configured cron entry is missing. Enable and save to recreate it.'
         result[id(row)] = Control(row, driver, time=hour, original=files.get(source, ''), enabled=row.state == 'on', available=state.get('known', True) and consistent and managed_file(files.get(source, ''), driver), note=note, out_of_sync=not candidates and bool(state.get('schedule')))
 
     if tainacan is not None:

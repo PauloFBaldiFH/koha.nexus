@@ -156,7 +156,7 @@ class KohaPanelApp(App):
             return
         self.push_screen(MainScreen())
         if self.env.demo:
-            self.notify("Demo mode: nothing is run on this machine.", timeout=4)
+            self.notify(t("Demo mode: nothing is run on this machine."), timeout=4)
 
     def on_resize(self, event) -> None:
         # 80-column SSH sessions: two cards per row instead of three.
@@ -339,7 +339,7 @@ class KohaPanelApp(App):
                 self.notify(str(e), severity="error")
                 return
             if rc not in (0, None):
-                self.notify(f"{label}: exit {rc}", severity="warning")
+                self.notify(f"{label}: " + t("Exit code ${code}", code=rc), severity="warning")
             self.check_platforms()
             if after:
                 after()

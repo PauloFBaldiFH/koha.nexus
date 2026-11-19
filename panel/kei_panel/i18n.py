@@ -18,6 +18,7 @@ from .env import CONFIG_DIR
 from .glyphs import plain_text, steady
 
 _VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}|\$([A-Za-z_][A-Za-z0-9_]*)")
+_BASH_DOUBLE_QUOTE_ESCAPE = re.compile(r'\\(["\\$`\n])')
 
 
 def _vars(s: str) -> list[str]:
@@ -70,7 +71,9 @@ def load_menu_pt(installer: Path | None) -> dict[str, str]:
     m = re.search(r"^declare -A _MENU_PT=\($(.*?)^\)", text, re.S | re.M)
     if not m:
         return {}
-    return dict(re.findall(r'\["((?:[^"\\]|\\.)*)"\]="((?:[^"\\]|\\.)*)"', m.group(1)))
+    pairs = re.findall(r'\["((?:[^"\\]|\\.)*)"\]="((?:[^"\\]|\\.)*)"', m.group(1))
+    return {_BASH_DOUBLE_QUOTE_ESCAPE.sub(r"\1", key): _BASH_DOUBLE_QUOTE_ESCAPE.sub(r"\1", value)
+            for key, value in pairs}
 
 
 class Translator:
@@ -95,7 +98,8 @@ class Translator:
             found.append(installer.resolve().parent / "lang" / f"{lang}.cache")
         return found
 
-    def __call__(self, src: str, **values: object) -> str:
+    def literal(self, src: str) -> str:
+        """Look up complete display text without expanding variables."""
         if not src:
             return ""
         res = src
@@ -106,7 +110,10 @@ class Translator:
                 res = self.table[src]
         if self.plain:
             res = plain_text(res)
-        res = steady(res)
+        return steady(res)
+
+    def __call__(self, src: str, **values: object) -> str:
+        res = self.literal(src)
         return expand(res, values) if "$" in res else res
 
 
@@ -121,3 +128,7 @@ def install(translator: Translator) -> None:
 
 def t(src: str, **values: object) -> str:
     return _current(src, **values)
+
+
+def t_literal(src: str) -> str:
+    return _current.literal(src)

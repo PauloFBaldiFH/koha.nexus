@@ -254,11 +254,8 @@ def translated(text: str) -> str:
     """The panel's translation of a text an engine sent in English (the
     DSpace runtime has no catalogue of its own); a text the installer
     already translated has no entry and comes back as it is."""
-    from .i18n import t
-    try:
-        return t(text)
-    except Exception:          # a text with ${...} that is not a template
-        return text
+    from .i18n import t_literal
+    return t_literal(text)
 
 
 def stage_parts(stage: str) -> tuple[str, int, int]:
@@ -310,7 +307,8 @@ class TaskOutcome:
         return self.results.get(key, default)
 
     def feed(self, line: str, reporter: "Reporter | None" = None,
-             on_result: Callable[[str, str], None] | None = None) -> None:
+             on_result: Callable[[str, str], None] | None = None, *,
+             translate_messages: bool = False) -> None:
         """One output line of the routine."""
         def log(text: str) -> None:
             if reporter:
@@ -361,6 +359,8 @@ class TaskOutcome:
             kind, _, rest = rest.partition(" ")
             title, _, text = rest.partition("\t")
             text = unescape(text)
+            if translate_messages and tag == "msg":
+                text = translated(text)
             self.messages.append((kind, title, text))
             if tag == "say":
                 self.said.add(len(self.messages) - 1)
@@ -522,7 +522,9 @@ class Bridge:
             async def answer(line: str) -> str:
                 return await answer_prompt(out, line, ask)
         out.rc = await self.stream(self._argv("--task", name, *args), reporter,
-                                   on_line=lambda line: out.feed(line, reporter, on_result), env=env,
+                                   on_line=lambda line: out.feed(
+                                       line, reporter, on_result, translate_messages=name == "dspace-panel"),
+                                   env=env,
                                    answer=answer)
         return out
 

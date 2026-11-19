@@ -64,7 +64,7 @@ class LoadingScreen(ModalScreen[TaskResult]):
             yield Static("", id="loader-waiting", markup=False)
             yield RichLog(id="loader-log", max_lines=500, wrap=True, markup=False)
             with Horizontal(id="loader-buttons"):
-                yield Button("Log", id="toggle-log", variant="default")
+                yield Button(t("Log"), id="toggle-log", variant="default")
                 yield Button(t("Cancel"), id="cancel", variant="error")
 
     def on_mount(self) -> None:

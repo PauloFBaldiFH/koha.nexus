@@ -43,7 +43,7 @@ async def show_failure(app, title: str, result: TaskResult) -> None:
     msg = out.last("error") if out else None
     if out and out.already_said(msg):
         return    # the person already read it while the routine ran
-    body = msg[2] if msg else (result.error or (f"exit {out.rc}" if out else t("Unknown error.")))
+    body = msg[2] if msg else (result.error or (t("Exit code ${code}", code=out.rc) if out else t("Unknown error.")))
     head = msg[1] if msg and msg[1] else title
     await app.push_screen_wait(MessageScreen(head, body, kind="error", log=result.log))
 

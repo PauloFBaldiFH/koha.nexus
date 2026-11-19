@@ -396,7 +396,7 @@ class CloudflareScreen(ModalScreen[None]):
         self._set_busy(None)
         if not out.ok and not quiet:
             msg = out.last("error")
-            await self._say(msg[1] if msg and msg[1] else label, msg[2] if msg else f"exit {out.rc}", "error")
+            await self._say(msg[1] if msg and msg[1] else label, msg[2] if msg else t("Exit code ${code}", code=out.rc), "error")
         return out
 
     async def _say(self, title: str, body: str, kind: str = "ok") -> None:
