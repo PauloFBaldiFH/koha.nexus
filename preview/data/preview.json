@@ -4715,17 +4715,17 @@
    "cs": "➕  Přidat systém",
    "ru": "➕  Добавить систему",
    "uk": "➕  Додати систему",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "➕  Sistem ekle",
+   "tl": "➕  Magdagdag ng system",
+   "id": "➕  Tambah sistem",
+   "ar": "➕  إضافة نظام",
+   "fa": "➕  افزودن سامانه",
+   "hi": "➕  सिस्टम जोड़ें",
+   "bn": "➕  সিস্টেম যোগ করুন",
+   "vi": "➕  Thêm hệ thống",
+   "zh": "➕  添加系统",
+   "ja": "➕  システムを追加",
+   "ko": "➕  시스템 추가"
   },
   "Instances": {
    "en": "Instances",
@@ -14165,17 +14165,17 @@
    "cs": "Nahrazení MARC",
    "ru": "Замена MARC",
    "uk": "Заміна MARC",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "MARC kayıtlarını değiştir",
+   "tl": "Palitan ang mga rekord ng MARC",
+   "id": "Ganti rekaman MARC",
+   "ar": "استبدال تسجيلات MARC",
+   "fa": "جایگزینی رکوردهای MARC",
+   "hi": "MARC रिकॉर्ड बदलें",
+   "bn": "MARC রেকর্ড প্রতিস্থাপন",
+   "vi": "Thay thế biểu ghi MARC",
+   "zh": "替换 MARC 记录",
+   "ja": "MARC レコードの置換",
+   "ko": "MARC 레코드 교체"
   },
   "Open MARC Replace": {
    "en": "Open MARC Replace",
@@ -25106,77 +25106,77 @@
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "tl": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "id": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "ar": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "fa": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "hi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "bn": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "vi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "zh": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "ja": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   },
   "ko": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 374,
+   "strings": 376,
    "strings_total": 554
   }
  }
