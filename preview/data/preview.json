@@ -5340,17 +5340,17 @@
    "cs": "🗑  Odstranit Koha",
    "ru": "🗑  Удалить Koha",
    "uk": "🗑  Видалити Koha",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "🗑  Koha’yı kaldır",
+   "tl": "🗑  Alisin ang Koha",
+   "id": "🗑  Hapus Koha",
+   "ar": "🗑  إزالة Koha",
+   "fa": "🗑  حذف Koha",
+   "hi": "🗑  Koha हटाएँ",
+   "bn": "🗑  Koha সরান",
+   "vi": "🗑  Gỡ bỏ Koha",
+   "zh": "🗑  移除 Koha",
+   "ja": "🗑  Koha を削除",
+   "ko": "🗑  Koha 제거"
   },
   "A checked package of Koha first; the packages, the other systems and the backups stay": {
    "en": "A checked package of Koha first; the packages, the other systems and the backups stay",
@@ -8540,17 +8540,17 @@
    "cs": "📜  Protokoly DSpace",
    "ru": "📜  Журналы DSpace",
    "uk": "📜  Журнали DSpace",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "📜  DSpace günlükleri",
+   "tl": "📜  Mga log ng DSpace",
+   "id": "📜  Log DSpace",
+   "ar": "📜  سجلات DSpace",
+   "fa": "📜  گزارش‌های DSpace",
+   "hi": "📜  DSpace लॉग",
+   "bn": "📜  DSpace লগ",
+   "vi": "📜  Nhật ký DSpace",
+   "zh": "📜  DSpace 日志",
+   "ja": "📜  DSpace ログ",
+   "ko": "📜  DSpace 로그"
   },
   "Shows bounded container logs with sensitive fields redacted. It never exports private configuration or the database password.": {
    "en": "Shows bounded container logs with sensitive fields redacted. It never exports private configuration or the database password.",
@@ -8915,17 +8915,17 @@
    "cs": "⏹  Zastavit DSpace",
    "ru": "⏹  Остановить DSpace",
    "uk": "⏹  Зупинити DSpace",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "⏹  DSpace’i durdur",
+   "tl": "⏹  Ihinto ang DSpace",
+   "id": "⏹  Hentikan DSpace",
+   "ar": "⏹  إيقاف DSpace",
+   "fa": "⏹  توقف DSpace",
+   "hi": "⏹  DSpace रोकें",
+   "bn": "⏹  DSpace বন্ধ করুন",
+   "vi": "⏹  Dừng DSpace",
+   "zh": "⏹  停止 DSpace",
+   "ja": "⏹  DSpace を停止",
+   "ko": "⏹  DSpace 중지"
   },
   "Stops the repository gracefully, retaining configuration and every data volume.": {
    "en": "Stops the repository gracefully, retaining configuration and every data volume.",
@@ -25106,77 +25106,77 @@
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "tl": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "id": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "ar": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "fa": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "hi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "bn": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "vi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "zh": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "ja": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   },
   "ko": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 377,
+   "strings": 380,
    "strings_total": 554
   }
  }
