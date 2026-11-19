@@ -10590,17 +10590,17 @@
    "cs": "⏰  Plány",
    "ru": "⏰  Расписания",
    "uk": "⏰  Розклади",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "⏰  Zamanlamalar",
+   "tl": "⏰  Mga iskedyul",
+   "id": "⏰  Jadwal",
+   "ar": "⏰  الجداول الزمنية",
+   "fa": "⏰  زمان‌بندی‌ها",
+   "hi": "⏰  समय-सारिणियाँ",
+   "bn": "⏰  সময়সূচি",
+   "vi": "⏰  Lịch chạy",
+   "zh": "⏰  计划任务",
+   "ja": "⏰  スケジュール",
+   "ko": "⏰  일정"
   },
   "⏰ Schedules": {
    "en": "⏰ Schedules",
@@ -10615,17 +10615,17 @@
    "cs": "⏰ Plány",
    "ru": "⏰ Расписания",
    "uk": "⏰ Розклади",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "⏰ Zamanlamalar",
+   "tl": "⏰ Mga iskedyul",
+   "id": "⏰ Jadwal",
+   "ar": "⏰ الجداول الزمنية",
+   "fa": "⏰ زمان‌بندی‌ها",
+   "hi": "⏰ समय-सारिणियाँ",
+   "bn": "⏰ সময়সূচি",
+   "vi": "⏰ Lịch chạy",
+   "zh": "⏰ 计划任务",
+   "ja": "⏰ スケジュール",
+   "ko": "⏰ 일정"
   },
   "🔒  Security & access hub": {
    "en": "🔒  Security & access hub",
@@ -11165,17 +11165,17 @@
    "cs": "🌍  Jazyky",
    "ru": "🌍  Языки",
    "uk": "🌍  Мови",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "🌍  Diller",
+   "tl": "🌍  Mga wika",
+   "id": "🌍  Bahasa",
+   "ar": "🌍  اللغات",
+   "fa": "🌍  زبان‌ها",
+   "hi": "🌍  भाषाएँ",
+   "bn": "🌍  ভাষা",
+   "vi": "🌍  Ngôn ngữ",
+   "zh": "🌍  语言",
+   "ja": "🌍  言語",
+   "ko": "🌍  언어"
   },
   "🌍 Language center": {
    "en": "🌍 Language center",
@@ -25106,77 +25106,77 @@
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "tl": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "id": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "ar": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "fa": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "hi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "bn": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "vi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "zh": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "ja": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   },
   "ko": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 370,
+   "strings": 373,
    "strings_total": 554
   }
  }
