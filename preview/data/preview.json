@@ -12940,17 +12940,17 @@
    "cs": "Servery Z39.50",
    "ru": "Серверы Z39.50",
    "uk": "Сервери Z39.50",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "Z39.50 sunucuları",
+   "tl": "Mga server ng Z39.50",
+   "id": "Server Z39.50",
+   "ar": "خوادم Z39.50",
+   "fa": "سرورهای Z39.50",
+   "hi": "Z39.50 सर्वर",
+   "bn": "Z39.50 সার্ভার",
+   "vi": "Máy chủ Z39.50",
+   "zh": "Z39.50 服务器",
+   "ja": "Z39.50 サーバー",
+   "ko": "Z39.50 서버"
   },
   "${n} working": {
    "en": "${n} working",
@@ -25106,77 +25106,77 @@
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "tl": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "id": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "ar": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "fa": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "hi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "bn": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "vi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "zh": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "ja": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   },
   "ko": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 376,
+   "strings": 377,
    "strings_total": 554
   }
  }
