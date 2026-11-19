@@ -502,7 +502,7 @@ class SaveBackupScreen(ModalScreen[None]):
             return
         if not out.ok:
             msg = out.last("error")
-            self._save_failed(msg[2] if msg else f"exit {out.rc}")
+            self._save_failed(msg[2] if msg else t("Exit code ${code}", code=out.rc))
             return
         self._busy = False
         self._file = Path(out.get("file") or "")

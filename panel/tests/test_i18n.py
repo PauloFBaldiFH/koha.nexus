@@ -1,5 +1,7 @@
 import base64
 
+import pytest
+
 from conftest import INSTALLER
 
 from kei_panel.env import normalize_panel_language
@@ -20,6 +22,29 @@ def test_portuguese_prefers_menu_pt():
     t = Translator("pt", INSTALLER)
     assert t("Control Dashboard") == "Painel de Controle"
     assert t("Back") == "Voltar"
+    source = "Compressing captured backup (${codec}); WordPress has resumed."
+    assert t.menu_pt[source] == "Compactando o backup capturado (${codec}); o WordPress voltou a funcionar."
+    assert t(source, codec="XZ") == "Compactando o backup capturado (XZ); o WordPress voltou a funcionar."
+
+
+@pytest.mark.parametrize("language, exit_label", [("pt", "Sair"), ("ar", "خروج")])
+def test_main_footer_translates_bindings_after_install(language, exit_label):
+    import asyncio
+
+    from kei_panel.app import KohaPanelApp
+    from kei_panel.env import PanelEnv
+    from kei_panel.glyphs import split_icon
+    from kei_panel.menus import section
+
+    async def main():
+        app = KohaPanelApp(PanelEnv(installer=INSTALLER, lang=language, plain=False, demo=True))
+        translator = Translator(language, INSTALLER)
+        async with app.run_test(size=(100, 30)):
+            bindings = app.screen.active_bindings
+            assert bindings["d"].binding.description == split_icon(translator(section("dashboard").label))[1]
+            assert bindings["q"].binding.description == exit_label
+
+    asyncio.run(main())
 
 
 def test_cache_entries_and_safety(tmp_path):
@@ -122,8 +147,7 @@ def test_bundled_cache_lines_are_readable():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2]
-    for language in ('cs', 'nl', 'pl', 'ru', 'sv', 'uk'):
-        path = root / 'lang' / f'{language}.cache'
+    for path in sorted((root / 'lang').glob('*.cache')):
         for number, line in enumerate(path.read_text(encoding='ascii').splitlines(), 1):
             if not line or line.startswith('#'):
                 continue
@@ -136,3 +160,26 @@ def test_bundled_cache_lines_are_readable():
                 raise AssertionError(f'{path.name}:{number}: invalid cache entry') from exc
             assert source and translated, f'{path.name}:{number}: empty cache entry'
             assert is_safe(source, translated), f'{path.name}:{number}: invalid placeholders'
+
+
+def test_tainacan_diagnosis_translates_states_and_preserves_technical_values(monkeypatch):
+    from kei_panel import i18n
+    from kei_panel.routines.platforms import tainacan_diagnosis_value
+
+    translator = Translator("pt", INSTALLER)
+    monkeypatch.setattr(i18n, "_current", translator)
+    assert tainacan_diagnosis_value("db", "exited") == translator("Stopped") != "exited"
+    assert tainacan_diagnosis_value("images_pinned", "yes") == "Sim"
+    assert tainacan_diagnosis_value("audit", "network=tainacan") == "network=tainacan"
+
+
+def test_dspace_protocol_localizes_messages_without_expanding_raw_values(monkeypatch):
+    from kei_panel import i18n
+    from kei_panel.bridge import TaskOutcome
+
+    monkeypatch.setattr(i18n, "_current", Translator("pt", INSTALLER))
+    outcome = TaskOutcome()
+    outcome.feed("@@msg error DSpace\tAnother DSpace operation is running.", translate_messages=True)
+    assert outcome.last("error")[2] == "Outra operação do DSpace está sendo executada."
+    outcome.feed("@@msg error DSpace\tUnexpected path /var/${literal}", translate_messages=True)
+    assert outcome.last("error")[2] == "Unexpected path /var/${literal}"

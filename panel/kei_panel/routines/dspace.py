@@ -7,7 +7,7 @@ import re
 from ..bridge import TaskOutcome
 from ..dspace import (admin_emails, admin_fact, backup_rows, diagnosis_rows, origin, payload, plan_rows,
                       preflight_rows, repair_rows, restore_plan_rows, restore_rows, test_rows)
-from ..i18n import t
+from ..i18n import t, t_literal
 from ..screens.dialogs import ChoiceScreen, ConfirmScreen, InputScreen, MessageScreen
 from ..screens.install_flow import CheckReportScreen, CompletionScreen, PlanSummaryScreen
 from .admin_access import ask_password
@@ -85,7 +85,8 @@ async def install(app):
     if available is None:
         return
     if not available.get('available'):
-        await app.push_screen_wait(MessageScreen(TITLE, t('DSpace image configuration could not be used.') + '\n\n' + str(available.get('reason', ''))))
+        await app.push_screen_wait(MessageScreen(TITLE, t('DSpace image configuration could not be used.') +
+                                                 '\n\n' + t_literal(str(available.get('reason', '')))))
         return
     deps = await initial_diagnosis(app)
     if deps is None:

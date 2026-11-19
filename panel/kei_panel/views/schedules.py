@@ -81,6 +81,12 @@ def day_value(freq, current):
     allowed = range(0, 7) if freq == 'weekly' else range(1, 32)
     return current if isinstance(current, int) and current in allowed else allowed[0]
 
+def schedule_note(control):
+    note = t(control.note)
+    if control.out_of_sync and control.driver in ('tainacan', 'set'):
+        missing = t("The configured cron entry is missing. Enable and save to recreate it.")
+        return "\n".join(filter(None, (note, missing)))
+    return note
 
 
 class RowSelect(Select):
@@ -350,8 +356,8 @@ class SchedulesView(SectionView):
             self.query_one(f"#sc-on-{i}").tooltip = t("Enabled after saving")
             self.query_one(f"#sc-freq-{i}").tooltip = t("Frequency")
             self.query_one(f"#sc-time-{i}").tooltip = t("Server time (HH:MM)")
-            if control.note:
-                await block.mount(Label(t(control.note), classes="sc-note"))
+            if note := schedule_note(control):
+                await block.mount(Label(note, classes="sc-note"))
             if not control.available:
                 await block.mount(Label(t("Read-only: the schedule contains manual changes or its settings could not be read. Use its original editor."), classes="sc-note"))
             self._fields(i)
@@ -405,7 +411,8 @@ class SchedulesView(SectionView):
             if values['freq'] != 'custom': summary.hour, summary.minute = cron.parse_time(values['time'])
             description = t("Switched off") if not values['enabled'] else schedules.describe(summary.schedule())
             if not await self.app.push_screen_wait(ConfirmScreen(t("Schedules"),
-                    platform_label(row.platform, names.of(self.app)) + ' · ' + row.name + '\n' + description + '\n\n' + t(control.note or "Only this task is changed. Other schedules are kept."))):
+                    platform_label(row.platform, names.of(self.app)) + ' · ' + row.name + '\n' + description + '\n\n' +
+                    (schedule_note(control) or t("Only this task is changed. Other schedules are kept.")))):
                 return
             from ..routines.schedules import apply
             if await apply(self.app, control, values):

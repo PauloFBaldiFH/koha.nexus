@@ -129,7 +129,7 @@ async def terminal(app) -> None:
     rc = app.bridge.run_command_interactive(
         app, shell_command(user, t("Type exit to go back to the panel.")))
     if rc not in (0, None, 130):
-        app.notify(f"{t('Open Debian terminal')}: exit {rc}", severity="warning")
+        app.notify(t("Open Debian terminal") + ": " + t("Exit code ${code}", code=rc), severity="warning")
 
 
 async def _terminal_tool(app, title: str, tool: str, argv: list[str] | None = None) -> None:
@@ -142,7 +142,7 @@ async def _terminal_tool(app, title: str, tool: str, argv: list[str] | None = No
         return
     rc = app.bridge.run_command_interactive(app, argv)
     if rc not in (0, None):
-        app.notify(f"{title}: exit {rc}", severity="warning")
+        app.notify(f"{title}: " + t("Exit code ${code}", code=rc), severity="warning")
 
 
 async def monitor(app) -> None:
@@ -160,7 +160,7 @@ async def monitor(app) -> None:
     argv = ["htop"] if choice == "1" else ["nethogs", *filter(None, [result.value.get("iface")])]
     rc = app.bridge.run_command_interactive(app, argv)
     if rc not in (0, None):
-        app.notify(f"{title}: exit {rc}", severity="warning")
+        app.notify(f"{title}: " + t("Exit code ${code}", code=rc), severity="warning")
 
 
 async def mc(app) -> None:

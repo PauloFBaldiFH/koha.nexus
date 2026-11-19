@@ -20,6 +20,7 @@ import re
 
 from .. import platforms
 from ..bridge import TaskOutcome
+from ..dspace import SERVICE_LABELS
 from ..i18n import t
 
 
@@ -107,6 +108,27 @@ TAINACAN_PLAN_LABELS = (("address", "Address"), ("web", "Web"), ("apache", "Web 
                         ("site", "Home page"), ("updates", "Updates"), ("kept", "Other systems"),
                         ("undo", "Undo"))
 
+CONTAINER_STATES = {
+    **SERVICE_LABELS, "none": "Not installed", "unknown": "Unknown",
+}
+YES_NO = {"yes": "Yes", "no": "No"}
+TAINACAN_DIAGNOSIS_STATES = {
+    "status": {"absent": "Not installed", "installing": "Installing", "installed": "Installed",
+               "failed": "Failed", "kept": "Removed, data kept"},
+    "health": {"healthy": "Passed", "failing": "Failed", "unknown": "Not checked"},
+    "db": CONTAINER_STATES,
+    "wordpress": CONTAINER_STATES,
+    "images_pinned": YES_NO,
+    "audit": {"ok": "OK"},
+    "apache_site": YES_NO,
+    "docker": {"down": "Stopped"},
+}
+
+
+def tainacan_diagnosis_value(field: str, value: str) -> str:
+    label = TAINACAN_DIAGNOSIS_STATES.get(field, {}).get(value)
+    return t(label) if label else value
+
 
 def tainacan_check_rows(values: list[str]) -> list[tuple[str, str, str]]:
     """The "check=state|label|detail" results of tainacan-preflight."""
@@ -126,7 +148,7 @@ def tainacan_status_rows(results: dict) -> list[tuple[str, str, str]]:
     rows = []
     for key, label in (("db", "Database (MariaDB)"), ("wordpress", "WordPress")):
         value = results.get(key, "")
-        rows.append((state(value == "running"), label, t("Running") if value == "running" else value or t("Unknown")))
+        rows.append((state(value == "running"), label, tainacan_diagnosis_value(key, value) or t("Unknown")))
     health = results.get("health", "")
     rows.append((state(health == "healthy"), "Collections API checked",
                  results.get("reason", "") if health != "healthy" else results.get("collections", "")))
@@ -593,7 +615,8 @@ async def tainacan_status(app) -> None:
             t("Tainacan diagnosis"), f"{msg[2]}\n\n{keep}" if msg and msg[2] else
             t("The diagnosis could not be read.") + "\n\n" + keep, kind="error"))
         return
-    text = "\n".join(f"{label}: {out.get(key)}" for key, label in labels if out.get(key))
+    text = "\n".join(f"{label}: {tainacan_diagnosis_value(key, out.get(key))}"
+                     for key, label in labels if out.get(key))
     checked = out.get("checked_at")
     if checked.isdigit():
         text += "\n\n" + t("Read at ${when}.", when=platforms.when(int(checked)))

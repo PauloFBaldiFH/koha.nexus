@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 from textual.app import ComposeResult
 from textual.containers import Grid
 
-from .i18n import t
+from .i18n import t, t_literal
 from .widgets.cards import LinkCard, StatusCard
 
 
@@ -115,7 +115,7 @@ def preflight_rows(data: dict, deps: dict) -> list[tuple[str, str, str]]:
     rows = []
     for row in data.get('checks') or []:
         if isinstance(row, dict) and row.get('state') in ('ok', 'warn', 'fail') and isinstance(row.get('label'), str):
-            rows.append((row['state'], row['label'], t(str(row.get('detail') or ''))))
+            rows.append((row['state'], row['label'], t_literal(str(row.get('detail') or ''))))
     if deps.get('docker_stopped'):
         rows.append(('warn', 'Docker service started', t('stopped: started with your confirmation')))
     if deps.get('apache_missing'):
@@ -160,7 +160,7 @@ def diagnosis_rows(data: dict) -> list[tuple[str, str, str]]:
     if health == 'api-ui-dependencies':
         rows.append(('ok', 'API, interface and login page checked', ''))
     elif health == 'failed':
-        rows.append(('fail', 'API, interface and login page checked', t(str(data.get('reason') or ''))))
+        rows.append(('fail', 'API, interface and login page checked', t_literal(str(data.get('reason') or ''))))
     else:
         rows.append(('warn', 'API, interface and login page checked', label(STATE_LABELS, data.get('status'))))
     access = data.get('public_access')
