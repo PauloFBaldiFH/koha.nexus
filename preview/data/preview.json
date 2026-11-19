@@ -12690,17 +12690,17 @@
    "cs": "Složka záloh",
    "ru": "Папка резервных копий",
    "uk": "Тека резервних копій",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "Yedekleme klasörü",
+   "tl": "Folder ng backup",
+   "id": "Folder cadangan",
+   "ar": "مجلد النسخ الاحتياطية",
+   "fa": "پوشهٔ پشتیبان",
+   "hi": "बैकअप फ़ोल्डर",
+   "bn": "ব্যাকআপ ফোল্ডার",
+   "vi": "Thư mục sao lưu",
+   "zh": "备份文件夹",
+   "ja": "バックアップフォルダー",
+   "ko": "백업 폴더"
   },
   "Low disk space: the next backups may not fit": {
    "en": "Low disk space: the next backups may not fit",
@@ -12840,17 +12840,17 @@
    "cs": "Aktualizace Koha",
    "ru": "Обновления Koha",
    "uk": "Оновлення Koha",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "Koha güncellemeleri",
+   "tl": "Mga update ng Koha",
+   "id": "Pembaruan Koha",
+   "ar": "تحديثات Koha",
+   "fa": "به‌روزرسانی‌های Koha",
+   "hi": "Koha अपडेट",
+   "bn": "Koha আপডেট",
+   "vi": "Bản cập nhật Koha",
+   "zh": "Koha 更新",
+   "ja": "Koha の更新",
+   "ko": "Koha 업데이트"
   },
   "Up to date": {
    "en": "Up to date",
@@ -15690,17 +15690,17 @@
    "cs": "🔗 Otevřít odkaz",
    "ru": "🔗 Открыть ссылку",
    "uk": "🔗 Відкрити посилання",
-   "tr": null,
-   "tl": null,
-   "id": null,
-   "ar": null,
-   "fa": null,
-   "hi": null,
-   "bn": null,
-   "vi": null,
-   "zh": null,
-   "ja": null,
-   "ko": null
+   "tr": "🔗 Bağlantıyı aç",
+   "tl": "🔗 Buksan ang link",
+   "id": "🔗 Buka tautan",
+   "ar": "🔗 فتح الرابط",
+   "fa": "🔗 باز کردن پیوند",
+   "hi": "🔗 लिंक खोलें",
+   "bn": "🔗 লিংক খুলুন",
+   "vi": "🔗 Mở liên kết",
+   "zh": "🔗 打开链接",
+   "ja": "🔗 リンクを開く",
+   "ko": "🔗 링크 열기"
   },
   "Pictures": {
    "en": "Pictures",
@@ -25106,77 +25106,77 @@
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "tl": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "id": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "ar": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "fa": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "hi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "bn": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "vi": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "zh": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "ja": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   },
   "ko": {
    "manual": 0,
    "manual_total": 195,
    "manual_outdated": [],
-   "strings": 367,
+   "strings": 370,
    "strings_total": 554
   }
  }
